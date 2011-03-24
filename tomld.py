@@ -1071,8 +1071,13 @@ def check():
 					color(prog4[i] + "  ", blue, 1)
 					color(rule4[i], purple, 1)
 
-					# confirmation
-					if choice("  add rules?"):
+					# confirmation (only if no --yes switch)
+					c = 1
+					if not opt_yes:
+						c = choice("  add rules?")
+					else:
+						print
+					if c:
 						flag_choice = 1
 						# always add rule to all domain's binary, not only who have their own domains
 						for d in xx:
