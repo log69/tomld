@@ -27,6 +27,7 @@
 # -----------
 # 24/03/2011 - tomld v0.18 - create profile.conf file on startup if missing
 #                          - set maximum accept entry value in profile.conf to a predefined one
+#                          - don't print confirmation text at the end of log messages with --yes on
 # 23/03/2011 - tomld v0.17 - add --keep switch to run tomld without turning learning mode domains into enforcing mode
 #                          - add --recursive switch to mark subdirs of these dirs fully wildcarded (usable for samba shares for example)
 #                          - on rules with allow_create entries, create the same with allow_unlink and allow_read/write too
