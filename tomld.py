@@ -1700,7 +1700,7 @@ try:
 		if not flag_firstrun:
 			sl = ""
 			# print time of sleeping period only when --once switch is not set
-			if not opt: sl = ", sleeping " + str(count) + "s between every cycle"
+			if not opt_once: sl = ", sleeping " + str(count) + "s between every cycle"
 			color("* whole running cycle took " + str(time.clock() - speed) + "s" + sl, green)
 			flag_firstrun = 1
 		# now it's safe to enforce mode on interrupt
