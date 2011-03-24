@@ -27,6 +27,7 @@
 # -----------
 # 24/03/2011 - tomld v0.18 - create profile.conf file on startup if missing
 #                          - set maximum accept entry value in profile.conf to a predefined one
+#                          - add --once switch to quit after first cycle immediately (might be useful for scripts)
 #                          - don't print confirmation text at the end of log messages with --yes on
 # 23/03/2011 - tomld v0.17 - add --keep switch to run tomld without turning learning mode domains into enforcing mode
 #                          - add --recursive switch to mark subdirs of these dirs fully wildcarded (usable for samba shares for example)
@@ -148,6 +149,7 @@ global opt_remove2;		opt_remove2		= 0
 global opt_yes;			opt_yes			= 0
 global opt_keep;		opt_keep		= 0
 global opt_recursive;	opt_recursive	= 0
+global opt_once;		opt_once		= 0
 
 global flag_reset;  flag_reset  = 0
 global flag_check;  flag_check  = 0
@@ -263,6 +265,8 @@ def help():
 	print "    -k   --keep             don't change domain's mode for this run"
 	print "                            (learning mode domains will stay so on exit)"
 	print "    -R   --recursive [dirs] replace subdirs of these dirs in rules with wildcards"
+	print "    -1   --once             quit after first cycle"
+	print "                            (might be useful for scripts)"
 	print
 	print "*executables are additonal programs to create domains for"
 	print
@@ -1301,10 +1305,13 @@ def check():
 
 # check command line options
 opt_all = ["-v", "--version", "-h", "--help", "--clear", "--reset", "-c", "--color", \
-		   "-i", "--info", "-r", "--remove", "--yes", "-k", "--keep", "-R", "--recursive"]
+		   "-i", "--info", "-r", "--remove", "--yes", "-k", "--keep", "-R", "--recursive", \
+		   "-1", "--once"]
 l = len(sys.argv) - 1
 if (l > 0):
 	op = sys.argv[1:]
+	if op.count("-1") or op.count("--once"):
+		opt_once = 1
 	if op.count("-c") or op.count("--color"):
 		opt_color = 1
 	if op.count("-k") or op.count("--keep"):
@@ -1695,6 +1702,12 @@ try:
 			flag_firstrun = 1
 		# now it's safe to enforce mode on interrupt
 		flag_safe = 1
+		
+		# if --once switch on then exit
+		if opt_once:
+			enforce()
+			save()
+			myexit()
 
 
 	# wait some time then rerun
