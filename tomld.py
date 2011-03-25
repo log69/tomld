@@ -25,7 +25,7 @@
 #
 # changelog:
 # -----------
-# 25/03/2011 - tomld v0.19 - add "f" parameter to tomoyo-savepolicy not to create too many backups in cycles
+# 25/03/2011 - tomld v0.19 - add "a" parameter to tomoyo-savepolicy not to create too many backups in cycles
 # 24/03/2011 - tomld v0.18 - create profile.conf file on startup if missing
 #                          - set maximum accept entry value in profile.conf to a predefined one
 #                          - add --once switch to quit after first cycle immediately (might be useful for scripts)
@@ -441,7 +441,7 @@ def load():
 	global tdomf
 	global texcf
 	# save config from memory to disk
-	os.system(tsave + " f")
+	os.system(tsave + " a")
 	# load config files from disk to memory
 	try: tdomf = open(tdom).read()
 	except: color("error: cannot open file " + tdom, red); myexit(1)
