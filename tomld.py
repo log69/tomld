@@ -25,7 +25,7 @@
 #
 # changelog:
 # -----------
-# 25/03/2011 - tomld v0.19 - run tomoyo-savepolicy only on exit not to create too many backups in cycles
+# 25/03/2011 - tomld v0.19 - create policy file backups only with --reset or --clear switches
 # 24/03/2011 - tomld v0.18 - create profile.conf file on startup if missing
 #                          - set maximum accept entry value in profile.conf to a predefined one
 #                          - add --once switch to quit after first cycle immediately (might be useful for scripts)
@@ -440,13 +440,20 @@ def choice(text):
 def load():
 	global tdomf
 	global texcf
-	# save config from memory to disk
-	os.system(tsave + " a")
-	# load config files from disk to memory
-	try: tdomf = open(tdom).read()
-	except: color("error: cannot open file " + tdom, red); myexit(1)
-	try: texcf = open(texc).read()
-	except: color("error: cannot open file " + texc, red); myexit(1)
+
+#	os.system(tsave)
+#	# load config files from disk to memory
+#	try: tdomf = open(tdom).read()
+#	except: color("error: cannot open file " + tdom, red); myexit(1)
+#	try: texcf = open(texc).read()
+#	except: color("error: cannot open file " + texc, red); myexit(1)
+
+	# load config from memory to variables
+	try: tdomf = os.popen(tsave + " d -").read()
+	except: color("error: cannot load domain policy from memory", red); myexit(1)
+	try: texcf = os.popen(tsave + " e -").read()
+	except: color("error: cannot load exception policy from memory", red); myexit(1)
+
 	# remove disabled mode entries so runtime will be faster
 	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
 	# remove deleted entries too
@@ -831,6 +838,7 @@ def check():
 	# load config files
 	global tdomf
 	global texcf
+	load()
 
 # ----------------------------------------------------------------------
 	# print programs already in domain (only profile 1-3 matters), but not in progs list
@@ -1291,6 +1299,8 @@ def check():
 		tdomf2 += i
 
 	tdomf = tdomf2
+	
+	save()
 
 
 # ----------------------------------------------------------------------
@@ -1565,7 +1575,7 @@ if not os.path.isdir(tdir):
 
 check_prof()
 
-# on reset, backup config files with tomoyo-savepolicy
+# on --reset, backup config files with tomoyo-savepolicy
 # (it always creates backup files using timestamp when saving)
 if opt_reset:
 	color("* resetting domain configurations on demand", red)
@@ -1576,10 +1586,11 @@ if opt_reset:
 if (not os.path.isfile(tdom)) or (not os.path.isfile(texc)) or opt_reset:
 	clear()
 
-# on clear, empty configuration files
+# on --clear, empty configuration files
 if (not opt_reset) and opt_clear:
 	color("* clearing domain configurations on demand", red)
 	if not choice("are you sure?"): myexit()
+	os.system(tsave)
 	clear()
 	color("* configuration cleared", red)
 	myexit()
@@ -1635,9 +1646,6 @@ color("* processes using network", green)
 # count variable for policy check
 global recheck; recheck = count
 
-
-# load config
-load()
 
 try:
   while 1:
