@@ -28,6 +28,7 @@
 # 25/03/2011 - tomld v0.19 - create policy file backups only with --reset or --clear switches
 #                          - print info when backups are created
 #                          - expand documentation
+#                          - handle error message type "domain not defined" in log
 # 24/03/2011 - tomld v0.18 - create profile.conf file on startup if missing
 #                          - set maximum accept entry value in profile.conf to a predefined one
 #                          - add --once switch to quit after first cycle immediately (might be useful for scripts)
@@ -971,7 +972,7 @@ def check():
 	except: color("error: cannot open file " + tlog, red); myexit(1)
 	log2 = []
 	# search for tomoyo error messages
-	s = re.findall(".* TOMOYO-ERROR:.* denied for .*$", log, re.MULTILINE)
+	s = re.findall(".* TOMOYO-ERROR: +.*$", log, re.MULTILINE)
 	l=len(s)
 
 	# check the mark if there are log messages
@@ -1022,7 +1023,7 @@ def check():
 	except:
 		color("error: cannot create file " + tmark, red)
 		myexit(1)
-
+	
 
 	# **********************************************
 	# ******* CONVERT LOG AND ADD TO POLICY ********
@@ -1038,81 +1039,147 @@ def check():
 	if flag_reset:
 		flag_reset = 0
 	else:
+		logall = ""
+		for i in log2: logall += i + "\n"
 
-	  if log2:
-		# collect logs and create rules from it
-		for i in log2:
-			s1 = re.sub(".* TOMOYO-ERROR: Access \'", "", i)
-			s2 = re.sub("\' denied for .*$", "", s1)
-			prog2 = re.sub(".*\' denied for ", "", s1)
-			comm2 = "allow_" + re.search("^[^ \(]*", s2).group()
-			ff    = re.search("[ ].*$", s2).group()
-			ff2   = re.sub("^[ ]*", "", ff)
-			# change "\" character to "\\" because of unicode
-			file2 = re.sub("\\\\", "\\\\\\\\", ff2)
-			rule2 = comm2 + " " + file2
-			flag = 0
-			# check if rule with binary exist already
-			for i in range(0, len(rule3)):
-				if (prog2 == prog3[i] and rule2 == rule3[i]):
-					flag = 1
-					break
-			# store if it doesn't exist
-			if flag == 0:
-				prog3.append(prog2)
-				rule3.append(rule2)
+		# 2 kinds of message types:
+		# TOMOYO-ERROR: Access 'read(...) /etc/file' denied for /bin/program
+		# TOMOYO-ERROR: Domain '<kernel> /bin/this/program /bin/other/program' not defined.
+		log3 = re.findall(".* TOMOYO-ERROR: Access \'.*$", logall, re.M)
+		log4 = re.findall(".* TOMOYO-ERROR: Domain \'.*$", logall, re.M)
 
-		# add rules to poliy file
-		if rule3 and prog3:
-			# sort prog3 and rule3 lists by prog3's values
-			l = len(prog3)
-			prog4 = []
-			rule4 = []
-			for i in range(0, l): prog4.append(prog3[i])
-			prog4.sort()
-			for i in prog4:
-				c = prog3.index(i)
-				r = rule3[c]
-				rule4.append(r)
-				prog3.pop(c)
-				rule3.pop(c)
+		# log type 1
+		if log3:
+			# collect logs and create rules from it
+			for i in log3:
+				s1 = re.sub(".* TOMOYO-ERROR: Access \'", "", i)
+				s2 = re.sub("\' denied for .*$", "", s1)
+				prog2 = re.sub(".*\' denied for ", "", s1)
+				comm2 = "allow_" + re.search("^[^ \(]*", s2).group()
+				ff    = re.search("[ ].*$", s2).group()
+				ff2   = re.sub("^[ ]*", "", ff)
+				# change "\" character to "\\" because of unicode
+				file2 = re.sub("\\\\", "\\\\\\\\", ff2)
+				rule2 = comm2 + " " + file2
+				flag = 0
+				# check if rule with binary exist already
+				for i in range(0, len(rule3)):
+					if (prog2 == prog3[i] and rule2 == rule3[i]):
+						flag = 1
+						break
+				# store if it doesn't exist
+				if flag == 0:
+					prog3.append(prog2)
+					rule3.append(rule2)
+
+			# add rules to poliy file
+			if rule3 and prog3:
+				# sort prog3 and rule3 lists by prog3's values
+				l = len(prog3)
+				prog4 = []
+				rule4 = []
+				for i in range(0, l): prog4.append(prog3[i])
+				prog4.sort()
+				for i in prog4:
+					c = prog3.index(i)
+					r = rule3[c]
+					rule4.append(r)
+					prog3.pop(c)
+					rule3.pop(c)
 			
-			l = len(rule4)
-			flag_choice = 0
-			for i in range(0, l):
-				xx = re.findall("^<kernel>.* " + prog4[i] + "$\n+use_profile +3 *$", tdomf, re.MULTILINE)
-				# check if log entry contains a domain that doesn't exist
-				if xx:
-					# print log messages
+				l = len(rule4)
+				flag_choice = 0
+				for i in range(0, l):
+					xx = re.findall("^<kernel>.* " + prog4[i] + "$\n+use_profile +3 *$", tdomf, re.MULTILINE)
+					# check if log entry contains a domain that doesn't exist
+					if xx:
+						# print log messages
+						if flag_print == 0:
+							flag_print = 1
+							color("* adding log messages to policy", yellow)
+						color(prog4[i] + "  ", blue, 1)
+						color(rule4[i], purple, 1)
+
+						# confirmation (only if no --yes switch)
+						c = 1
+						if not opt_yes:
+							c = choice("  add rules?")
+						else:
+							print
+						if c:
+							flag_choice = 1
+							# always add rule to all domain's binary, not only who have their own domains
+							for d in xx:
+								s = re.sub(d, d + "\n" + rule4[i], tdomf)
+								tdomf = s
+
+						if flag_choice:
+							# switch back domain to learning mode
+							# and print this message after every different programs
+							p = prog4[i]
+							if i >= l-1:
+								learn(p)
+								flag_choice = 0
+							elif not p == prog4[i+1]:
+								learn(p)
+								flag_choice = 0
+
+		# log type 2
+		if log4:
+			# collect logs and create rules from it
+			log5 = []
+			for i in log4:
+				# get the domain name that was denied
+				s1 = re.sub(".* TOMOYO-ERROR: Domain \'", "", i)
+				s2 = re.sub("\' not defined\..*$", "", s1)
+				if s2 not in log5:
+					log5.append(s2)
+
+			if log5:
+				log5.sort()
+				# cycle through the domains
+				prog4 = []
+				rule4 = []
+				l = len(log5)
+				for i in range(0, l):
+					# get the main binary of the domain in the log
+					s1 = re.sub("^<kernel> +", "", log5[i], re.M)
+					s2 = re.search("^[^ ]+", s1, re.M)
+					if not s2:
+						color("error: not expected format of error log", red)
+						myexit(1)
+					s3 = s2.group()
+					prog4.append(s3)
+					rule4.append(log5[i])
+
+				l = len(rule4)
+				if l > 0:
 					if flag_print == 0:
 						flag_print = 1
 						color("* adding log messages to policy", yellow)
-					color(prog4[i] + "  ", blue, 1)
-					color(rule4[i], purple, 1)
+					flag_choice = 0
+					for i in range(0, l):
+						color(prog4[i] + "  ", blue, 1)
+						color(rule4[i], purple, 1)
 
-					# confirmation (only if no --yes switch)
-					c = 1
-					if not opt_yes:
-						c = choice("  add rules?")
-					else:
-						print
-					if c:
-						flag_choice = 1
-						# always add rule to all domain's binary, not only who have their own domains
-						for d in xx:
-							s = re.sub(d, d + "\n" + rule4[i], tdomf)
-							tdomf = s
+						# confirmation (only if no --yes switch)
+						c = 1
+						if not opt_yes:
+							c = choice("  add rules?")
+						else:
+							print
+						if c:
+							# add subdomain from log
+							tdomf += log5[i] + "\n\nuse_profile 1\n\n"
 
-					if flag_choice:
-						# switch back domain to learning mode
-						# and print this message after every different programs
-						p = prog4[i]
-						if i >= l-1:
-							learn(p)
-							flag_choice = 0
-						elif not p == prog4[i+1]:
-							learn(p)
-							flag_choice = 0
+							# print info after every different domain
+							p = prog4[i]
+							flag = 0
+							if i >= l-1: flag = 1
+							elif not p == prog4[i+1]: flag = 1
+							if flag:
+								color(p + "  ", blue, 1)
+								color("new domains added in learning mode", red)
 
 
 # ----------------------------------------------------------------------
