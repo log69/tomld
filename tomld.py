@@ -26,6 +26,7 @@
 # changelog:
 # -----------
 # 25/03/2011 - tomld v0.19 - create policy file backups only with --reset or --clear switches
+#                          - print info when backups are created
 # 24/03/2011 - tomld v0.18 - create profile.conf file on startup if missing
 #                          - set maximum accept entry value in profile.conf to a predefined one
 #                          - add --once switch to quit after first cycle immediately (might be useful for scripts)
@@ -1581,6 +1582,7 @@ if opt_reset:
 	color("* resetting domain configurations on demand", red)
 	if not choice("are you sure?"): myexit()
 	os.system(tsave)
+	color("policy file backups created", green)
 
 # create new empty policy files if missing or if --reset switch is on
 if (not os.path.isfile(tdom)) or (not os.path.isfile(texc)) or opt_reset:
@@ -1591,6 +1593,7 @@ if (not opt_reset) and opt_clear:
 	color("* clearing domain configurations on demand", red)
 	if not choice("are you sure?"): myexit()
 	os.system(tsave)
+	color("policy file backups created", green)
 	clear()
 	color("* configuration cleared", red)
 	myexit()
