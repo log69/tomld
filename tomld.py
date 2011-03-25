@@ -283,7 +283,7 @@ def help():
 	print "- the program assumes to be run in a fully trusted environment"
 	print "- processes in the domains should run in learning mode for quite some time to collect",
 	print "all the necessary rules to avoid malfunctioning by access deny later"
-	print "- on reboot, the rules should be stored manually by running \"tomoyo-savepolicy\"",
+	print "- before reboot, the rules should be stored manually by running \"tomoyo-savepolicy\"",
 	print "or \"tomld -k -1\" as root if there are still domains in learning mode,",
 	print "because Tomoyo forgets the learned rules on system restart"
 	print "- enforcing mode should never be switched back off for security reason"
