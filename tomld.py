@@ -27,6 +27,7 @@
 # -----------
 # 25/03/2011 - tomld v0.19 - create policy file backups only with --reset or --clear switches
 #                          - print info when backups are created
+#                          - expand documentation
 # 24/03/2011 - tomld v0.18 - create profile.conf file on startup if missing
 #                          - set maximum accept entry value in profile.conf to a predefined one
 #                          - add --once switch to quit after first cycle immediately (might be useful for scripts)
@@ -282,6 +283,9 @@ def help():
 	print "- the program assumes to be run in a fully trusted environment"
 	print "- processes in the domains should run in learning mode for quite some time to collect",
 	print "all the necessary rules to avoid malfunctioning by access deny later"
+	print "- on reboot, the rules should be stored manually by running \"tomoyo-savepolicy\"",
+	print "or \"tomld -k -1\" as root if there are still domains in learning mode,",
+	print "because Tomoyo forgets the learned rules on system restart"
 	print "- enforcing mode should never be switched back off for security reason"
 	print "- exception domains means programs with no rules at all"
 	print "- programs should be used in a maximum possible way during the learning phase",
