@@ -25,7 +25,7 @@
 #
 # changelog:
 # -----------
-# 25/03/2011 - tomld v0.19 - add "a" parameter to tomoyo-savepolicy not to create too many backups in cycles
+# 25/03/2011 - tomld v0.19 - run tomoyo-savepolicy only on exit not to create too many backups in cycles
 # 24/03/2011 - tomld v0.18 - create profile.conf file on startup if missing
 #                          - set maximum accept entry value in profile.conf to a predefined one
 #                          - add --once switch to quit after first cycle immediately (might be useful for scripts)
@@ -831,7 +831,6 @@ def check():
 	# load config files
 	global tdomf
 	global texcf
-	load()
 
 # ----------------------------------------------------------------------
 	# print programs already in domain (only profile 1-3 matters), but not in progs list
@@ -1295,11 +1294,6 @@ def check():
 
 
 # ----------------------------------------------------------------------
-	# save config files
-	save()
-
-
-# ----------------------------------------------------------------------
 
 # *********************
 # ******* INIT ********
@@ -1641,6 +1635,9 @@ color("* processes using network", green)
 # count variable for policy check
 global recheck; recheck = count
 
+
+# load config
+load()
 
 try:
   while 1:
