@@ -429,11 +429,11 @@ def error_conf(num):
 # choice
 def choice(text):
 	if opt_yes:
-		print text + " [yes/No] y"
+		print text + " [y/N] y"
 		sys.stdout.flush()
 		return 1
 	else:
-		print text + " [yes/No]",
+		print text + " [y/N]",
 		sys.stdout.flush()
 		try: c = raw_input().lower()
 		except: print; myexit(1)
