@@ -25,6 +25,7 @@
 #
 # changelog:
 # -----------
+# 26/03/2011 - tomld v0.20 - minor bugfixes
 # 25/03/2011 - tomld v0.19 - create policy file backups only with --reset or --clear switches
 #                          - print info when backups are created
 #                          - expand documentation
@@ -101,7 +102,7 @@ import termios, fcntl, select
 # **************************
 
 # program version
-ver = "0.19"
+ver = "0.20"
 
 # home dir
 home = "/home"
@@ -817,12 +818,11 @@ def myexit(num = 0):
 	# delete pid file
 	try: os.remove(pidf)
 	except: None
-	# stat
-	d = re.findall("^<kernel>.+$\n+use_profile +[1-3] *$", tdomf, re.M)
-	r = re.findall("^allow_", tdomf, re.M)
-	color(str(len(d)) + " active domains, " + str(len(r)) + " rules")
-	# exit
-	if not num: color("exit", red)
+	if num:
+		# stat
+		d = re.findall("^<kernel>.+$\n+use_profile +[1-3] *$", tdomf, re.M)
+		r = re.findall("^allow_", tdomf, re.M)
+		color(str(len(d)) + " active domains, " + str(len(r)) + " rules")
 	exit(num)
 
 
