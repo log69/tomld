@@ -812,17 +812,19 @@ def remove(text):
 			color("error: no domains by pattern", red)
 
 
+# print domain stat
+def stat():
+	global tdomf
+	d = re.findall("^<kernel>.+$\n+use_profile +[1-3] *$", tdomf, re.M)
+	r = re.findall("^allow_", tdomf, re.M)
+	color(str(len(d)) + " active domains, " + str(len(r)) + " rules")
+
 # my exit
 def myexit(num = 0):
-	global tdomf
 	# delete pid file
 	try: os.remove(pidf)
 	except: None
-	if num:
-		# stat
-		d = re.findall("^<kernel>.+$\n+use_profile +[1-3] *$", tdomf, re.M)
-		r = re.findall("^allow_", tdomf, re.M)
-		color(str(len(d)) + " active domains, " + str(len(r)) + " rules")
+	# exit
 	exit(num)
 
 
@@ -1791,6 +1793,7 @@ try:
 		if opt_once:
 			enforce()
 			save()
+			stat()
 			myexit()
 
 
@@ -1802,6 +1805,7 @@ try:
 		if flag_safe:
 			enforce()
 			save()
+			stat()
 		else:
 			color("* haven't finished to run at least once", red)
 		myexit()
@@ -1816,6 +1820,7 @@ except KeyboardInterrupt:
 		enforce()
 		# save config
 		save()
+		stat()
 	else:
 		color("* haven't finished to run at least once", red)
 
@@ -1827,4 +1832,5 @@ except KeyboardInterrupt:
 print
 enforce()
 save()
+stat()
 myexit()
