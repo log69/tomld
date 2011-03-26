@@ -26,6 +26,7 @@
 # changelog:
 # -----------
 # 26/03/2011 - tomld v0.20 - minor bugfixes
+#                          - some code cleanup
 # 25/03/2011 - tomld v0.19 - create policy file backups only with --reset or --clear switches
 #                          - print info when backups are created
 #                          - expand documentation
@@ -818,6 +819,21 @@ def stat():
 	d = re.findall("^<kernel>.+$\n+use_profile +[1-3] *$", tdomf, re.M)
 	r = re.findall("^allow_", tdomf, re.M)
 	color(str(len(d)) + " active domains, " + str(len(r)) + " rules")
+
+
+# my finish
+def myfinish()
+	# check if everything was run at least once before turning on enforcing mode
+	if flag_safe:
+		# turn on enforcing mode for all old domains before exiting
+		enforce()
+		# save config
+		save()
+		stat()
+	else:
+		color("* haven't finished to run at least once", red)
+	myexit()
+
 
 # my exit
 def myexit(num = 0):
@@ -1788,13 +1804,11 @@ try:
 			flag_firstrun = 1
 		# now it's safe to enforce mode on interrupt
 		flag_safe = 1
+
 		
 		# if --once switch on then exit
 		if opt_once:
-			enforce()
-			save()
-			stat()
-			myexit()
+			myfinish()
 
 
 	# wait some time then rerun
@@ -1802,35 +1816,15 @@ try:
 		time.sleep(1)
 	except KeyboardInterrupt:
 		print
-		if flag_safe:
-			enforce()
-			save()
-			stat()
-		else:
-			color("* haven't finished to run at least once", red)
-		myexit()
-
+		myfinish()
 
 except KeyboardInterrupt:
 	print
+	myfinish()
 
-	# check if everything was run at least once before turning on enforcing mode
-	if flag_safe:
-		# turn on enforcing mode for all old domains before exiting
-		enforce()
-		# save config
-		save()
-		stat()
-	else:
-		color("* haven't finished to run at least once", red)
-
-	myexit()
 
 # ----------------------------------------------------------------------
 
-
 print
-enforce()
-save()
-stat()
-myexit()
+flag_safe = 1
+myfinish()
