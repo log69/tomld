@@ -1547,7 +1547,7 @@ if not os.getuid() == 0: color("error: root privileges needed", red); myexit(1)
 if check_instance():
 	color("error: tomld is running already", red)
 	color("exit", red)
-	exit(1)
+	myexit(1)
 
 
 # check system type and print system info
