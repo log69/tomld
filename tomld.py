@@ -105,7 +105,7 @@ import termios, fcntl, select
 # **************************
 
 # program version
-ver = "0.20"
+ver = "0.21"
 
 # home dir
 home = "/home"
