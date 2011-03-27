@@ -634,7 +634,10 @@ def enforce():
 				p = re.search("^<kernel> +/[^ ]+ *$", i, re.MULTILINE)
 				if p:
 					if not flag_old2: color("* turn on enforcing mode for old domains", green); flag_old2 = 1
-					color(p.group()[9:-1], blue)
+					# get only binary name
+					p2 = re.search("/[^ ]+", p.group(), re.MULTILINE)
+					# print it
+					color(p2.group(), blue)
 				sd1 = re.sub("use_profile +[1-2] *", "use_profile 3", i)
 				sd2 = re.sub(i, sd1, tdomf)
 				tdomf = sd2
@@ -779,10 +782,10 @@ def remove(text):
 			flag_count = 0
 			for i in r1:
 				color(i, blue, 1)
-				color(", ", "", 1)
+				color("  ", "", 1)
 				# ask for confirmation
 				if choice("remove domain?"):
-					tdomf2 = tdomf + "\n\n<kernel>"
+					tdomf2 = tdomf + "\n\n<kernel>\n"
 					r2 = re.findall("^" + i + "\n[^>]*^<kernel>", tdomf2, re.M + re.I + re.DOTALL)
 					if r2:
 						for i2 in r2:
@@ -792,11 +795,25 @@ def remove(text):
 							else: 			r4 = r3
 							r5 = ""
 							for i3 in r4: r5 += i3 + "\n"
-							# remove domain from config
-							r6 = re.sub(re.escape(r5), "", tdomf, re.M)
+							
+							# remove domain from domain policy
+							r6 = re.sub(re.escape(r5), "", tdomf2, re.M)
 							flag_count += 1
 
-							tdomf = r6
+							tdomf2 = r6
+
+					tdomf = re.sub(re.compile("^<kernel> *$", re.M), "", tdomf2, re.M)
+					
+					# remove domain from exception policy
+					p = re.search("^<kernel> +/[^ ]+", i, re.M)
+					if p:
+						# get the main binary name
+						p2 = re.search("/[^ ]+$", p.group(), re.M)
+						p3 = p2.group()
+						# remove it from exception policy
+						r6 = re.sub(".* +" + p3, "", texcf)
+						texcf = r6
+
 
 			if flag_count > 0:
 				if flag_count == 1:
