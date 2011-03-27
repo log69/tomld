@@ -27,6 +27,8 @@
 # -----------
 # 27/03/2011 - tomld v0.21 - more bugfixes and code cleanup
 #                          - change in structure: from now allow_mkdir will cause the file's parent dir to be wildcarded too
+#                          - change in structure: i created an exception list for the dirs, plus the ~/.file counts as an exception too
+#                            so the policy gets a bit tighter with this
 # 26/03/2011 - tomld v0.20 - minor bugfixes
 #                          - some code cleanup
 # 25/03/2011 - tomld v0.19 - create policy file backups only with --reset or --clear switches
@@ -195,7 +197,10 @@ supp = ["debian 6.", "ubuntu 10.10."]
 # (but only if there was any operation on the dir at all of course)
 # this loosen security, but makes automation easier
 # planned to be tightened later
-global spec; spec = [home + "/", "/proc/", "/usr/share/", "/etc/fonts/", "/var/cache/"]
+global spec; spec = [home + "/", "/usr/share/", "/etc/fonts/", "/var/cache/"]
+
+# just like the above, but these are the exceptions
+global spec_ex; spec_ex = ["/etc/"]
 
 # special programs - these programs will never get a standalone enforcing mode domain
 global spec_prog; spec_prog = ["/bin/sh", "/bin/bash", "/bin/dash", "/usr/sbin/sshd"]
@@ -1269,7 +1274,8 @@ def check():
 							if compare(r2, i4):
 								flag = 1
 								break
-						if not flag: spec2.append(r2)
+						if not flag:
+							spec2.append(r2)
 
 			# is it a special allow_mkdir line?
 			if i2[0] in cre2:
@@ -1284,7 +1290,8 @@ def check():
 							if compare(r2, i4):
 								flag = 1
 								break
-						if not flag: spec3.append(r2)
+						if not flag:
+							spec3.append(r2)
 
 
 	# iterate through all the rules and reshape them
@@ -1335,39 +1342,67 @@ def check():
 									flag = 2
 									break
 						
-						# is it in spec?
-						if not flag:
-							for d in spec:
-								l1 = len(d)
-								l2 = len(param)
-								if l1 < l2:
-									if param[0:l1] == d:
-										flag = 1
-										break
-						
-						# is it in spec2?
-						if not flag:
-							# get the dir name
+
+						# ****************************************
+						# ********  MAKE AN EXCEPTION  ***********
+						# **** if it's ~/.file or in spex_ex *****
+						# ****************************************
+						# check it in spec and spec2 only if it is not an exception (spec_ex)
+						flag_ex = 0
+						# set the exception also if it's a ~/.setting file
+						r = re.search("^/.+/", param, re.MULTILINE)
+						if r:
+							r5 = r.group()
+							if compare(home + "/\*/", r5):
+								r6 = re.search("/\.[^/]+$", param, re.MULTILINE)
+								if r6:
+									flag_ex = 1
+						# check dir in exception						
+						if not flag_ex:
 							r = re.search("^/.+/", param, re.MULTILINE)
 							if r:
-								# let's watch out for the "\*" wildcard and compare dirs like that
 								r5 = r.group()
-								for i5 in spec2:
+								for i5 in spec_ex:
 									if compare(r5, i5):
-										flag = 1
+										flag_ex = 1
 										break
 
+						# is it in spec?
+						if not flag_ex:
+							if not flag:
+								for d in spec:
+									l1 = len(d)
+									l2 = len(param)
+									if l1 < l2:
+										if param[0:l1] == d:
+											flag = 1
+											break
+						
+						# is it in spec2?
+						if not flag_ex:
+							if not flag:
+								# get the dir name
+								r = re.search("^/.+/", param, re.MULTILINE)
+								if r:
+									# let's watch out for the "\*" wildcard and compare dirs like that
+									r5 = r.group()
+									for i5 in spec2:
+										if compare(r5, i5):
+											flag = 1
+											break
+
 						# is it in spec3?
-						if not flag3:
-							# get the dir name
-							r = re.search("^/.+/", param, re.MULTILINE)
-							if r:
-								# let's watch out for the "\*" wildcard and compare dirs like that
-								r5 = r.group()
-								for i5 in spec3:
-									if compare(r5, i5):
-										flag3 = 1
-										break
+						if not flag_ex:
+							if not flag3:
+								# get the dir name
+								r = re.search("^/.+/", param, re.MULTILINE)
+								if r:
+									# let's watch out for the "\*" wildcard and compare dirs like that
+									r5 = r.group()
+									for i5 in spec3:
+										if compare(r5, i5):
+											flag3 = 1
+											break
 
 						# path is in spec or spec2
 						if flag:
