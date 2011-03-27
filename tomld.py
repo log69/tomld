@@ -25,6 +25,8 @@
 #
 # changelog:
 # -----------
+# 27/03/2011 - tomld v0.21 - more bugfixes and code cleanup
+#                          - change in structure: from now allow_mkdir will cause the file's parent dir to be wildcarded too
 # 26/03/2011 - tomld v0.20 - minor bugfixes
 #                          - some code cleanup
 # 25/03/2011 - tomld v0.19 - create policy file backups only with --reset or --clear switches
@@ -384,22 +386,24 @@ def package_d(name):
 # get absolute pathname from a name
 # first the current directory is checked, then the path list on the path env variable
 def which(file):
-	if file:
-		if not file[0] == "/":
-			p2 = [os.path.realpath(".")]
-			p = os.getenv("PATH").split(":")
-			if p:
-				for i in p:
-					if i: p2.append(i)
-			for i in p2:
-				if os.path.isdir(i):
-					for f in os.listdir(i):
-						if file == f:
-							f2 = os.path.realpath(os.path.join(i, f))
-							if os.path.isfile(f2): return f2
-		else:
-			f2 = os.path.realpath(file)
-			if os.path.isfile(f2): return f2
+	f2 = os.path.realpath(file)
+	if os.path.isfile(f2): return f2
+	else:
+		# get current dir
+		p2 = [os.path.realpath(".")]
+		# get PATH env dir
+		p = os.getenv("PATH").split(":")
+		if p:
+			# add dirs
+			for i in p:
+				if i: p2.append(i)
+		# search fir file in dirs
+		for i in p2:
+			if os.path.isdir(i):
+				for f in os.listdir(i):
+					if file == f:
+						f2 = os.path.realpath(os.path.join(i, f))
+						if os.path.isfile(f2): return f2
 
 	return ""
 
@@ -1231,11 +1235,17 @@ def check():
 	# and do this overall because it cannot be known if one non-uniq filname will be reused
 	# by other processes
 	spec2 = []
+	spec3 = []
 
 	# these are the special create entries, where the place of the file will be wildcarded
 	# because it cannot be determined fully yet if the file being created has a uniq filename
 	# or a contantly changing one (temporary name)
-	cre = ["allow_create", "allow_mksock", "allow_mkdir", "allow_rename", "allow_unlink"]
+	cre  = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir"]
+
+	# allow_mkdir will also have a special handling, cause usually files are created in the
+	# new dir too, and it cannot be surely told if the dir itself has a uniq name too,
+	# so this exact dir should be wildcarded too with the files in it
+	cre2 = ["allow_mkdir"]
 
 	# collect more special dirs (that will be wildcarded)
 	temp1 = re.findall("^allow_.*$", tdomf, re.M)
@@ -1245,11 +1255,12 @@ def check():
 		l = len(i2)
 		# good to go with at least 2 parameters
 		if l >= 2:
+
 			# is it a special allow_ line?
 			if i2[0] in cre:
 				# check params from number 2 (first is only the allow_)
 				for i3 in range(1, l):
-					# get the dir name only
+					# get the dir name only (cannot be root dir /)
 					r = re.search("^/.+/", i2[i3], re.MULTILINE)
 					if r:
 						r2 = r.group()
@@ -1259,6 +1270,22 @@ def check():
 								flag = 1
 								break
 						if not flag: spec2.append(r2)
+
+			# is it a special allow_mkdir line?
+			if i2[0] in cre2:
+				# check params from number 2 (first is only the allow_)
+				for i3 in range(1, l):
+					# get the dir name only (cannot be root dir /)
+					r = re.search("^/.+/", i2[i3], re.MULTILINE)
+					if r:
+						r2 = r.group()
+						flag = 0
+						for i4 in spec3:
+							if compare(r2, i4):
+								flag = 1
+								break
+						if not flag: spec3.append(r2)
+
 
 	# iterate through all the rules and reshape them
 	tdomf2 = ""
@@ -1291,7 +1318,8 @@ def check():
 						
 						param = i2[i3]
 						param2 = ""
-						flag = 0
+						flag  = 0
+						flag3 = 0
 
 						# is it in specr?
 						# specr is sorted, so it should find the top-most directory by default
@@ -1329,13 +1357,33 @@ def check():
 										flag = 1
 										break
 
+						# is it in spec3?
+						if not flag3:
+							# get the dir name
+							r = re.search("^/.+/", param, re.MULTILINE)
+							if r:
+								# let's watch out for the "\*" wildcard and compare dirs like that
+								r5 = r.group()
+								for i5 in spec3:
+									if compare(r5, i5):
+										flag3 = 1
+										break
+
 						# path is in spec or spec2
 						if flag:
 							# is it a file or dir?
 							if param[-1] == "/":
-								r = re.sub("[^/]+/$", "\\\\*/", param)
+								r = re.sub("/[^/]+/$", "/\\\\*/", param)
 							else:
-								r = re.sub("[^/]+$", "\\\\*", param)
+								r = re.sub("/[^/]+$", "/\\\\*", param)
+							param = r
+
+						# path is in spec3
+						if flag3:
+							# is it a file? (dir is managed before with spec and spec2 code)
+							if not param[-1] == "/":
+								# wildcard file with parent dir too
+								r = re.sub("/[^/]+/[^/]+$", "/\\\\*/\\\\*", param)
 							param = r
 
 						# path is in specr
