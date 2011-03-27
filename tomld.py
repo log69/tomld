@@ -191,15 +191,11 @@ global speed; speed = 0
 # supported platforms
 supp = ["debian 6.", "ubuntu 10.10."]
 
-# special dirs - only these will get modified with "\*" wildcards
-# the concept is to allow the operation on the whole dirs recursively inside these dirs,
-# and allow only the exact operation outside these dirs
-# (but only if there was any operation on the dir at all of course)
-# this loosen security, but makes automation easier
-# planned to be tightened later
+# special dirs - the leaf dirs or files in these get wildcarded
+# this loosen security, but makes automation easier, planned to be tightened later
 global spec; spec = [home + "/", "/usr/share/", "/etc/fonts/", "/var/cache/"]
 
-# just like the above, but these are the exceptions
+# just like the above, but these are the exceptions to them
 global spec_ex; spec_ex = ["/etc/", home + "/\*/"]
 
 # special programs - these programs will never get a standalone enforcing mode domain
