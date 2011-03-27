@@ -27,8 +27,8 @@
 # -----------
 # 27/03/2011 - tomld v0.21 - more bugfixes and code cleanup
 #                          - change in structure: from now allow_mkdir will cause the file's parent dir to be wildcarded too
-#                          - change in structure: i created an exception list for the dirs, plus the ~/.file counts as an exception too
-#                            so the policy gets a bit tighter with this
+#                          - change in structure: i created an exception list for the dirs, so the policy gets a bit tighter with this
+#                            exception list contains now = "/etc", "/home/\*/"
 # 26/03/2011 - tomld v0.20 - minor bugfixes
 #                          - some code cleanup
 # 25/03/2011 - tomld v0.19 - create policy file backups only with --reset or --clear switches
@@ -200,7 +200,7 @@ supp = ["debian 6.", "ubuntu 10.10."]
 global spec; spec = [home + "/", "/usr/share/", "/etc/fonts/", "/var/cache/"]
 
 # just like the above, but these are the exceptions
-global spec_ex; spec_ex = ["/etc/"]
+global spec_ex; spec_ex = ["/etc/", home + "/\*/"]
 
 # special programs - these programs will never get a standalone enforcing mode domain
 global spec_prog; spec_prog = ["/bin/sh", "/bin/bash", "/bin/dash", "/usr/sbin/sshd"]
@@ -1349,14 +1349,14 @@ def check():
 						# ****************************************
 						# check it in spec and spec2 only if it is not an exception (spec_ex)
 						flag_ex = 0
-						# set the exception also if it's a ~/.setting file
-						r = re.search("^/.+/", param, re.MULTILINE)
-						if r:
-							r5 = r.group()
-							if compare(home + "/\*/", r5):
-								r6 = re.search("/\.[^/]+$", param, re.MULTILINE)
-								if r6:
-									flag_ex = 1
+#						# set the exception also if it's a ~/.setting file
+#						r = re.search("^/.+/", param, re.MULTILINE)
+#						if r:
+#							r5 = r.group()
+#							if compare(home + "/\*/", r5):
+#								r6 = re.search("/\.[^/]+$", param, re.MULTILINE)
+#								if r6:
+#									flag_ex = 1
 						# check dir in exception						
 						if not flag_ex:
 							r = re.search("^/.+/", param, re.MULTILINE)
@@ -1366,6 +1366,9 @@ def check():
 									if compare(r5, i5):
 										flag_ex = 1
 										break
+
+
+
 
 						# is it in spec?
 						if not flag_ex:
