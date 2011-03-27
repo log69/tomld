@@ -1546,7 +1546,6 @@ if not os.getuid() == 0: color("error: root privileges needed", red); myexit(1)
 # check already running instance of the program
 if check_instance():
 	color("error: tomld is running already", red)
-	color("exit", red)
 	myexit(1)
 
 
