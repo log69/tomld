@@ -191,18 +191,18 @@ global speed; speed = 0
 # supported platforms
 supp = ["debian 6.", "ubuntu 10.10."]
 
-# special dirs - the leaf dirs or files in these get wildcarded
-# this loosen security, but makes automation easier, planned to be tightened later
+# this will contain the dirs to be fully wildcarded resursively with --recursive switch on
+global specr; specr = []
+
+# special dirs - the leaf dirs or files get wildcarded in any subdirs of them
 global spec; spec = [home + "/", "/usr/share/", "/etc/fonts/", "/var/cache/"]
 
-# just like the above, but these are the exceptions to them
+# just like the above, but these are the exception dirs
+# exact match needs on these dirs for the leaf dir or file not to get wildcarded
 global spec_ex; spec_ex = ["/etc/", home + "/\*/"]
 
-# special programs - these programs will never get a standalone enforcing mode domain
+# exception programs - these programs will never get a standalone enforcing mode domain
 global spec_prog; spec_prog = ["/bin/sh", "/bin/bash", "/bin/dash", "/usr/sbin/sshd"]
-
-# this will contain the dirs to be fully wildcarded given by the --recursive switch
-global specr; specr = []
 
 
 
