@@ -1215,10 +1215,10 @@ def check():
 		tdomf2 = ""
 		s2 = ""
 		for i in tdomf.splitlines(1):
+			s = i
 
 			# operate only on rules
 			if i[0:6] == "allow_":
-				s = i
 				r = i.split()
 				l2 = len(r)
 				dir1 = ""
@@ -1300,6 +1300,8 @@ def check():
 				if not s == s2:
 					tdomf2 += s
 					s2 = s
+
+			tdomf2 += s
 
 		tdomf = tdomf2
 
