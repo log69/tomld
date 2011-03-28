@@ -27,6 +27,7 @@
 # -----------
 # 28/03/2011 - tomld v0.22 - speed up info and remove functions
 #                          - add full recursive directory subtitution with wildcards
+#                          - several bugfix
 # 27/03/2011 - tomld v0.21 - more bugfixes and code cleanup
 #                          - change in structure: from now allow_mkdir will cause the file's parent dir to be wildcarded too
 #                          - change in structure: i created an exception list for the dirs, so the policy gets a bit tighter with this
