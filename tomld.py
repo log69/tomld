@@ -26,7 +26,7 @@
 # changelog:
 # -----------
 # 28/03/2011 - tomld v0.22 - speedup info and remove functions
-#                          - ...
+#                          - add full recursive directory subtitution with wildcards
 # 27/03/2011 - tomld v0.21 - more bugfixes and code cleanup
 #                          - change in structure: from now allow_mkdir will cause the file's parent dir to be wildcarded too
 #                          - change in structure: i created an exception list for the dirs, so the policy gets a bit tighter with this
@@ -194,7 +194,9 @@ global speed; speed = 0
 supp = ["debian 6.", "ubuntu 10.10."]
 
 # this will contain the dirs to be fully wildcarded resursively with --recursive switch on
-global specr; specr = []
+global specr;  specr  = []
+# this will show the full dir depths in numbers to all recursive dirs
+global specr2_count; specr2_count = []
 
 # special dirs - the leaf dirs or files get wildcarded in any subdirs of them
 global spec; spec = [home + "/", "/usr/share/", "/etc/fonts/", "/var/cache/"]
@@ -359,14 +361,14 @@ def comparer(d1, d2):
 	e2 = d2.split("/")
 	l1 = len(e1)-1
 	l2 = len(e2)-1
-	if l1 == 0 or l2 == 0 or l1 < l2: return 0
+	if l1 == 0 or l2 == 0 or l1 < l2: return ""
 	# compare the dirs
 	flag = 0
 	for i in range(0, l2):
 		c1 = e1[i]
 		c2 = e2[i]
 		if (not c1 == "\*") and (not c2 == "\*") and (not c1 == c2):
-			return 0
+			return ""
 	return d2
 #	return 1
 
@@ -706,7 +708,6 @@ def info(text = ""):
 	load()
 	if text:
 		# show info about domains and rules
-#		r1 = re.findall("^<kernel>[^\n]*" + text + ".*?(?=<kernel>)", tdomf, re.M + re.I + re.DOTALL)
 		r1 = re.findall("^<kernel>.*" + text + ".*$", tdomf, re.M + re.I)
 		if r1:
 			print
@@ -1203,6 +1204,100 @@ def check():
 	# ******* RESHAPE RULES ********
 	# ******************************
 
+
+
+	# -----------------------------------------------------------------------------------------------------------
+
+	# recursive dir handling: change all subdir names of all dir in specr to fully wildcarded
+	l = len(specr)
+	if l > 0:
+
+		tdomf2 = ""
+		for i in tdomf.splitlines(1):
+			s = i
+			r = i.split()
+			l2 = len(r)
+			# more than 1 parameter? it means 1 or 2 dirs
+			if l2 == 2:
+				ind1 = 0
+				# is the dir in specr?
+				for i3 in specr:
+					dir1 = comparer(r[1], i3)
+					if dir1: break
+					ind1 += 1
+				# if so
+				if dir1:
+					c = specr2_count[ind1]
+					if c > 0:
+						s = ""
+						for i4 in range(1, c):
+							dr = ""
+							# is it a dir or file originally
+							if r[1][:-1] == "/":
+								dr = dir1
+								for i5 in range(c-i4, c):
+									dr += "\*/"
+							else:
+								dr = dir1[:-1]
+								for i5 in range(c-i4, c):
+									dr += "/\*"
+							
+							s += r[0] + " " + dr + "\n"
+
+						print; print s
+
+			elif l2 == 3:
+				ind1 = 0
+				ind2 = 0
+				# is the dir in specr?
+				for i3 in specr:
+					dir1 = comparer(r[1], i3)
+					if dir1: break
+					ind1 += 1
+				# is the dir2 in specr?
+				for i3 in specr:
+					dir2 = comparer(r[2], i3)
+					if dir2: break
+					ind2 += 1
+
+				# if any of them yes, and they both refer to the same recursive dir
+				if (dir1 or dir2) and (ind1 == ind2):
+				
+					if dir1 and (not dir2):
+						c = specr2_count[ind1]
+						if c > 0:
+							s = ""
+							for i4 in range(1, c):
+								dr = ""
+								# is it a dir or file originally
+								if r[1][:-1] == "/":
+									dr = dir1
+									for i5 in range(c-i4, c):
+										dr += "\*/"
+								else:
+									dr = dir1[:-1]
+									for i5 in range(c-i4, c):
+										dr += "/\*"
+							
+								s += r[0] + " " + dr + "\n"
+
+					if (not dir1) and dir2:
+						pass
+
+					if dir1 and dir2:
+						pass
+	
+
+			tdomf2 += s
+
+		tdomf = tdomf2
+
+		exit()
+
+		save()
+		load()
+
+
 	# the spec predefined dirs and those dirs that have files newly created in them
 	# will be wildcarded
 
@@ -1299,19 +1394,19 @@ def check():
 						flag  = 0
 						flag3 = 0
 
-						# is it in specr?
-						# specr is sorted, so it should find the top-most directory by default
-						# get the dir name
-						r = re.search("^/.+/", param, re.MULTILINE)
-						if r:
-							# let's watch out for the "\*" wildcard and compare dirs like that
-							# but this time recursively, only the beginning of specr must match
-							r5 = r.group()
-							for i5 in specr:
-								param2 = comparer(r5, i5)
-								if param2:
-									flag = 2
-									break
+#						# is it in specr?
+#						# specr is sorted, so it should find the top-most directory by default
+#						# get the dir name
+#						r = re.search("^/.+/", param, re.MULTILINE)
+#						if r:
+#							# let's watch out for the "\*" wildcard and compare dirs like that
+#							# but this time recursively, only the beginning of specr must match
+#							r5 = r.group()
+#							for i5 in specr:
+#								param2 = comparer(r5, i5)
+#								if param2:
+#									flag = 2
+#									break
 						
 
 						# ****************************************
@@ -1393,33 +1488,33 @@ def check():
 							if not param[-1] == "/":
 								# wildcard file with parent dir too
 								r = re.sub("/[^/]+/[^/]+$", "/\\\\*/\\\\*", param)
-							param = r
+								param = r
 
-						# path is in specr
-						if flag == 2:
-							e1 = param.split("/")
-							e2 = param2.split("/")
-							l1 = len(e1)-1
-							l2 = len(e2)-1
-							
-							# change all subdir names to wildcard "\*"
-							param3 = ""
-							for i in range(0, l1):
-								c1 = e1[i]
-								if i < l2:
-									c2 = e2[i]
-									if c1 == "\*" or c2 == "\*":
-										param3 += "\*" + "/"
-									else:
-										param3 += c1 + "/"
-								else:
-									param3 += "\*" + "/"
-							
-							# was it a dir or a file originally?
-							if not param[-1] == "/":
-								param3 += "\*"
-
-							param = param3
+#						# path is in specr
+#						if flag == 2:
+#							e1 = param.split("/")
+#							e2 = param2.split("/")
+#							l1 = len(e1)-1
+#							l2 = len(e2)-1
+#							
+#							# change all subdir names to wildcard "\*"
+#							param3 = ""
+#							for i in range(0, l1):
+#								c1 = e1[i]
+#								if i < l2:
+#									c2 = e2[i]
+#									if c1 == "\*" or c2 == "\*":
+#										param3 += "\*" + "/"
+#									else:
+#										param3 += c1 + "/"
+#								else:
+#									param3 += "\*" + "/"
+#							
+#							# was it a dir or a file originally?
+#							if not param[-1] == "/":
+#								param3 += "\*"
+#
+#							param = param3
 
 						# wildcard library files version numbers
 						if re.search("/lib.+[\.0-9]*\.so[\.0-9]*$", param, re.MULTILINE):
@@ -1588,6 +1683,15 @@ if (l > 0):
 			color("error: bad option parameter", red)
 			myexit(1)
 	specr.sort()
+
+	# calculate dir depths of all recursive dirs
+	color("calculating directory depths for recursive dirs...", yellow, 1)
+	for i in specr:
+		c = 0
+		for dirpath, dirnames, filenames in os.walk(i):
+			c += 1
+		specr2_count.append(c)
+	color("done", yellow)
 
 
 	# the rest of the parameters not starting with "-"
