@@ -118,7 +118,7 @@ home = "/home"
 global count; count = 10
 
 # max entries variable in profile config
-global maxe; maxe = 5000
+global maxe; maxe = 10000
 
 # tomoyo kernel parameter
 global tkern; tkern = "security=tomoyo"
