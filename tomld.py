@@ -1218,14 +1218,18 @@ def check():
 			s = i
 			r = i.split()
 			l2 = len(r)
+			dir1 = ""
+			dir2 = ""
 			# more than 1 parameter? it means 1 or 2 dirs
 			if l2 == 2:
-				ind1 = 0
-				# is the dir in specr?
-				for i3 in specr:
-					dir1 = comparer(r[1], i3)
-					if dir1: break
-					ind1 += 1
+				rx1 = re.search("^/.+/", r[1], re.MULTILINE)
+				if rx1:
+					ind1 = 0
+					# is the dir in specr?
+					for i3 in specr:
+						dir1 = comparer(rx1.group(), i3)
+						if dir1: break
+						ind1 += 1
 				# if so
 				if dir1:
 					c = specr2_count[ind1]
