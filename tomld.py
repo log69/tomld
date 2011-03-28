@@ -382,7 +382,7 @@ def package_d(name):
 		if os.path.isfile(f):
 			try: f2 = open(f).read()
 			except: color("error: cannot open file " + f2, red); myexit(1)
-			p = re.search("^Package: " + name + "$\n^Status: install ok installed$", f2, re.MULTILINE)
+			p = re.search("^Package: " + re.escape(name) + "$\n^Status: install ok installed$", f2, re.MULTILINE)
 			if p: return 1
 
 	return 0
@@ -466,7 +466,7 @@ def load():
 	except: color("error: cannot load exception policy from memory", red); myexit(1)
 
 	# remove disabled mode entries so runtime will be faster
-	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
+	s = re.sub(re.escape(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M)), "", tdomf)
 	# remove deleted entries too
 	s2 = re.findall("^.*\(deleted\)$", tdomf, re.M)
 	if s2:
@@ -486,7 +486,7 @@ def load():
 				s = s3
 	tdomf = s
 	# remove quota_exceeded entries too
-	s = re.sub(re.compile("^quota_exceeded *$\n", re.M), "", tdomf)
+	s = re.sub(re.escape(re.compile("^quota_exceeded *$\n", re.M)), "", tdomf)
 
 	tdomf = s
 
@@ -496,7 +496,7 @@ def load():
 def save():
 	global tdomf
 	# remove disabled mode entries so runtime will be faster
-	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
+	s = re.sub(re.escape(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M)), "", tdomf)
 	tdomf = s
 	# write back policy files to disk
 	try:
@@ -570,7 +570,7 @@ def check_prof():
 		r = re.search("^[^=]*=", i, re.M)
 		if r:
 			r2 = r.group()
-			s = re.search("^" + r2, tprof, re.M)
+			s = re.search("^" + re.escape(r2), tprof, re.M)
 			# add missing entry
 			if not s:
 				flag = 1
@@ -595,14 +595,14 @@ def check_prof():
 def learn(prog3):
 	global tdomf
 	# look up all domain with profile 3
-	x = re.findall("^<kernel>.* +" + prog3 + " *$\n+use_profile +3 *$", tdomf, re.MULTILINE)
+	x = re.findall("^<kernel>.* +" + re.escape(prog3) + " *$\n+use_profile +3 *$", tdomf, re.MULTILINE)
 	# turn back learning mode form enforcing mode for binary
 	if x:
 		color(prog3 + "  ", blue, 1)
 		color("switch back domain from enforcing to learning mode", red)
 		for i in x:
 			sd1 = re.sub("use_profile +3 *", "use_profile 1", i)
-			sd2 = re.sub(i, sd1, tdomf)
+			sd2 = re.sub(re.escape(i), sd1, tdomf)
 			tdomf = sd2
 
 
@@ -618,7 +618,7 @@ def enforce():
 			# check if it's not a standalone exception and not a domain with newly created learning mode
 			for i in x:
 				p = re.search("/[^ ]*$", i, re.MULTILINE).group()[:-1]
-				p2 = re.search("^<kernel> +" + p + " *$", p, re.MULTILINE)
+				p2 = re.search("^<kernel> +" + re.escape(p) + " *$", p, re.MULTILINE)
 				if not p in progl:
 					if not p in spec_prog or ((p in spec_prog) and (not p2)):
 						x2.append(i)
@@ -637,7 +637,7 @@ def enforce():
 					# print it
 					color(p2.group(), blue)
 				sd1 = re.sub("use_profile +[1-2] *", "use_profile 3", i)
-				sd2 = re.sub(i, sd1, tdomf)
+				sd2 = re.sub(re.escape(i), sd1, tdomf)
 				tdomf = sd2
 		else:
 			if flag_old:
@@ -767,7 +767,7 @@ def remove(text):
 	load()
 	if text:
 		# search for the domain to remove
-		r1 = re.findall("^<kernel>.*" + text + ".*$", tdomf, re.M + re.I)
+		r1 = re.findall("^<kernel>.*" + re.escape(text) + ".*$", tdomf, re.M + re.I)
 		if r1:
 			print
 			# how many domains are found?
@@ -792,7 +792,7 @@ def remove(text):
 
 							tdomf2 = r6
 
-					tdomf = re.sub(re.compile("^<kernel> *$", re.M), "", tdomf2, re.M)
+					tdomf = re.sub(re.escape(re.compile("^<kernel> *$", re.M)), "", tdomf2, re.M)
 					
 					# remove domain from exception policy
 					p = re.search("^<kernel> +/[^ ]+", i, re.M)
@@ -801,7 +801,7 @@ def remove(text):
 						p2 = re.search("/[^ ]+$", p.group(), re.M)
 						p3 = p2.group()
 						# remove it from exception policy
-						r6 = re.sub(".* +" + p3, "", texcf)
+						r6 = re.sub(".* +" + re.escape(p3), "", texcf)
 						texcf = r6
 
 
@@ -927,7 +927,7 @@ def check():
 
 	for prog in progs:
 		# does the domain exist for the program?
-		x = re.search("^initialize_domain *" + prog + " *$", texcf, re.MULTILINE)
+		x = re.search("^initialize_domain *" + re.escape(prog) + " *$", texcf, re.MULTILINE)
 		if x:
 			# pritn only once
 			if not flag_firstrun:
@@ -943,7 +943,7 @@ def check():
 			texcf += "\ninitialize_domain " + prog + "\n"
 
 		# does the rule exist for it?
-		x = re.findall("^<kernel> +" + prog + " *$\n+use_profile +[0-9]+ *$", tdomf, re.MULTILINE)
+		x = re.findall("^<kernel> +" + re.escape(prog) + " *$\n+use_profile +[0-9]+ *$", tdomf, re.MULTILINE)
 		if not x:
 			color(", no rule", "", 1)
 			print ", ",; color("create rule with learning mode on", green, 1)
@@ -959,13 +959,13 @@ def check():
 			if not flag_firstrun:
 				color(", rule exists", "", 1)
 			# search for all subdomains too
-			xx = re.findall("^<kernel> +" + prog + ".*$\n+use_profile +[0-9]+ *$", tdomf, re.MULTILINE)
+			xx = re.findall("^<kernel> +" + re.escape(prog) + ".*$\n+use_profile +[0-9]+ *$", tdomf, re.MULTILINE)
 			if not xx: error_conf("102")
 
 			# cycle through the domain and its subdomains
 			for d in xx:
 				# get subdomain binary
-				prog2 = re.search(prog + ".*$", d, re.MULTILINE).group()
+				prog2 = re.search(re.escape(prog) + ".*$", d, re.MULTILINE).group()
 				# get mode
 				x2 = re.findall("use_profile +[0-9]+", d, re.MULTILINE)
 				if len(x2) > 1: error_conf("103")
@@ -984,7 +984,7 @@ def check():
 						if flag_firstrun: print
 					# if in disabled mode, turn on learning mode for the domain or subdomain
 					sd1 = re.sub("use_profile +0 *", "use_profile 1", d)
-					sd2 = re.sub(d, sd1, tdomf)
+					sd2 = re.sub(re.escape(d), sd1, tdomf)
 					tdomf = sd2
 
 				if profile == 1:
@@ -1140,7 +1140,7 @@ def check():
 				l = len(rule4)
 				flag_choice = 0
 				for i in range(0, l):
-					xx = re.findall("^<kernel>.* " + prog4[i] + "$\n+use_profile +3 *$", tdomf, re.MULTILINE)
+					xx = re.findall("^<kernel>.* " + re.escape(prog4[i]) + "$\n+use_profile +3 *$", tdomf, re.MULTILINE)
 					# check if log entry contains a domain that doesn't exist
 					if xx:
 						# print log messages
@@ -1160,7 +1160,7 @@ def check():
 							flag_choice = 1
 							# always add rule to all domain's binary, not only who have their own domains
 							for d in xx:
-								s = re.sub(d, d + "\n" + rule4[i], tdomf)
+								s = re.sub(re.escape(d), d + "\n" + rule4[i], tdomf)
 								tdomf = s
 
 						if flag_choice:
@@ -1556,7 +1556,7 @@ def check():
 							param = r
 
 						# change /home/user/ dir to /home/\*/ form to support multiple users
-						i4 = re.sub("^" + home + "/[^/]+/", home + "/\\\\*/", param)
+						i4 = re.sub("^" + re.escape(home) + "/[^/]+/", home + "/\\\\*/", param)
 						param = i4
 
 						s += " " + param
@@ -1823,13 +1823,13 @@ if pl1 == "debian" or pl1 == "ubuntu":
 					color("error: no such file: " + i, red); myexit(1)
 				f2 = open(f).read()
 				# kernel parameter set yet?
-				p0 = re.search("^GRUB_CMDLINE_LINUX=\".*" + tkern + ".*\"$", f2, re.MULTILINE)
+				p0 = re.search("^GRUB_CMDLINE_LINUX=\".*" + re.escape(tkern) + ".*\"$", f2, re.MULTILINE)
 				if not p0:
 					p = re.search("^GRUB_CMDLINE_LINUX=\".*\"$", f2, re.MULTILINE)
 					if p:
 						p1 = p.group()
 						p2 = re.sub("\"$", " " + tkern + "\"", p1)
-						p3 = re.sub(p1, p2, f2)
+						p3 = re.sub(re.escape(p1), p2, f2)
 						f2 = p3
 					else:
 						f2 += "\nGRUB_CMDLINE_LINUX=\"" + tkern + "\"\n"
