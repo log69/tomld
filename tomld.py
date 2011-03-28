@@ -1215,58 +1215,25 @@ def check():
 		tdomf2 = ""
 		s2 = ""
 		for i in tdomf.splitlines(1):
-			s = i
-			r = i.split()
-			l2 = len(r)
-			dir1 = ""
-			dir2 = ""
-			# more than 1 parameter? it means 1 or 2 dirs
-			if l2 == 2:
-				ind1 = 0
-				# is the dir in specr?
-				for i3 in specr:
-					dir1 = comparer(r[1], i3)
-					if dir1: break
-					ind1 += 1
-				# if so
-				if dir1:
-					c = specr2_count[ind1]
-					if c > 0:
-						s = ""
-						for i4 in range(1, c):
-							dr = ""
-							# is it a dir or file originally
-							if r[1][:-1] == "/":
-								dr = dir1
-								for i5 in range(c-i4, c):
-									dr += "\*/"
-							else:
-								dr = dir1[:-1]
-								for i5 in range(c-i4, c):
-									dr += "/\*"
-							
-							s += r[0] + " " + dr + "\n"
 
-						print; print s
+			# operate only on rules
+			if i[0:6] == "allow_":
+				s = i
+				r = i.split()
+				l2 = len(r)
+				dir1 = ""
+				dir2 = ""
 
-			elif l2 == 3:
-				ind1 = 0
-				ind2 = 0
-				# is the dir in specr?
-				for i3 in specr:
-					dir1 = comparer(r[1], i3)
-					if dir1: break
-					ind1 += 1
-				# is the dir2 in specr?
-				for i3 in specr:
-					dir2 = comparer(r[2], i3)
-					if dir2: break
-					ind2 += 1
-
-				# if any of them yes, and they both refer to the same recursive dir
-				if (dir1 or dir2) and (ind1 == ind2):
-				
-					if dir1 and (not dir2):
+				# more than 1 parameter? it means 1 or 2 dirs
+				if l2 == 2:
+					ind1 = 0
+					# is the dir in specr?
+					for i3 in specr:
+						dir1 = comparer(r[1], i3)
+						if dir1: break
+						ind1 += 1
+					# if so
+					if dir1:
 						c = specr2_count[ind1]
 						if c > 0:
 							s = ""
@@ -1284,18 +1251,55 @@ def check():
 							
 								s += r[0] + " " + dr + "\n"
 
-					if (not dir1) and dir2:
-						pass
+							print; print s
 
-					if dir1 and dir2:
-						pass
+				elif l2 == 3:
+					ind1 = 0
+					ind2 = 0
+					# is the dir in specr?
+					for i3 in specr:
+						dir1 = comparer(r[1], i3)
+						if dir1: break
+						ind1 += 1
+					# is the dir2 in specr?
+					for i3 in specr:
+						dir2 = comparer(r[2], i3)
+						if dir2: break
+						ind2 += 1
+
+					# if any of them yes, and they both refer to the same recursive dir
+					if (dir1 or dir2) and (ind1 == ind2):
+				
+						if dir1 and (not dir2):
+							c = specr2_count[ind1]
+							if c > 0:
+								s = ""
+								for i4 in range(1, c):
+									dr = ""
+									# is it a dir or file originally
+									if r[1][:-1] == "/":
+										dr = dir1
+										for i5 in range(c-i4, c):
+											dr += "\*/"
+									else:
+										dr = dir1[:-1]
+										for i5 in range(c-i4, c):
+											dr += "/\*"
+							
+									s += r[0] + " " + dr + "\n"
+
+						if (not dir1) and dir2:
+							pass
+
+						if dir1 and dir2:
+							pass
 	
 
-			# insert rule only if the former rule was not the same
-			# this is to avoid massive multiplication of the rules because of the recursive check
-			if not s == s2:
-				tdomf2 += s
-				s2 = s
+				# insert rule only if the former rule was not the same
+				# this is to avoid massive multiplication of the rules because of the recursive check
+				if not s == s2:
+					tdomf2 += s
+					s2 = s
 
 		tdomf = tdomf2
 
