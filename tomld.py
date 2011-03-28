@@ -454,6 +454,7 @@ def choice(text):
 
 
 # load config files
+# kernel memory --> variables
 def load():
 	global tdomf
 	global texcf
@@ -472,8 +473,8 @@ def load():
 		for i in s2:
 			# domain is marked as "(deleted)"
 			if re.search("^<kernel>", i, re.M):
-				tdomf2 = tdomf + "\n\n<kernel>"
-				r2 = re.findall(re.escape(i) + ".*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
+				tdomf2 = tdomf + "\n<kernel>"
+				r2 = re.findall(re.escape(i) + "\n.*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
 				if r2:
 					for i2 in r2:
 						# remove domain from config
@@ -491,6 +492,7 @@ def load():
 
 
 # save config files
+# variables --> disk --> kernel memory
 def save():
 	global tdomf
 	# remove disabled mode entries so runtime will be faster
@@ -529,7 +531,7 @@ def clear():
 		myexit(1)
 	try:
 		f = open(tdom, "w")
-		f.write("")
+		f.write("<kernel>\nuse_profile 0\n\n")
 		f.flush()
 		f.close
 	except:
@@ -706,21 +708,27 @@ def info(text = ""):
 	global tdomf
 	global texcf
 	load()
+	domain_cleanup()
 	if text:
 		# show info about domains and rules
-		r1 = re.findall("^<kernel>.*" + text + ".*$", tdomf, re.M + re.I)
+		r1 = re.findall("^<kernel>.*" + re.escape(text) + ".*$", tdomf, re.M + re.I)
 		if r1:
 			print
 			# how many domains are found?
 			for i in r1:
 				color(i, blue)
 				# it's needed to mark the last domain's end too
-				tdomf2 = tdomf + "\n\n<kernel>"
-				r2 = re.findall("^" + i + ".*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
+				tdomf2 = tdomf + "\n<kernel>"
+				r2 = re.findall("^" + re.escape(i) + "\n.*?^(?=<kernel>)", tdomf2, re.M + re.DOTALL)
 				if r2:
 					for i2 in r2:
 						i3 = re.search("use_profile.*", i2, re.M + re.DOTALL)
-						if i3: color(i3.group(), red)
+						if i3:
+							# remove the last newline
+							i4 = i3.group()
+							i5 = i4
+							if i4[-1] == "\n": i5 = i4[:-1]
+							color(i5, red)
 			# print stat
 			l = len(r1)
 			if l > 1:
@@ -775,7 +783,7 @@ def remove(text):
 				# ask for confirmation
 				if choice("remove domain?"):
 					tdomf2 = tdomf + "\n\n<kernel>\n"
-					r2 = re.findall("^" + i + ".*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
+					r2 = re.findall("^" + re.escape(i) + "\n.*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
 					if r2:
 						for i2 in r2:
 							# remove domain from domain policy
@@ -810,6 +818,32 @@ def remove(text):
 				print
 		else:
 			color("error: no domains by pattern", red)
+
+
+# sort and uniq all rules in all domains
+def domain_cleanup():
+	global tdomf
+	tdomf3 = ""
+	tdomf2 = tdomf + "\n<kernel>"
+	r = re.findall("^<kernel>.*?^(?=<kernel>)", tdomf2, re.M + re.DOTALL)
+	if r:
+		# cycle through domains
+		for i in r:
+			# cycle through lines of domain
+			r2 = []
+			for i2 in i.splitlines(1):
+				if not i2 == "\n":
+					if not i2[0:6] == "allow_":
+						tdomf3 += i2
+					else:
+						if i2 not in r2:
+							r2.append(i2)
+				
+			r2.sort()
+			tdomf3 +=  "".join(r2)
+			tdomf3 += "\n"
+
+		tdomf = tdomf3
 
 
 # print domain stat
@@ -1204,30 +1238,7 @@ def check():
 	# ******* RESHAPE RULES ********
 	# ******************************
 
-
-	# sort and uniq all rules in all domains
-	tdomf3 = ""
-	tdomf2 = tdomf + "\n\n<kernel>"
-	r = re.findall("^<kernel>.*?^(?=<kernel>)", tdomf2, re.M + re.DOTALL)
-	if r:
-		# cycle through domains
-		for i in r:
-			# cycle through lines of domain
-			r2 = []
-			for i2 in i.splitlines(1):
-				if not i2 == "\n":
-					if not i2[0:6] == "allow_":
-						tdomf3 += i2
-					else:
-						if i2 not in r2:
-							r2.append(i2)
-				
-			r2.sort()
-			tdomf3 +=  "".join(r2)
-			tdomf3 += "\n"
-
-		tdomf = tdomf3
-
+	domain_cleanup()
 
 	# -----------------------------------------------------------------------------------------------------------
 
@@ -1565,14 +1576,18 @@ def check():
 		
 		# operate only on rules
 		if i[0:13] == "allow_create ":
-			i2 = re.sub("allow_create ", "allow_read/write ", i)
-			i3 = re.sub("allow_create ", "unlink ", i)
-			i = i + i2 + i3
+			i2 = re.sub("allow_create ", "allow_read/write ", i, re.M)
+			i3 = re.sub("allow_create ", "allow_unlink ", i, re.M)
+			i4 = re.sub("allow_create ", "allow_truncate ", i, re.M)
+			i = i + i2 + i3 + i4
 
 		tdomf2 += i
 
 	tdomf = tdomf2
 	
+
+	domain_cleanup()
+
 	save()
 
 
