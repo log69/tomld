@@ -466,7 +466,7 @@ def load():
 	except: color("error: cannot load exception policy from memory", red); myexit(1)
 
 	# remove disabled mode entries so runtime will be faster
-	s = re.sub(re.escape(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M)), "", tdomf)
+	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
 	# remove deleted entries too
 	s2 = re.findall("^.*\(deleted\)$", tdomf, re.M)
 	if s2:
@@ -486,7 +486,7 @@ def load():
 				s = s3
 	tdomf = s
 	# remove quota_exceeded entries too
-	s = re.sub(re.escape(re.compile("^quota_exceeded *$\n", re.M)), "", tdomf)
+	s = re.sub(re.compile("^quota_exceeded *$\n", re.M), "", tdomf)
 
 	tdomf = s
 
@@ -496,7 +496,7 @@ def load():
 def save():
 	global tdomf
 	# remove disabled mode entries so runtime will be faster
-	s = re.sub(re.escape(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M)), "", tdomf)
+	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
 	tdomf = s
 	# write back policy files to disk
 	try:
@@ -792,7 +792,7 @@ def remove(text):
 
 							tdomf2 = r6
 
-					tdomf = re.sub(re.escape(re.compile("^<kernel> *$", re.M)), "", tdomf2, re.M)
+					tdomf = re.sub(re.compile("^<kernel> *$", re.M), "", tdomf2, re.M)
 					
 					# remove domain from exception policy
 					p = re.search("^<kernel> +/[^ ]+", i, re.M)
