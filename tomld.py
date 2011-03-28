@@ -1735,9 +1735,10 @@ if (l > 0):
 				if d == "/":
 					color("error: root directory is not allowed", red)
 					myexit(1)
-				if os.path.isdir(os.path.realpath(d)):
-					if not d in specr:
-						specr.append(d)
+				d2 = os.path.realpath(d)
+				if os.path.isdir(d2):
+					if not d2 in specr:
+						specr.append(d2)
 				else:
 					color("error: no such directory: " + d, red)
 					myexit(1)
@@ -1749,6 +1750,8 @@ if (l > 0):
 			color("error: bad option parameter", red)
 			myexit(1)
 	specr.sort()
+	
+	print; print specr; exit()
 
 
 	# the rest of the parameters not starting with "-"
