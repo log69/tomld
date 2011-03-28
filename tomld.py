@@ -456,13 +456,6 @@ def load():
 	global tdomf
 	global texcf
 
-#	os.system(tsave)
-#	# load config files from disk to memory
-#	try: tdomf = open(tdom).read()
-#	except: color("error: cannot open file " + tdom, red); myexit(1)
-#	try: texcf = open(texc).read()
-#	except: color("error: cannot open file " + texc, red); myexit(1)
-
 	# load config from memory to variables
 	try: tdomf = os.popen(tsave + " d -").read()
 	except: color("error: cannot load domain policy from memory", red); myexit(1)
@@ -478,15 +471,9 @@ def load():
 			# domain is marked as "(deleted)"
 			if re.search("^<kernel>", i, re.M):
 				tdomf2 = tdomf + "\n\n<kernel>"
-				r2 = re.findall(re.escape(i) + "\n[^>]*^<kernel>", tdomf2, re.M + re.I + re.DOTALL)
+				r2 = re.findall(re.escape(i) + ".*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
 				if r2:
 					for i2 in r2:
-						r3 = i2.split("\n")
-						r4 = []
-						if len(r3) > 1: r4 = r3[:-1]
-						else: 			r4 = r3
-						r5 = ""
-						for i3 in r4: r5 += i3 + "\n"
 						# remove domain from config
 						r6 = re.sub(re.escape(r5), "", s, re.M)
 						s = r6
@@ -1068,8 +1055,7 @@ def check():
 	if flag_reset:
 		flag_reset = 0
 	else:
-		logall = ""
-		for i in log2: logall += i + "\n"
+		logall = "\n".join(log2)
 
 		# 2 kinds of message types:
 		# TOMOYO-ERROR: Access 'read(...) /etc/file' denied for /bin/program
