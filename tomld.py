@@ -1302,6 +1302,7 @@ def check():
 					s2 = s
 
 			tdomf2 += s
+			s2 = ""
 
 		tdomf = tdomf2
 
