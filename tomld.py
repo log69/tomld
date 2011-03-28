@@ -1213,6 +1213,7 @@ def check():
 	if l > 0:
 
 		tdomf2 = ""
+		s2 = ""
 		for i in tdomf.splitlines(1):
 			s = i
 			r = i.split()
@@ -1288,7 +1289,9 @@ def check():
 						pass
 	
 
-			tdomf2 += s
+			if not s == s2:
+				tdomf2 += s
+				s2 = s
 
 		tdomf = tdomf2
 
