@@ -1205,7 +1205,7 @@ def check():
 	# ******************************
 
 
-	# sort all rules in all domains
+	# sort and uniq all rules in all domains
 	tdomf3 = ""
 	tdomf2 = tdomf + "\n\n<kernel>"
 	r = re.findall("^<kernel>.*?^(?=<kernel>)", tdomf2, re.M + re.DOTALL)
