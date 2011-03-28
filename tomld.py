@@ -1232,10 +1232,10 @@ def check():
 	# -----------------------------------------------------------------------------------------------------------
 
 	# recursive dir handling: change all subdir names of all dir in specr to fully wildcarded
+	tdomf2 = ""
 	l = len(specr)
 	if l > 0:
 
-		tdomf2 = ""
 		s2 = ""
 		for i in tdomf.splitlines(1):
 			s = i
@@ -1937,8 +1937,13 @@ if specr:
 	color("calculating directory depths for recursive dirs...", yellow, 1)
 	for i in specr:
 		c = 0
+		c1 = len(re.findall("/", i))
 		for dirpath, dirnames, filenames in os.walk(i):
-			c += 1
+			c2 = len(re.findall("/", dirpath))
+			if c2 > c: c = c2
+		c = c - c1 + 1
+		# add one plus extra
+		c += 1
 		specr2_count.append(c)
 	color("done", yellow)
 
