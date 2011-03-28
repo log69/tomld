@@ -25,6 +25,8 @@
 #
 # changelog:
 # -----------
+# 28/03/2011 - tomld v0.22 - speedup info and remove functions
+#                          - ...
 # 27/03/2011 - tomld v0.21 - more bugfixes and code cleanup
 #                          - change in structure: from now allow_mkdir will cause the file's parent dir to be wildcarded too
 #                          - change in structure: i created an exception list for the dirs, so the policy gets a bit tighter with this
@@ -107,7 +109,7 @@ import termios, fcntl, select
 # **************************
 
 # program version
-ver = "0.21"
+ver = "0.22"
 
 # home dir
 home = "/home"
@@ -717,6 +719,7 @@ def info(text = ""):
 	load()
 	if text:
 		# show info about domains and rules
+#		r1 = re.findall("^<kernel>[^\n]*" + text + ".*?(?=<kernel>)", tdomf, re.M + re.I + re.DOTALL)
 		r1 = re.findall("^<kernel>.*" + text + ".*$", tdomf, re.M + re.I)
 		if r1:
 			print
@@ -725,18 +728,11 @@ def info(text = ""):
 				color(i, blue)
 				# it's needed to mark the last domain's end too
 				tdomf2 = tdomf + "\n\n<kernel>"
-				r2 = re.findall("^" + i + "\n[^>]*^<kernel>", tdomf2, re.M + re.I + re.DOTALL)
+				r2 = re.findall("^" + i + ".*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
 				if r2:
 					for i2 in r2:
-						r3 = i2.split("\n")
-						r4 = []
-						if len(r3) > 1: r4 = r3[:-1]
-						else: 			r4 = r3
-						r5 = ""
-						for i3 in r4[1:]:
-							if i3:
-								r5 += i3 + "\n"
-						color(r5, red)
+						i3 = re.search("use_profile.*", i2, re.M + re.DOTALL)
+						if i3: color(i3.group(), red)
 			# print stat
 			l = len(r1)
 			if l > 1:
@@ -791,18 +787,11 @@ def remove(text):
 				# ask for confirmation
 				if choice("remove domain?"):
 					tdomf2 = tdomf + "\n\n<kernel>\n"
-					r2 = re.findall("^" + i + "\n[^>]*^<kernel>", tdomf2, re.M + re.I + re.DOTALL)
+					r2 = re.findall("^" + i + ".*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
 					if r2:
 						for i2 in r2:
-							r3 = i2.split("\n")
-							r4 = []
-							if len(r3) > 1: r4 = r3[:-1]
-							else: 			r4 = r3
-							r5 = ""
-							for i3 in r4: r5 += i3 + "\n"
-							
 							# remove domain from domain policy
-							r6 = re.sub(re.escape(r5), "", tdomf2, re.M)
+							r6 = re.sub(re.escape(i2), "", tdomf2, re.M)
 							flag_count += 1
 
 							tdomf2 = r6
