@@ -1289,6 +1289,8 @@ def check():
 						pass
 	
 
+			# insert rule only if the former rule was not the same
+			# this is to avoid massive multiplication of the rules because of the recursive check
 			if not s == s2:
 				tdomf2 += s
 				s2 = s
