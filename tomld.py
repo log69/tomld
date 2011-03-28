@@ -1205,6 +1205,29 @@ def check():
 	# ******************************
 
 
+	# sort all rules in all domains
+	tdomf3 = ""
+	tdomf2 = tdomf + "\n\n<kernel>"
+	r = re.findall("^<kernel>.*?^(?=<kernel>)", tdomf2, re.M + re.DOTALL)
+	if r:
+		# cycle through domains
+		for i in r:
+			# cycle through lines of domain
+			r2 = []
+			for i2 in i.splitlines(1):
+				if not i2 == "\n":
+					if not i2[0:6] == "allow_":
+						tdomf3 += i2
+					else:
+						if i2 not in r2:
+							r2.append(i2)
+				
+			r2.sort()
+			tdomf3 +=  "".join(r2)
+			tdomf3 += "\n"
+
+		tdomf = tdomf3
+
 
 	# -----------------------------------------------------------------------------------------------------------
 
@@ -1216,6 +1239,7 @@ def check():
 		s2 = ""
 		for i in tdomf.splitlines(1):
 			s = i
+			
 
 			# operate only on rules
 			if i[0:6] == "allow_":
@@ -1240,7 +1264,7 @@ def check():
 							for i4 in range(1, c):
 								dr = ""
 								# is it a dir or file originally
-								if r[1][:-1] == "/":
+								if r[1][-1] == "/":
 									dr = dir1
 									for i5 in range(c-i4, c):
 										dr += "\*/"
@@ -1250,8 +1274,6 @@ def check():
 										dr += "/\*"
 							
 								s += r[0] + " " + dr + "\n"
-
-							print; print s
 
 				elif l2 == 3:
 					ind1 = 0
@@ -1267,8 +1289,8 @@ def check():
 						if dir2: break
 						ind2 += 1
 
-					# if any of them yes, and they both refer to the same recursive dir
-					if (dir1 or dir2) and (ind1 == ind2):
+					# if any of them yes and refer to the same recursive dir
+					if dir1 or dir2:
 				
 						if dir1 and (not dir2):
 							c = specr2_count[ind1]
@@ -1277,7 +1299,7 @@ def check():
 								for i4 in range(1, c):
 									dr = ""
 									# is it a dir or file originally
-									if r[1][:-1] == "/":
+									if r[1][-1] == "/":
 										dr = dir1
 										for i5 in range(c-i4, c):
 											dr += "\*/"
@@ -1286,12 +1308,45 @@ def check():
 										for i5 in range(c-i4, c):
 											dr += "/\*"
 							
-									s += r[0] + " " + dr + "\n"
+									s += r[0] + " " + dr + " " + r[2] + "\n"
 
 						if (not dir1) and dir2:
-							pass
+							c = specr2_count[ind2]
+							if c > 0:
+								s = ""
+								for i4 in range(1, c):
+									dr = ""
+									# is it a dir or file originally
+									if r[2][-1] == "/":
+										dr = dir2
+										for i5 in range(c-i4, c):
+											dr += "\*/"
+									else:
+										dr = dir2[:-1]
+										for i5 in range(c-i4, c):
+											dr += "/\*"
+							
+									s += r[0] + " " + r[1] + " " + dr + "\n"
 
-						if dir1 and dir2:
+						if (dir1 and dir2) and (ind1 == ind2):
+							c = specr2_count[ind1]
+							if c > 0:
+								s = ""
+								for i4 in range(1, c):
+									dr = ""
+									# is it a dir or file originally
+									if r[1][-1] == "/":
+										dr = dir1
+										for i5 in range(c-i4, c):
+											dr += "\*/"
+									else:
+										dr = dir1[:-1]
+										for i5 in range(c-i4, c):
+											dr += "/\*"
+							
+									s += r[0] + " " + dr + " " + dr + "\n"
+	
+						if (dir1 and dir2) and (not ind1 == ind2):
 							pass
 	
 
@@ -1301,15 +1356,11 @@ def check():
 					tdomf2 += s
 					s2 = s
 
-			tdomf2 += s
-			s2 = ""
+			else:
+				tdomf2 += s
+				s2 = ""
 
 		tdomf = tdomf2
-
-		exit()
-
-		save()
-		load()
 
 
 	# the spec predefined dirs and those dirs that have files newly created in them
@@ -1698,15 +1749,6 @@ if (l > 0):
 			myexit(1)
 	specr.sort()
 
-	# calculate dir depths of all recursive dirs
-	color("calculating directory depths for recursive dirs...", yellow, 1)
-	for i in specr:
-		c = 0
-		for dirpath, dirnames, filenames in os.walk(i):
-			c += 1
-		specr2_count.append(c)
-	color("done", yellow)
-
 
 	# the rest of the parameters not starting with "-"
 	# are additional programs to check
@@ -1888,6 +1930,17 @@ if (opt_remove):
 
 
 # ----------------------------------------------------------------------
+
+# calculate dir depths of all recursive dirs
+if specr:
+	color("calculating directory depths for recursive dirs...", yellow, 1)
+	for i in specr:
+		c = 0
+		for dirpath, dirnames, filenames in os.walk(i):
+			c += 1
+		specr2_count.append(c)
+	color("done", yellow)
+
 
 
 # ************************************
