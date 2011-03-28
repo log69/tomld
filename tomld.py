@@ -1751,8 +1751,6 @@ if (l > 0):
 			myexit(1)
 	specr.sort()
 	
-	print; print specr; exit()
-
 
 	# the rest of the parameters not starting with "-"
 	# are additional programs to check
