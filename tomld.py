@@ -1460,35 +1460,8 @@ def check():
 						flag  = 0
 						flag3 = 0
 
-#						# is it in specr?
-#						# specr is sorted, so it should find the top-most directory by default
-#						# get the dir name
-#						r = re.search("^/.+/", param, re.MULTILINE)
-#						if r:
-#							# let's watch out for the "\*" wildcard and compare dirs like that
-#							# but this time recursively, only the beginning of specr must match
-#							r5 = r.group()
-#							for i5 in specr:
-#								param2 = comparer(r5, i5)
-#								if param2:
-#									flag = 2
-#									break
-						
 
-						# ****************************************
-						# ********  MAKE AN EXCEPTION  ***********
-						# **** if it's ~/.file or in spex_ex *****
-						# ****************************************
-						# check it in spec and spec2 only if it is not an exception (spec_ex)
 						flag_ex = 0
-#						# set the exception also if it's a ~/.setting file
-#						r = re.search("^/.+/", param, re.MULTILINE)
-#						if r:
-#							r5 = r.group()
-#							if compare(home + "/\*/", r5):
-#								r6 = re.search("/\.[^/]+$", param, re.MULTILINE)
-#								if r6:
-#									flag_ex = 1
 						# check dir in exception						
 						if not flag_ex:
 							r = re.search("^/.+/", param, re.MULTILINE)
@@ -1556,31 +1529,6 @@ def check():
 								r = re.sub("/[^/]+/[^/]+$", "/\\\\*/\\\\*", param)
 								param = r
 
-#						# path is in specr
-#						if flag == 2:
-#							e1 = param.split("/")
-#							e2 = param2.split("/")
-#							l1 = len(e1)-1
-#							l2 = len(e2)-1
-#							
-#							# change all subdir names to wildcard "\*"
-#							param3 = ""
-#							for i in range(0, l1):
-#								c1 = e1[i]
-#								if i < l2:
-#									c2 = e2[i]
-#									if c1 == "\*" or c2 == "\*":
-#										param3 += "\*" + "/"
-#									else:
-#										param3 += c1 + "/"
-#								else:
-#									param3 += "\*" + "/"
-#							
-#							# was it a dir or a file originally?
-#							if not param[-1] == "/":
-#								param3 += "\*"
-#
-#							param = param3
 
 						# wildcard library files version numbers
 						if re.search("/lib.+[\.0-9]*\.so[\.0-9]*$", param, re.MULTILINE):
