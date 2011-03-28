@@ -1292,41 +1292,41 @@ def check():
 					# if any of them yes and refer to the same recursive dir
 					if dir1 or dir2:
 				
-						if dir1 and (not dir2):
-							c = specr2_count[ind1]
-							if c > 0:
-								s = ""
-								for i4 in range(1, c):
-									dr = ""
-									# is it a dir or file originally
-									if r[1][-1] == "/":
-										dr = dir1
-										for i5 in range(c-i4, c):
-											dr += "\*/"
-									else:
-										dr = dir1[:-1]
-										for i5 in range(c-i4, c):
-											dr += "/\*"
-							
-									s += r[0] + " " + dr + " " + r[2] + "\n"
+#						if dir1 and (not dir2):
+#							c = specr2_count[ind1]
+#							if c > 0:
+#								s = ""
+#								for i4 in range(1, c):
+#									dr = ""
+#									# is it a dir or file originally
+#									if r[1][-1] == "/":
+#										dr = dir1
+#										for i5 in range(c-i4, c):
+#											dr += "\*/"
+#									else:
+#										dr = dir1[:-1]
+#										for i5 in range(c-i4, c):
+#											dr += "/\*"
+#							
+#									s += r[0] + " " + dr + " " + r[2] + "\n"
 
-						if (not dir1) and dir2:
-							c = specr2_count[ind2]
-							if c > 0:
-								s = ""
-								for i4 in range(1, c):
-									dr = ""
-									# is it a dir or file originally
-									if r[2][-1] == "/":
-										dr = dir2
-										for i5 in range(c-i4, c):
-											dr += "\*/"
-									else:
-										dr = dir2[:-1]
-										for i5 in range(c-i4, c):
-											dr += "/\*"
-							
-									s += r[0] + " " + r[1] + " " + dr + "\n"
+#						if (not dir1) and dir2:
+#							c = specr2_count[ind2]
+#							if c > 0:
+#								s = ""
+#								for i4 in range(1, c):
+#									dr = ""
+#									# is it a dir or file originally
+#									if r[2][-1] == "/":
+#										dr = dir2
+#										for i5 in range(c-i4, c):
+#											dr += "\*/"
+#									else:
+#										dr = dir2[:-1]
+#										for i5 in range(c-i4, c):
+#											dr += "/\*"
+#							
+#									s += r[0] + " " + r[1] + " " + dr + "\n"
 
 						if (dir1 and dir2) and (ind1 == ind2):
 							c = specr2_count[ind1]
@@ -1346,8 +1346,9 @@ def check():
 							
 									s += r[0] + " " + dr + " " + dr + "\n"
 	
-						if (dir1 and dir2) and (not ind1 == ind2):
-							pass
+
+#						if (dir1 and dir2) and (not ind1 == ind2):
+#							pass
 	
 
 				# insert rule only if the former rule was not the same
