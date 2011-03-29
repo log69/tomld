@@ -118,7 +118,7 @@ ver = "0.23"
 home = "/home"
 
 # policy check interval
-global count; count = 30
+global count; count = 10
 
 # max entries variable in profile config
 global maxe; maxe = 10000
@@ -2231,27 +2231,37 @@ try:
 				d4 = os.path.join(d2, d3)
 				# interested only in links
 				if os.path.islink(d4) and os.path.exists(d4):
-					d5 = os.readlink(d4)
-					# choose the links starting with word socket only
-					if d5.startswith("socket"):
-						pid = dir
-						# remove my PID from the list
-						if not pid == mypid:
-							sock = d5[8:-1]
-							# if socket is one of the inodes
-							if netf3.count(sock):
-								f = os.path.join("/proc", pid, "exe")
-								if os.path.islink(f) and os.path.exists(f):
-									# store the link to binary
-									f2 = os.readlink(f)
-									if (not progs.count(f2)) and (not f2 in spec_prog):
-										# print info once
-										if flag2 == 0:
-											flag2 = 1
-											color("* new processes using network", yellow)
-										# store it if not an exception
-										progs.append(f2)
-										color(f2, blue)
+					flag_ok = 0
+					try:
+						d5 = os.readlink(d4)
+						flag_ok = 1
+					except: None
+					if flag_ok:
+						# choose the links starting with word socket only
+						if d5.startswith("socket"):
+							pid = dir
+							# remove my PID from the list
+							if not pid == mypid:
+								sock = d5[8:-1]
+								# if socket is one of the inodes
+								if netf3.count(sock):
+									f = os.path.join("/proc", pid, "exe")
+									if os.path.islink(f) and os.path.exists(f):
+										# store the link to binary
+										flag_ok = 0
+										try:
+											f2 = os.readlink(f)
+											flag_ok = 1
+										except: None
+										if flag_ok:
+											if (not progs.count(f2)) and (not f2 in spec_prog):
+												# print info once
+												if flag2 == 0:
+													flag2 = 1
+													color("* new processes using network", yellow)
+												# store it if not an exception
+												progs.append(f2)
+												color(f2, blue)
 	
 
 	# run policy check from time to time
