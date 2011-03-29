@@ -357,7 +357,7 @@ def compare(d1, d2):
 # compare paths containing \* wildcard
 # but recursively, only the beginning of the dir must match
 # d1 must contain the beginning of d2 (d2 is specr)
-def comparer(d1, d2):
+def compare_r(d1, d2):
 	e1 = d1.split("/")
 	e2 = d2.split("/")
 	l1 = len(e1)-1
@@ -821,6 +821,94 @@ def remove(text):
 			color("error: no domains by pattern", red)
 
 
+# compare 3 files or dirs and give back a wildcarded name if they seem to be the same (but contain random part)
+def compare_t(last1, last2, last3):
+	# create type of rule
+	cre = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir"]
+
+#	if last3[0:13] == "allow_create ":
+#	# the 2 rules before are create rules too?
+#	if last1[0:13] == "allow_create " and last2[0:13] == "allow_create ":
+
+	# all of them have the same length?
+	if len(last3) == len(last1) and len(last3) == len(last2):
+		# they have parameters?
+		a1 = last1.split()
+		a2 = last2.split()
+		a3 = last3.split()
+		l1 = len(a1)
+		l2 = len(a2)
+		l3 = len(a3)
+		# they have the same number of parameters with at least 1?
+		if l3 == l1 and l3 == l2 and l3 > 1:
+			# check with 1 parameter only
+			if l3 == 2:
+				# rule types are the same?
+				if a3[0] == a1[0] and a3[0] == a2[0]:
+					# is it create type of rule?
+					if a3[0] in cre:
+						# parameters are not nothing?
+						if a1[1] and a2[1] and a3[1]:
+							# parameters are files or dirs?
+							flag_dir = 0
+							# files
+							if (not a1[1][-1] == "/") and (not a2[1][-1] == "/") and (not a3[1][-1] == "/"):
+								flag_dir = 1
+							# dirs
+							elif (a1[1][-1] == "/") and (a2[1][-1] == "/") and (a3[1][-1] == "/"):
+								flag_dir = 2
+							if flag_dir:
+								b1 = ""; b2 = ""; b3 = ""
+								if flag_dir == 1:
+									b1 = a1[1]; b2 = a2[1]; b3 = a3[1]
+								else:
+									b1 = a1[1][:-1]; b2 = a2[1][:-1]; b3 = a3[1][:-1]
+								# get the dir names
+								d1 = re.search("^/.+/", b1, re.MULTILINE)
+								d2 = re.search("^/.+/", b2, re.MULTILINE)
+								d3 = re.search("^/.+/", b3, re.MULTILINE)
+								if d1 and d2 and d3:
+									dd1 = d1.group()
+									dd2 = d2.group()
+									dd3 = d3.group()
+									# their dirs match?
+									if dd3 == dd1 and dd3 == dd2:
+										# get the file names
+										f1 = re.search("[^/]+$", b1, re.MULTILINE)
+										f2 = re.search("[^/]+$", b2, re.MULTILINE)
+										f3 = re.search("[^/]+$", b3, re.MULTILINE)
+										if f1 and f2 and f3:
+											ff1 = f1.group()
+											ff2 = f2.group()
+											ff3 = f3.group()
+											# their file names doesn't contain any wildcard?
+											# this means their dir is among the exception dirs,
+											# otherwise they would have been managed before
+											# because of having a create rule
+											w1 = re.search("\*|\$", ff1)
+											w2 = re.search("\*|\$", ff2)
+											w3 = re.search("\*|\$", ff3)
+											if (not w1) and (not w2) and (not w3):
+												# if some part of the file matches in them
+												flag = 0
+												pos = 0
+												l = len(ff1)
+												# check the beginning
+												for i2 in range(0, l):
+													if ff3[i2] == ff1[i2] and ff3[i2] == ff2[i2]:
+														flag = 1
+														pos = i2
+													else:
+														break
+												if flag:
+													new = ff3[0:pos+1] + "\*"
+													if flag_dir == 2: new += "/"
+													i = a3[0] + " " + dd3 + new + "\n"
+													return i
+
+	return ""
+
+
 # sort and uniq all rules in all domains
 def domain_cleanup():
 	global tdomf
@@ -1265,7 +1353,7 @@ def check():
 					ind1 = 0
 					# is the dir in specr?
 					for i3 in specr:
-						dir1 = comparer(r[1], i3)
+						dir1 = compare_r(r[1], i3)
 						if dir1: break
 						ind1 += 1
 					# if so
@@ -1292,12 +1380,12 @@ def check():
 					ind2 = 0
 					# is the dir in specr?
 					for i3 in specr:
-						dir1 = comparer(r[1], i3)
+						dir1 = compare_r(r[1], i3)
 						if dir1: break
 						ind1 += 1
 					# is the dir2 in specr?
 					for i3 in specr:
-						dir2 = comparer(r[2], i3)
+						dir2 = compare_r(r[2], i3)
 						if dir2: break
 						ind2 += 1
 
@@ -1389,7 +1477,7 @@ def check():
 	# these are the special create entries, where the place of the file will be wildcarded
 	# because it cannot be determined fully yet if the file being created has a uniq filename
 	# or a contantly changing one (temporary name)
-	cre  = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir"]
+	cre = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir"]
 
 	# allow_mkdir will also have a special handling, cause usually files are created in the
 	# new dir too, and it cannot be surely told if the dir itself has a uniq name too,
@@ -1468,6 +1556,15 @@ def check():
 						# only one of them is enough to find
 						
 						param = i2[i3]
+						# get parent dir of param (if file or dir)
+						paramd = ""
+						if not param[-1] == "/":
+							r = re.search("^/.+/", param, re.MULTILINE)
+							if r: paramd = r.group()
+						else:
+							r = re.search("^/.+/", param[:-1], re.MULTILINE)
+							if r: paramd = r.group()
+						
 						param2 = ""
 						flag  = 0
 						flag3 = 0
@@ -1476,13 +1573,10 @@ def check():
 						flag_ex = 0
 						# check dir in exception						
 						if not flag_ex:
-							r = re.search("^/.+/", param, re.MULTILINE)
-							if r:
-								r5 = r.group()
-								for i5 in spec_ex:
-									if compare(r5, i5):
-										flag_ex = 1
-										break
+							for i5 in spec_ex:
+								if compare(paramd, i5):
+									flag_ex = 1
+									break
 
 
 
@@ -1501,28 +1595,18 @@ def check():
 						# is it in spec2?
 						if not flag_ex:
 							if not flag:
-								# get the dir name
-								r = re.search("^/.+/", param, re.MULTILINE)
-								if r:
-									# let's watch out for the "\*" wildcard and compare dirs like that
-									r5 = r.group()
-									for i5 in spec2:
-										if compare(r5, i5):
-											flag = 1
-											break
+								for i5 in spec2:
+									if compare(paramd, i5):
+										flag = 1
+										break
 
 						# is it in spec3?
 						if not flag_ex:
 							if not flag3:
-								# get the dir name
-								r = re.search("^/.+/", param, re.MULTILINE)
-								if r:
-									# let's watch out for the "\*" wildcard and compare dirs like that
-									r5 = r.group()
-									for i5 in spec3:
-										if compare(r5, i5):
-											flag3 = 1
-											break
+								for i5 in spec3:
+									if compare(paramd, i5):
+										flag3 = 1
+										break
 
 						# path is in spec or spec2
 						if flag:
@@ -1568,14 +1652,21 @@ def check():
 
 	tdomf = tdomf2
 
-	# iterate through all the rules and reshape them
+
+	# ----------------------------------------------------------------------------------------------------------
+	# ***********************
+	# ***  FINAL RESHAPE  ***
+	# ***********************
+	# iterate through all the rules again and reshape them
+
 	# all entries with allow_create will be recreated with allow_unlink and allow_read/write entries too
-	# cause there are deny logs frequently coming back for the created files trying to be written and unlinked
-	# what is created should be allowed to be written or unlinked
+	# cause there are deny logs frequently coming back for the created files trying to be written, unlinked or trancated
+	# what is created should be allowed to be written or unlinked or truncated
+
 	tdomf2 = ""
 	for i in tdomf.splitlines(1):
 		
-		# operate only on rules
+		# on create rule, add read/write, unlink and truncate too if 
 		if i[0:13] == "allow_create ":
 			i2 = re.sub("allow_create ", "allow_read/write ", i, re.M)
 			i3 = re.sub("allow_create ", "allow_unlink ", i, re.M)
@@ -1585,9 +1676,51 @@ def check():
 		tdomf2 += i
 
 	tdomf = tdomf2
-	
 
 	domain_cleanup()
+
+
+
+	# also, check the last 3 rules and if they match partly (being temp files), then wildcard it
+	# but only if it's in an exception dir, cause otherwise it's managed before
+
+	last1 = ""
+	last2 = ""
+	last3 = ""
+	tdomf2 = ""
+	for i in tdomf.splitlines(1):
+		last3 = i
+		
+		# check the last 3 rules and determine if the params start with the same name, but end the other way
+		# this might mean thease are temporary files containg random chars
+		# within the same domain yet?
+		if last3[0:6] == "allow_":
+			# were there 2 rules yet?
+			if last1 and last2:
+				d = compare_t(last1, last2, last3)
+				if d:
+					i = d
+					print "OK"; print last3, i
+					last1 = ""
+					last2 = ""
+					last3 = ""
+
+
+			# roll the rules
+			last1 = last2
+			last2 = last3
+		else:
+			last2 = ""
+			last3 = ""
+
+		tdomf2 += i
+
+	tdomf = tdomf2
+	
+	domain_cleanup()
+
+#	print tdomf
+	exit()
 
 	save()
 
