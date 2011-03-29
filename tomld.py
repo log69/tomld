@@ -118,7 +118,7 @@ ver = "0.23"
 home = "/home"
 
 # policy check interval
-global count; count = 10
+global count; count = 30
 
 # max entries variable in profile config
 global maxe; maxe = 10000
