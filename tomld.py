@@ -978,8 +978,8 @@ def compare_t(last1, last2, last3):
 											w2_ = re.search("\*|\$", ff2_)
 											w3_ = re.search("\*|\$", ff3_)
 
-											new1 = ff3  + "/"
-											new2 = ff3_ + "/"
+											new  = ff3  + "/"
+											new_ = ff3_ + "/"
 											if (not w1) and (not w2) and (not w3):
 												# if some part of the file matches in them
 												flag = 0
@@ -996,8 +996,8 @@ def compare_t(last1, last2, last3):
 														break
 												# if there was any part the same but not all was the same
 												if flag and flag_notall:
-													new1 = ff3[0:pos+1] + "\*"
-													if flag_dir == 2: new1 += "/"
+													new = ff3[0:pos+1] + "\*"
+													if flag_dir == 2: new += "/"
 
 											if (not w1_) and (not w2_) and (not w3_):
 												# if some part of the file matches in them
@@ -1015,11 +1015,11 @@ def compare_t(last1, last2, last3):
 														break
 												# if there was any part the same but not all was the same
 												if flag2 and flag_notall2:
-													new2 = ff3[0:pos+1] + "\*"
-													if flag_dir == 2: new2 += "/"
+													new_ = ff3_[0:pos+1] + "\*"
+													if flag_dir == 2: new_ += "/"
 
 												if (flag and flag_notall) or (flag2 and flag_notall2):
-													i = a3[0] + " " + dd3 + new1 + " " + dd3_ + new2 + "\n"
+													i = a3[0] + " " + dd3 + new + " " + dd3_ + new_ + "\n"
 													return i
 
 	return ""
