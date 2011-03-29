@@ -1018,6 +1018,8 @@ def compare_t(last1, last2, last3):
 													new_ = ff3_[0:pos+1] + "\*"
 													if flag_dir == 2: new_ += "/"
 
+
+												# return the result if there was any change
 												if (flag and flag_notall) or (flag2 and flag_notall2):
 													i = a3[0] + " " + dd3 + new + " " + dd3_ + new_ + "\n"
 													return i
@@ -1799,7 +1801,6 @@ def check():
 
 	# also, check the last 3 rules and if they match partly (being temp files), then wildcard it
 	# but only if it's in an exception dir, cause otherwise it's managed before
-	print
 
 	last1 = ""
 	last2 = ""
@@ -1817,7 +1818,6 @@ def check():
 				d = compare_t(last1, last2, last3)
 				if d:
 					i = d
-					print last3, i
 					last1 = ""
 					last2 = ""
 					last3 = ""
