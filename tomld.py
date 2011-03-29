@@ -917,6 +917,7 @@ def compare_t(last1, last2, last3):
 					if a3[0] in cre:
 						# parameters are not nothing?
 						if a1[1] and a2[1] and a3[1] and a1[2] and a2[2] and a3[2]:
+							print "OKKKKKKKKKKKKK", last3
 							# parameters are files or dirs?
 							flag_dir = 0
 							# files
@@ -977,8 +978,8 @@ def compare_t(last1, last2, last3):
 											w2_ = re.search("\*|\$", ff2_)
 											w3_ = re.search("\*|\$", ff3_)
 
-											new1 = ff3
-											new2 = ff3_
+											new1 = ff3  + "/"
+											new2 = ff3_ + "/"
 											if (not w1) and (not w2) and (not w3):
 												# if some part of the file matches in them
 												flag = 0
@@ -1798,6 +1799,7 @@ def check():
 
 	# also, check the last 3 rules and if they match partly (being temp files), then wildcard it
 	# but only if it's in an exception dir, cause otherwise it's managed before
+	print
 
 	last1 = ""
 	last2 = ""
@@ -1815,7 +1817,7 @@ def check():
 				d = compare_t(last1, last2, last3)
 				if d:
 					i = d
-					print "OK"; print last3, i
+					print last3, i
 					last1 = ""
 					last2 = ""
 					last3 = ""
