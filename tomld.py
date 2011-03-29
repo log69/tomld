@@ -260,6 +260,8 @@ def help():
 	print "Tomoyo security module is part of the mainline Linux kernel since version 2.6.30.",
 	print "Currently this solution targets Linux systems only."
 	print
+	print "*TOMOYO(r) is a registered trademark of NTT DATA Corporation"
+	print
 	print "LINKS:"
 	print "http://tomoyo.sourceforge.jp"
 	print "http://tomoyo.sourceforge.jp/documentation.html.en"
