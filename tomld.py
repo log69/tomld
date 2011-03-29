@@ -891,6 +891,7 @@ def compare_t(last1, last2, last3):
 											if (not w1) and (not w2) and (not w3):
 												# if some part of the file matches in them
 												flag = 0
+												flag_notall = 0
 												pos = 0
 												l = len(ff1)
 												# check the beginning
@@ -899,8 +900,10 @@ def compare_t(last1, last2, last3):
 														flag = 1
 														pos = i2
 													else:
+														flag_notall = 1
 														break
-												if flag:
+												# if there was any part the same but not all was the same
+												if flag and flag_notall:
 													new = ff3[0:pos+1] + "\*"
 													if flag_dir == 2: new += "/"
 													i = a3[0] + " " + dd3 + new + "\n"
