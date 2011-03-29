@@ -318,8 +318,7 @@ def help():
 	print "- run it the 1st time, now it will offer to install all missing packages and setup grub with kernel parameter"
 	print "- system reboot is necessary now"
 	print "- run it the 2nd time, now it will create domains for the processes automatically with learning mode"
-	print "- stop it now, cause the domains will stay in learning mode and the tomoyo module will",
-	print "collect all rules, even if the whole system is restarted"
+	print "- stop it now, cause the domains will stay in learning mode and the tomoyo module will collect all rules"
 	print "- reboot the system or at least all the services and applications that have domains now"
 	print "- hours or days later let's run it the 3rd time, now the access denied logs will be converted to rules,",
 	print "and on exit all remaining domains will be turned into enforcing mode"
