@@ -25,6 +25,8 @@
 #
 # changelog:
 # -----------
+# 29/03/2011 - tomld v0.23 - add feature to try to detect temporary names and wildcard them
+#                          - major bugfixes
 # 28/03/2011 - tomld v0.22 - speed up info and remove functions
 #                          - add full recursive directory subtitution with wildcards
 #                          - several bugfix
@@ -110,7 +112,7 @@ import termios, fcntl, select
 # **************************
 
 # program version
-ver = "0.22"
+ver = "0.23"
 
 # home dir
 home = "/home"
