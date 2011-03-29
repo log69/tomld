@@ -1835,9 +1835,6 @@ def check():
 	
 	domain_cleanup()
 
-#	print tdomf
-	exit()
-
 	save()
 
 
