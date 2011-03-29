@@ -909,6 +909,118 @@ def compare_t(last1, last2, last3):
 													i = a3[0] + " " + dd3 + new + "\n"
 													return i
 
+			# check with 2 parameters
+			elif l3 == 3:
+				# rule types are the same?
+				if a3[0] == a1[0] and a3[0] == a2[0]:
+					# is it create type of rule?
+					if a3[0] in cre:
+						# parameters are not nothing?
+						if a1[1] and a2[1] and a3[1] and a1[2] and a2[2] and a3[2]:
+							# parameters are files or dirs?
+							flag_dir = 0
+							# files
+							if (not a1[1][-1] == "/") and (not a2[1][-1] == "/") and (not a3[1][-1] == "/") and \
+							   (not a1[2][-1] == "/") and (not a2[2][-1] == "/") and (not a3[2][-1] == "/"):
+								flag_dir = 1
+							# dirs
+							elif (a1[1][-1] == "/") and (a2[1][-1] == "/") and (a3[1][-1] == "/") and \
+							     (a1[2][-1] == "/") and (a2[2][-1] == "/") and (a3[2][-1] == "/"):
+								flag_dir = 2
+							if flag_dir:
+								b1  = ""; b2  = ""; b3  = ""
+								b1_ = ""; b2_ = ""; b3_ = ""
+								if flag_dir == 1:
+									b1  = a1[1]; b2  = a2[1]; b3  = a3[1]
+									b1_ = a1[2]; b2_ = a2[2]; b3_ = a3[2]
+								else:
+									b1  = a1[1][:-1]; b2  = a2[1][:-1]; b3  = a3[1][:-1]
+									b1_ = a1[2][:-1]; b2_ = a2[2][:-1]; b3_ = a3[2][:-1]
+								# get the dir names
+								d1  = re.search("^/.+/", b1,  re.MULTILINE)
+								d2  = re.search("^/.+/", b2,  re.MULTILINE)
+								d3  = re.search("^/.+/", b3,  re.MULTILINE)
+								d1_ = re.search("^/.+/", b1_, re.MULTILINE)
+								d2_ = re.search("^/.+/", b2_, re.MULTILINE)
+								d3_ = re.search("^/.+/", b3_, re.MULTILINE)
+								if d1 and d2 and d3 and d1_ and d2_ and d3_:
+									dd1  = d1.group()
+									dd2  = d2.group()
+									dd3  = d3.group()
+									dd1_ = d1_.group()
+									dd2_ = d2_.group()
+									dd3_ = d3_.group()
+									# their dirs match?
+									if dd3 == dd1 and dd3 == dd2 and dd3_ == dd1_ and dd3_ == dd2_:
+										# get the file names
+										f1  = re.search("[^/]+$", b1, re.MULTILINE)
+										f2  = re.search("[^/]+$", b2, re.MULTILINE)
+										f3  = re.search("[^/]+$", b3, re.MULTILINE)
+										f1_ = re.search("[^/]+$", b1_, re.MULTILINE)
+										f2_ = re.search("[^/]+$", b2_, re.MULTILINE)
+										f3_ = re.search("[^/]+$", b3_, re.MULTILINE)
+										if f1 and f2 and f3 and f1_ and f2_ and f3_:
+											ff1  = f1.group()
+											ff2  = f2.group()
+											ff3  = f3.group()
+											ff1_ = f1_.group()
+											ff2_ = f2_.group()
+											ff3_ = f3_.group()
+											# their file names doesn't contain any wildcard?
+											# this means their dir is among the exception dirs,
+											# otherwise they would have been managed before
+											# because of having a create rule
+											w1 = re.search("\*|\$", ff1)
+											w2 = re.search("\*|\$", ff2)
+											w3 = re.search("\*|\$", ff3)
+											w1_ = re.search("\*|\$", ff1_)
+											w2_ = re.search("\*|\$", ff2_)
+											w3_ = re.search("\*|\$", ff3_)
+
+											new1 = ff3
+											new2 = ff3_
+											if (not w1) and (not w2) and (not w3):
+												# if some part of the file matches in them
+												flag = 0
+												flag_notall = 0
+												pos = 0
+												l = len(ff1)
+												# check the beginning
+												for i2 in range(0, l):
+													if ff3[i2] == ff1[i2] and ff3[i2] == ff2[i2]:
+														flag = 1
+														pos = i2
+													else:
+														flag_notall = 1
+														break
+												# if there was any part the same but not all was the same
+												if flag and flag_notall:
+													new1 = ff3[0:pos+1] + "\*"
+													if flag_dir == 2: new1 += "/"
+
+											if (not w1_) and (not w2_) and (not w3_):
+												# if some part of the file matches in them
+												flag2 = 0
+												flag_notall2 = 0
+												pos = 0
+												l = len(ff1_)
+												# check the beginning
+												for i2 in range(0, l):
+													if ff3_[i2] == ff1_[i2] and ff3_[i2] == ff2_[i2]:
+														flag2 = 1
+														pos = i2
+													else:
+														flag_notall2 = 1
+														break
+												# if there was any part the same but not all was the same
+												if flag2 and flag_notall2:
+													new2 = ff3[0:pos+1] + "\*"
+													if flag_dir == 2: new2 += "/"
+
+												if (flag and flag_notall) or (flag2 and flag_notall2):
+													i = a3[0] + " " + dd3 + new1 + " " + dd3_ + new2 + "\n"
+													return i
+
 	return ""
 
 
