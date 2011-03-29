@@ -917,7 +917,6 @@ def compare_t(last1, last2, last3):
 					if a3[0] in cre:
 						# parameters are not nothing?
 						if a1[1] and a2[1] and a3[1] and a1[2] and a2[2] and a3[2]:
-							print "OKKKKKKKKKKKKK", last3
 							# parameters are files or dirs?
 							flag_dir = 0
 							# files
