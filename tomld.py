@@ -82,8 +82,10 @@
 #
 #	1)	init
 #	2)	search for new processes using network
-#	3)	while counter-- goto 2
-#	4)	check prolicy for domain and all its subdomains
+#	3)	sleep short
+#	3)	while counter-- goto 2 (means long sleep for check)
+#	4)	load policy
+#	5)	check prolicy for domain and all its subdomains
 #		if disabled mode
 #			turn on learning mode
 #		if learning mode
@@ -92,12 +94,27 @@
 #			no change
 #		if enforcing mode
 #			no change
-#	5) get recent log
-#	6) convert logs to rules and add them to policy
-#	7) switch back domains with access deny from enforcing to learning mode until exit only
-#	8) reshape policy rules
-#	9) goto 2
-#	10) on exit, turn all old domains with profile 1-2 into enforcing mode
+#	6)	get recent log
+#	7)	convert logs to rules and add them to policy (confirm)
+#	8)	switch back domains with access deny from enforcing to learning mode until exit
+#	9)	reshape policy rules:
+#			domain config cleanup (sort and uniq)
+#			wildcard subdirs of recursive dirs (if any)
+#			collect dir names of create rules (that are not in exception list)
+#			collect dir names to mkdir (that are not in exception list)
+#			wildcard formerly collected dir names (only leaf file or dir name)
+#			wildcard collected mkdir names' leaf and one parent dir too
+#			wildcard library files version numbers
+#			wildcard pid number in /proc/number/ dirs
+#			wildcard user name in /home/user/ dirs
+#			readd every create rule as unlink, read/write etc. too
+#			domain config cleanup (sort and uniq)
+#			wildcard files and dirs with changing names that are not wildcarded yet
+#				(this means dirs in in exception list)
+#			domain config cleanup (sort and uniq)
+#	10)	save policy
+#	11) goto 2
+#	12) on exit, turn all old domains with profile 1-2 into enforcing mode
 
 
 
@@ -129,7 +146,7 @@ global tkern; tkern = "security=tomoyo"
 global tpak1d; tpak1d = "linux-patch-tomoyo1.7"
 global tpak2d; tpak2d = "tomoyo-tools"
 
-# tomoyo files
+# tomoyo vars and files
 global tdomf; tdomf   = ""
 global texcf; texcf   = ""
 global tprof; tprof   = ""
@@ -2270,6 +2287,7 @@ try:
 	if recheck >= count:
 		recheck = 0
 		flag2 = 0
+		flag_safe = 0
 		check()
 		# print only once
 		if not flag_firstrun:
@@ -2278,7 +2296,7 @@ try:
 			if not opt_once: sl = ", sleeping " + str(count) + "s between every cycle"
 			color("* whole running cycle took " + str(time.clock() - speed) + "s" + sl, green)
 			flag_firstrun = 1
-		# now it's safe to enforce mode on interrupt
+		# now it's safe to enforce mode and save config on interrupt, cause check() finished running
 		flag_safe = 1
 
 		
@@ -2302,5 +2320,4 @@ except KeyboardInterrupt:
 # ----------------------------------------------------------------------
 
 print
-flag_safe = 1
 myfinish()
