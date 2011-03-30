@@ -110,7 +110,7 @@
 #			readd every create rule as unlink, read/write etc. too
 #			domain config cleanup (sort and uniq)
 #			wildcard files and dirs with changing names that are not wildcarded yet
-#				(this means dirs in in exception list)
+#				(this means dirs in the exception list)
 #			domain config cleanup (sort and uniq)
 #	10)	save policy
 #	11) goto 2
