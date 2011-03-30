@@ -121,7 +121,6 @@
 import os, sys
 import time, re
 import platform
-import termios, fcntl, select
 
 
 # **************************
