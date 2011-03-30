@@ -133,7 +133,7 @@ ver = "0.23"
 # home dir
 home = "/home"
 
-# policy check interval
+# policy check interval in seconds
 global count; count = 10
 
 # max entries variable in profile config
@@ -177,7 +177,7 @@ global opt_clear;		opt_clear		= 0
 global opt_info;		opt_info		= 0
 global opt_info2;		opt_info2		= ""
 global opt_remove;		opt_remove		= 0
-global opt_remove2;		opt_remove2		= 0
+global opt_remove2;		opt_remove2		= ""
 global opt_yes;			opt_yes			= 0
 global opt_keep;		opt_keep		= 0
 global opt_recursive;	opt_recursive	= 0
@@ -201,12 +201,12 @@ global yellow; yellow	= "\033[33;48m"
 global bold;   bold		= "\033[1m"
 global clr;    clr		= "\033[0m"
 
-# other
 # all binaries with domains
 global progs; progs = []
 # binaries only with newly created learning mode
 # these won't have enforcing mode turned on on exit
 global progl; progl = []
+# variable to store the time to measure speed of run
 global speed; speed = 0
 
 # supported platforms
