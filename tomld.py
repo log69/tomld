@@ -844,7 +844,7 @@ def remove(text):
 # compare 3 files or dirs and give back a wildcarded name if they seem to be the same (but contain random part)
 def compare_t(last1, last2, last3):
 	# create type of rule
-	cre = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir"]
+	cre = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir", "allow_link"]
 
 #	if last3[0:13] == "allow_create ":
 #	# the 2 rules before are create rules too?
@@ -1616,7 +1616,7 @@ def check():
 	# these are the special create entries, where the place of the file will be wildcarded
 	# because it cannot be determined fully yet if the file being created has a uniq filename
 	# or a contantly changing one (temporary name)
-	cre = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir"]
+	cre = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir", "allow_link"]
 
 	# allow_mkdir will also have a special handling, cause usually files are created in the
 	# new dir too, and it cannot be surely told if the dir itself has a uniq name too,
