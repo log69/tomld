@@ -1081,6 +1081,7 @@ def stat():
 
 # my finish
 def myfinish():
+	global flag_safe
 	# check if everything was run at least once before turning on enforcing mode
 	if flag_safe:
 		# turn on enforcing mode for all old domains before exiting
