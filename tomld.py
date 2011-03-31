@@ -2288,7 +2288,6 @@ try:
 	if recheck >= count:
 		recheck = 0
 		flag2 = 0
-		flag_safe = 0
 		check()
 		# print only once
 		if not flag_firstrun:
