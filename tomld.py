@@ -1083,6 +1083,7 @@ def stat():
 # my finish
 def myfinish():
 	global flag_safe
+	global flag_firstrun
 	# check if everything was run at least once before turning on enforcing mode
 	if flag_safe:
 		# turn on enforcing mode for all old domains before exiting
@@ -1090,7 +1091,7 @@ def myfinish():
 		# save config
 		save()
 		stat()
-	else:
+	elif flag_firstrun:
 		color("* haven't finished to run at least once", red)
 	myexit()
 
@@ -2288,14 +2289,15 @@ try:
 	if recheck >= count:
 		recheck = 0
 		flag2 = 0
+		flag_safe = 0
 		check()
 		# print only once
 		if not flag_firstrun:
+			flag_firstrun = 1
 			sl = ""
 			# print time of sleeping period only when --once switch is not set
 			if not opt_once: sl = ", sleeping " + str(count) + "s between every cycle"
 			color("* whole running cycle took " + str(time.clock() - speed) + "s" + sl, green)
-			flag_firstrun = 1
 		# now it's safe to enforce mode and save config on interrupt, cause check() finished running
 		flag_safe = 1
 
