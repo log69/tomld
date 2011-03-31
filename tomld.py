@@ -1091,7 +1091,7 @@ def myfinish():
 		# save config
 		save()
 		stat()
-	elif flag_firstrun:
+	elif not flag_firstrun:
 		color("* haven't finished to run at least once", red)
 	myexit()
 
