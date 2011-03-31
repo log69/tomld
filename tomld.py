@@ -25,7 +25,8 @@
 #
 # changelog:
 # -----------
-# 31/03/2011 - tomld v0.24 - minor bugfixes
+# 31/03/2011 - tomld v0.24 - major bugfixes
+#                          - improve domain cleanup function by making the rules more uniq
 # 29/03/2011 - tomld v0.23 - add feature to try to detect temporary names and wildcard them
 #                          - major bugfixes
 # 28/03/2011 - tomld v0.22 - speed up info and remove functions
@@ -358,11 +359,11 @@ def uniq(list):
 
 
 # compare paths containing \* wildcard
-def compare(d1, d2):
+def compare_dirs(d1, d2):
 	e1 = d1.split("/")
 	e2 = d2.split("/")
-	l1 = len(e1)-1
-	l2 = len(e2)-1
+	l1 = len(e1)
+	l2 = len(e2)
 	if l1 == 0 or l2 == 0: return 0
 	if l1 == l2:
 		for i in range(0, l1):
@@ -377,9 +378,13 @@ def compare(d1, d2):
 # compare paths containing \* wildcard
 # but recursively, only the beginning of the dir must match
 # d1 must contain the beginning of d2 (d2 is specr)
-def compare_r(d1, d2):
-	e1 = d1.split("/")
-	e2 = d2.split("/")
+def compare_recursive(d1, d2):
+	dd1 = re.search("^.*/", d1, re.M)
+	if not dd1: return ""
+	dd2 = re.search("^.*/", d2, re.M)
+	if not dd2: return ""
+	e1 = dd1.group().split("/")
+	e2 = dd2.group().split("/")
 	l1 = len(e1)-1
 	l2 = len(e2)-1
 	if l1 == 0 or l2 == 0 or l1 < l2: return ""
@@ -390,8 +395,98 @@ def compare_r(d1, d2):
 		c2 = e2[i]
 		if (not c1 == "\*") and (not c2 == "\*") and (not c1 == c2):
 			return ""
+
 	return d2
-#	return 1
+
+
+# compare names containing only 1 \* wildcard anywhere
+# returns 1 even if both of them are null
+def compare_names(d1, d2):
+	r1 = re.search("\*", d1)
+	r2 = re.search("\*", d2)
+	if (not r1) and (not r2) and (not d1 == d2): return 0
+	if r1:
+		e1 = re.sub("\\\\\*", "*", d1)
+		d1 = e1
+	if r2:
+		e2 = re.sub("\\\\\*", "*", d2)
+		d2 = e2
+	l1 = len(d1)
+	l2 = len(d2)
+	if l1 == 0 and l2 == 0: return 1
+	if l1 and l2:
+	
+		if r1 and (not r2):
+			w1 = re.search("^[^\*]*", d1, re.M).group()
+			w2 = re.search("[^\*]*$", d1, re.M).group()
+			wl1 = len(w1)
+			wl2 = len(w2)
+			if not (l2 >= wl1 + wl2): return 0
+			if not (w1 == d2[:wl1] and w2 == d2[l2-wl2:l2]): return 0
+			return 1
+	
+		if (not r1) and r2:
+			w1 = re.search("^[^\*]*", d2, re.M).group()
+			w2 = re.search("[^\*]*$", d2, re.M).group()
+			wl1 = len(w1)
+			wl2 = len(w2)
+			# first word's char length must be more or equal than the other's without wildcard
+			if not (l1 >= wl1 + wl2): return 0
+			if not (w1 == d1[:wl1] and w2 == d1[l1-wl2:l1]): return 0
+			return 1
+	
+		if r1 and r2:
+			w1 = re.search("^[^\*]*", d1, re.M).group()
+			w2 = re.search("[^\*]*$", d1, re.M).group()
+			w3 = re.search("^[^\*]*", d2, re.M).group()
+			w4 = re.search("[^\*]*$", d2, re.M).group()
+			wl1 = len(w1)
+			wl2 = len(w2)
+			wl3 = len(w3)
+			wl4 = len(w4)
+			wd1 = wl1
+			wd2 = wl2
+			# compare the less chars beside the wildcard from both sides			
+			if wl1 > wl3: wd1 = wl3
+			if wl2 > wl4: wd2 = wl4
+			if not (d1[:wd1] == d2[:wd1] and d1[l1-wd2:l1] == d2[l2-wd2:l2]): return 0
+			return 1
+	
+		return 1
+
+	else:
+		return 0
+
+
+# compare rules containing \* wildcard anywhere
+def compare_rules(d1, d2):
+	e1 = d1.split()
+	e2 = d2.split()
+	l1 = len(e1)-1
+	l2 = len(e2)-1
+	# fail if number of parameters differ
+	if l1 == 0 or l2 == 0 or (not l1 == l2): return 0
+	# fail if rule type differs
+	if not e1[0] == e2[0]: return 0
+	# compare the paths only
+	for i in range(1, l1+1):
+		f1 = e1[i]
+		f2 = e2[i]
+		r1 = re.search("\*", f1)
+		r2 = re.search("\*", f2)
+		if (not r1) and (not r2) and (not f1 == f2):
+			return 0
+		elif r1 or r2:
+			ee1 = f1.split("/")
+			ee2 = f2.split("/")
+			ll1 = len(ee1)-1
+			ll2 = len(ee2)-1
+			if not ll1 == ll2: return 0
+			# compare the dir and file names between "/" char
+			for i2 in range(0, ll1+1):
+				if not compare_names(ee1[i2], ee2[i2]): return 0
+
+	return 1
 
 
 # check if package is installed (debian)
@@ -842,7 +937,7 @@ def remove(text):
 
 
 # compare 3 files or dirs and give back a wildcarded name if they seem to be the same (but contain random part)
-def compare_t(last1, last2, last3):
+def compare_temp(last1, last2, last3):
 	# create type of rule
 	cre = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir", "allow_link"]
 
@@ -1051,26 +1146,50 @@ def domain_cleanup():
 	global tdomf
 	tdomf3 = ""
 	tdomf2 = tdomf + "\n<kernel>"
+	# collect all domains separately
 	r = re.findall("^<kernel>.*?^(?=<kernel>)", tdomf2, re.M + re.DOTALL)
 	if r:
 		# cycle through domains
 		for i in r:
-			# cycle through lines of domain
+			
 			r2 = []
-			for i2 in i.splitlines(1):
-				if not i2 == "\n":
+			rule2 = ""
+			# cycle through lines of domain and make the rules uniq and sort it
+			for i2 in i.splitlines():
+				if i2:
+					# is the line a rule?
 					if not i2[0:6] == "allow_":
-						tdomf3 += i2
+						tdomf3 += i2 + "\n"
 					else:
-						if i2 not in r2:
+						if not i2 in r2:
 							r2.append(i2)
-				
+
 			r2.sort()
-			tdomf3 +=  "".join(r2)
-			tdomf3 += "\n"
+			r3 = []
+
+			# make rules uniq by wildcard compare too
+			if r2:
+				rule2 = ""
+				ind = 0
+				c = 0
+				for i2 in r2:
+					# if rules match, then replace it with the shorter one (meaning better wildcard)
+					if compare_rules(rule2, i2):
+						if len(rule2) > len(i2):
+							rule2 = i2
+					# if not, then add it to the real container
+					else:
+						if not i2 in r3:
+							r3.append(i2)
+							rule2 = i2
+							ind = c
+					c += 1
+
+			tdomf3 +=  "\n".join(r3)
+			tdomf3 += "\n\n"
 
 		tdomf = tdomf3
-
+		
 
 # print domain stat
 def stat():
@@ -1478,7 +1597,7 @@ def check():
 		s2 = ""
 		for i in tdomf.splitlines(1):
 			s = i
-			
+	
 
 			# operate only on rules
 			if i[0:6] == "allow_":
@@ -1487,12 +1606,12 @@ def check():
 				dir1 = ""
 				dir2 = ""
 
-				# more than 1 parameter? it means 1 or 2 dirs
+				# 1 or 2 parameters?
 				if l2 == 2:
 					ind1 = 0
 					# is the dir in specr?
 					for i3 in specr:
-						dir1 = compare_r(r[1], i3)
+						dir1 = compare_recursive(r[1], i3)
 						if dir1: break
 						ind1 += 1
 					# if so
@@ -1500,7 +1619,7 @@ def check():
 						c = specr2_count[ind1]
 						if c > 0:
 							s = ""
-							for i4 in range(1, c):
+							for i4 in range(1, c+1):
 								dr = ""
 								# is it a dir or file originally
 								if r[1][-1] == "/":
@@ -1519,12 +1638,12 @@ def check():
 					ind2 = 0
 					# is the dir in specr?
 					for i3 in specr:
-						dir1 = compare_r(r[1], i3)
+						dir1 = compare_recursive(r[1], i3)
 						if dir1: break
 						ind1 += 1
 					# is the dir2 in specr?
 					for i3 in specr:
-						dir2 = compare_r(r[2], i3)
+						dir2 = compare_recursive(r[2], i3)
 						if dir2: break
 						ind2 += 1
 
@@ -1535,7 +1654,7 @@ def check():
 #							c = specr2_count[ind1]
 #							if c > 0:
 #								s = ""
-#								for i4 in range(1, c):
+#								for i4 in range(1, c+1):
 #									dr = ""
 #									# is it a dir or file originally
 #									if r[1][-1] == "/":
@@ -1553,7 +1672,7 @@ def check():
 #							c = specr2_count[ind2]
 #							if c > 0:
 #								s = ""
-#								for i4 in range(1, c):
+#								for i4 in range(1, c+1):
 #									dr = ""
 #									# is it a dir or file originally
 #									if r[2][-1] == "/":
@@ -1571,7 +1690,7 @@ def check():
 							c = specr2_count[ind1]
 							if c > 0:
 								s = ""
-								for i4 in range(1, c):
+								for i4 in range(1, c+1):
 									dr = ""
 									# is it a dir or file originally
 									if r[1][-1] == "/":
@@ -1642,7 +1761,7 @@ def check():
 						r2 = r.group()
 						flag = 0
 						for i4 in spec2:
-							if compare(r2, i4):
+							if compare_dirs(r2, i4):
 								flag = 1
 								break
 						if not flag:
@@ -1658,7 +1777,7 @@ def check():
 						r2 = r.group()
 						flag = 0
 						for i4 in spec3:
-							if compare(r2, i4):
+							if compare_dirs(r2, i4):
 								flag = 1
 								break
 						if not flag:
@@ -1713,7 +1832,7 @@ def check():
 						# check dir in exception						
 						if not flag_ex:
 							for i5 in spec_ex:
-								if compare(paramd, i5):
+								if compare_dirs(paramd, i5):
 									flag_ex = 1
 									break
 
@@ -1735,7 +1854,7 @@ def check():
 						if not flag_ex:
 							if not flag:
 								for i5 in spec2:
-									if compare(paramd, i5):
+									if compare_dirs(paramd, i5):
 										flag = 1
 										break
 
@@ -1743,7 +1862,7 @@ def check():
 						if not flag_ex:
 							if not flag3:
 								for i5 in spec3:
-									if compare(paramd, i5):
+									if compare_dirs(paramd, i5):
 										flag3 = 1
 										break
 
@@ -1836,7 +1955,7 @@ def check():
 		if last3[0:6] == "allow_":
 			# were there 2 rules yet?
 			if last1 and last2:
-				d = compare_t(last1, last2, last3)
+				d = compare_temp(last1, last2, last3)
 				if d:
 					i = d
 					last1 = ""
