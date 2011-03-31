@@ -25,6 +25,7 @@
 #
 # changelog:
 # -----------
+# 31/03/2011 - tomld v0.24 - minor bugfixes
 # 29/03/2011 - tomld v0.23 - add feature to try to detect temporary names and wildcard them
 #                          - major bugfixes
 # 28/03/2011 - tomld v0.22 - speed up info and remove functions
@@ -128,7 +129,7 @@ import platform
 # **************************
 
 # program version
-ver = "0.23"
+ver = "0.24"
 
 # home dir
 home = "/home"
