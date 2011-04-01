@@ -27,7 +27,7 @@
 # -----------
 # 01/04/2011 - tomld v0.25 - more major bugfixes
 # 31/03/2011 - tomld v0.24 - major bugfixes
-#                          - improve domain cleanup function by making the rules more uniq
+#                          - improve domain cleanup function by making the rules more unique
 # 29/03/2011 - tomld v0.23 - add feature to try to detect temporary names and wildcard them
 #                          - major bugfixes
 # 28/03/2011 - tomld v0.22 - speed up info and remove functions
@@ -101,7 +101,7 @@
 #	7)	convert logs to rules and add them to policy (confirm)
 #	8)	switch back domains with access deny from enforcing to learning mode until exit
 #	9)	reshape policy rules:
-#			domain config cleanup (sort and uniq)
+#			domain config cleanup (sort and unique)
 #			wildcard subdirs of recursive dirs (if any)
 #			collect dir names of create rules (that are not in exception list)
 #			collect dir names to mkdir (that are not in exception list)
@@ -111,10 +111,10 @@
 #			wildcard pid number in /proc/number/ dirs
 #			wildcard user name in /home/user/ dirs
 #			readd every create rule as unlink, read/write etc. too
-#			domain config cleanup (sort and uniq)
+#			domain config cleanup (sort and unique)
 #			wildcard files and dirs with changing names that are not wildcarded yet
 #				(this means dirs in the exception list)
-#			domain config cleanup (sort and uniq)
+#			domain config cleanup (sort and unique)
 #	10)	save policy
 #	11) goto 2
 #	12) on exit, turn all old domains with profile 1-2 into enforcing mode
@@ -345,7 +345,7 @@ def help():
 	print
 
 
-# sort and uniq a list
+# sort and unique a list
 def uniq(list):
 	l = len(list)
 	if l > 1:
@@ -1141,7 +1141,7 @@ def compare_temp(last1, last2, last3):
 	return ""
 
 
-# sort and uniq all rules in all domains
+# sort and unique all rules in all domains
 def domain_cleanup():
 	global tdomf
 	tdomf3 = ""
@@ -1154,7 +1154,7 @@ def domain_cleanup():
 			
 			r2 = []
 			rule2 = ""
-			# cycle through lines of domain and make the rules uniq and sort it
+			# cycle through lines of domain and make the rules unique and sort it
 			for i2 in i.splitlines():
 				if i2:
 					# is the line a rule?
@@ -1167,7 +1167,7 @@ def domain_cleanup():
 			r2.sort()
 			r3 = []
 
-			# make rules uniq by wildcard compare too
+			# make rules unique by wildcard compare too
 			if r2:
 				rule2 = ""
 				ind = -1
@@ -1729,18 +1729,18 @@ def check():
 
 	# there are 2 runs: first is to collect all the dir names that have create entries
 	# second run is to make all entries containing the former ones wildcarded
-	# and do this overall because it cannot be known if one non-uniq filname will be reused
+	# and do this overall because it cannot be known if one non-unique filname will be reused
 	# by other processes
 	spec2 = []
 	spec3 = []
 
 	# these are the special create entries, where the place of the file will be wildcarded
-	# because it cannot be determined fully yet if the file being created has a uniq filename
+	# because it cannot be determined fully yet if the file being created has a unique filename
 	# or a contantly changing one (temporary name)
 	cre = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir", "allow_link"]
 
 	# allow_mkdir will also have a special handling, cause usually files are created in the
-	# new dir too, and it cannot be surely told if the dir itself has a uniq name too,
+	# new dir too, and it cannot be surely told if the dir itself has a unique name too,
 	# so this exact dir should be wildcarded too with the files in it
 	cre2 = ["allow_mkdir"]
 
