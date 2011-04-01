@@ -124,7 +124,6 @@ import os, sys
 import time, re
 import platform
 
-
 # **************************
 # ******* VARIABLES ********
 # **************************
@@ -402,13 +401,15 @@ def compare_recursive(d1, d2):
 # compare names containing only 1 \* wildcard anywhere
 # returns 1 even if both of them are null
 def compare_names(d1, d2):
-	r1 = re.search("\*", d1)
-	r2 = re.search("\*", d2)
+	r1 = re.findall("\*", d1)
+	r2 = re.findall("\*", d2)
 	if (not r1) and (not r2) and (not d1 == d2): return 0
 	if r1:
+		if len(r1) > 1: return 0
 		e1 = re.sub("\\\\\*", "*", d1)
 		d1 = e1
 	if r2:
+		if len(r2) > 1: return 0
 		e2 = re.sub("\\\\\*", "*", d2)
 		d2 = e2
 	l1 = len(d1)
@@ -1170,12 +1171,14 @@ def domain_cleanup():
 			# make rules uniq by wildcard compare too
 			if r2:
 				rule2 = ""
-				ind = 0
+				ind = -1
 				c = 0
 				for i2 in r2:
 					# if rules match, then replace it with the shorter one (meaning better wildcard)
 					if compare_rules(rule2, i2):
 						if len(rule2) > len(i2):
+							if ind >= 0:
+								r3[ind] = i2
 							rule2 = i2
 					# if not, then add it to the real container
 					else:
@@ -1183,7 +1186,7 @@ def domain_cleanup():
 							r3.append(i2)
 							rule2 = i2
 							ind = c
-					c += 1
+							c += 1
 
 			tdomf3 +=  "\n".join(r3)
 			tdomf3 += "\n\n"
