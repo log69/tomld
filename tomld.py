@@ -26,6 +26,8 @@
 # changelog:
 # -----------
 # 01/04/2011 - tomld v0.25 - more major bugfixes
+#                          - add sand clock to see when check rutin is working, so we can stop it while sleeping
+#                          - some code cleanup
 # 31/03/2011 - tomld v0.24 - major bugfixes
 #                          - improve domain cleanup function by making the rules more unique
 # 29/03/2011 - tomld v0.23 - add feature to try to detect temporary names and wildcard them
