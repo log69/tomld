@@ -189,7 +189,8 @@ global flag_reset;  flag_reset  = 0
 global flag_check;  flag_check  = 0
 global flag_check2; flag_check2 = 0
 global flag_check3; flag_check3 = 0
-global flag_firstrun; flag_firstrun = 0
+global flag_firstrun; flag_firstrun = 1
+global flag_clock;	flag_clock = 0
 global flag_safe;   flag_safe   = 0
 
 # colors
@@ -343,6 +344,24 @@ def help():
 	print "- hours or days later let's run it the 3rd time, now the access denied logs will be converted to rules,",
 	print "and on exit all remaining domains will be turned into enforcing mode"
 	print
+
+
+# print sand clock
+def sand_clock(dot = 0):
+	global flag_firstrun
+	global flag_clock
+	if not flag_firstrun:
+		if dot:
+			sys.stdout.write(".")
+			flag_clock = 0
+		else:
+			c = flag_clock % 4
+			if c == 0: sys.stdout.write("-\b")
+			if c == 1: sys.stdout.write("\\\b")
+			if c == 2: sys.stdout.write("|\b")
+			if c == 3: sys.stdout.write("/\b")
+			flag_clock += 1
+		sys.stdout.flush()
 
 
 # sort and unique a list
@@ -1211,7 +1230,7 @@ def myfinish():
 		enforce()
 		# save config
 		save()
-	elif not flag_firstrun:
+	elif flag_firstrun:
 		color("* haven't finished to run at least once", red)
 	stat()
 	myexit()
@@ -1237,6 +1256,11 @@ def myexit(num = 0):
 def check():
 # ----------------------------------------------------------------------
 
+	global flag_firstrun
+
+	sand_clock()
+
+
 #  	speed2 = time.clock()
 #	print "time ", str(time.clock() - speed2)
 
@@ -1252,7 +1276,6 @@ def check():
 	global flag_check2
 	global flag_check3
 	flag_check3 = 0
-	global flag_firstrun
 	if not flag_check:
 		flag_check = 1
 		x = re.findall("^<kernel> +/[^ ]+ *$\n+use_profile +[1-3] *$", tdomf, re.MULTILINE)
@@ -1270,16 +1293,16 @@ def check():
 
 # ----------------------------------------------------------------------
 	# print output only once if no change happened
-	if not flag_firstrun: color("* checking policy and rules", yellow)
-	# print dots
-	else: sys.stdout.write("."); sys.stdout.flush()
+	if flag_firstrun: color("* checking policy and rules", yellow)
+
+	sand_clock()
 
 	for prog in progs:
 		# does the domain exist for the program?
 		x = re.search("^initialize_domain *" + re.escape(prog) + " *$", texcf, re.MULTILINE)
 		if x:
 			# pritn only once
-			if not flag_firstrun:
+			if flag_firstrun:
 				color(prog, blue, 1); flag_check3 = 1
 				color(", domain exists", "", 1)
 		else:
@@ -1296,7 +1319,7 @@ def check():
 		if not x:
 			color(", no rule", "", 1)
 			print ", ",; color("create rule with learning mode on", green, 1)
-			if flag_firstrun: print
+			if not flag_firstrun: print
 			# create a rule for it
 			tdomf += "\n<kernel> " + prog + "\n\nuse_profile 1\n\n"
 			# store prog name to know not to turn on enforcing mode for these ones
@@ -1305,7 +1328,7 @@ def check():
 			# only 1 rule should exist
 			if len(x) > 1: error_conf("101")
 			# print only once
-			if not flag_firstrun:
+			if flag_firstrun:
 				color(", rule exists", "", 1)
 			# search for all subdomains too
 			xx = re.findall("^<kernel> +" + re.escape(prog) + ".*$\n+use_profile +[0-9]+ *$", tdomf, re.MULTILINE)
@@ -1330,27 +1353,27 @@ def check():
 						color(", disabled mode", "", 1)
 						print ", ",
 						color("turn on learning mode", green, 1)
-						if flag_firstrun: print
+						if not flag_firstrun: print
 					# if in disabled mode, turn on learning mode for the domain or subdomain
 					sd1 = re.sub("use_profile +0 *", "use_profile 1", d)
 					sd2 = re.sub(re.escape(d), sd1, tdomf)
 					tdomf = sd2
 
 				if profile == 1:
-					if not flag_firstrun:
+					if flag_firstrun:
 						if prog2 == prog: color(", learning mode on", "", 1)
 
 				if profile == 2:
-					if not flag_firstrun:
+					if flag_firstrun:
 						if prog2 == prog: color(", permissive mode on", "", 1)
 
 				if profile == 3:
 					# enfocing mode should never be switched back off once it's on
-					if not flag_firstrun:
+					if flag_firstrun:
 						if prog2 == prog: print ", ",; color("enforcing mode on", purple, 1)
 
 		# new line
-		if not flag_firstrun: print
+		if flag_firstrun: print
 
 
 # ----------------------------------------------------------------------
@@ -1358,6 +1381,8 @@ def check():
 	# ************************
 	# ******* GET LOG ********
 	# ************************
+
+	sand_clock()
 
 	# get recent tomoyo error messages from syslog
 	global tmarkf
@@ -1428,6 +1453,8 @@ def check():
 	# **********************************************
 	# ******* CONVERT LOG AND ADD TO POLICY ********
 	# **********************************************
+
+	sand_clock()
 
 	# convert log messages into rules and add them to policy
 	flag_print = 0
@@ -1587,6 +1614,8 @@ def check():
 	# ******* RESHAPE RULES ********
 	# ******************************
 
+	sand_clock()
+
 	domain_cleanup()
 
 	# -----------------------------------------------------------------------------------------------------------
@@ -1722,6 +1751,10 @@ def check():
 				s2 = ""
 
 		tdomf = tdomf2
+
+
+
+	sand_clock()
 
 
 	# the spec predefined dirs and those dirs that have files newly created in them
@@ -1919,6 +1952,8 @@ def check():
 	# ***********************
 	# iterate through all the rules again and reshape them
 
+	sand_clock()
+
 	# domain sorting and cleanup is needed here cause the following rutins heavily depend on a sorted dataflow
 	domain_cleanup()
 
@@ -1961,6 +1996,8 @@ def check():
 	domain_cleanup()
 
 
+	sand_clock()
+
 	# all entries with allow_create will be recreated with allow_unlink and allow_read/write entries too
 	# cause there are deny logs frequently coming back for the created files trying to be written, unlinked or trancated
 	# what is created should be allowed to be written or unlinked or truncated
@@ -1979,13 +2016,17 @@ def check():
 
 	tdomf = tdomf2
 
+	sand_clock()
 
 	domain_cleanup()
 
 	save()
 
+	sand_clock(1)
+
 
 # ----------------------------------------------------------------------
+
 
 # *********************
 # ******* INIT ********
@@ -2417,12 +2458,13 @@ try:
 		flag_safe = 0
 		check()
 		# print only once
-		if not flag_firstrun:
-			flag_firstrun = 1
+		if flag_firstrun:
+			flag_firstrun = 0
 			sl = ""
 			# print time of sleeping period only when --once switch is not set
 			if not opt_once: sl = ", sleeping " + str(count) + "s between every cycle"
 			color("* whole running cycle took " + str(time.clock() - speed) + "s" + sl, green)
+			if not opt_once: color("(press ctrl+c to stop)", red)
 		# now it's safe to enforce mode and save config on interrupt, cause check() finished running
 		flag_safe = 1
 
