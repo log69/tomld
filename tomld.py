@@ -939,7 +939,7 @@ def remove(text):
 # compare 3 files or dirs and give back a wildcarded name if they seem to be the same (but contain random part)
 def compare_temp(last1, last2, last3):
 	# create type of rule
-	cre = ["allow_create", "allow_mksock", "allow_rename", "allow_unlink", "allow_mkdir", "allow_link"]
+	cre = ["allow_create", "allow_mksock", "allow_mkdir", "allow_rename", "allow_link"]
 
 #	if last3[0:13] == "allow_create ":
 #	# the 2 rules before are create rules too?
@@ -1917,26 +1917,8 @@ def check():
 	# ***********************
 	# iterate through all the rules again and reshape them
 
-	# all entries with allow_create will be recreated with allow_unlink and allow_read/write entries too
-	# cause there are deny logs frequently coming back for the created files trying to be written, unlinked or trancated
-	# what is created should be allowed to be written or unlinked or truncated
-
-	tdomf2 = ""
-	for i in tdomf.splitlines(1):
-		
-		# on create rule, add read/write, unlink and truncate too if 
-		if i[0:13] == "allow_create ":
-			i2 = re.sub("allow_create ", "allow_read/write ", i, re.M)
-			i3 = re.sub("allow_create ", "allow_unlink ", i, re.M)
-			i4 = re.sub("allow_create ", "allow_truncate ", i, re.M)
-			i = i + i2 + i3 + i4
-
-		tdomf2 += i
-
-	tdomf = tdomf2
-
+	# domain sorting and cleanup is needed here cause the following rutins heavily depend on a sorted dataflow
 	domain_cleanup()
-
 
 
 	# also, check the last 3 rules and if they match partly (being temp files), then wildcard it
@@ -1974,6 +1956,28 @@ def check():
 
 	tdomf = tdomf2
 	
+	domain_cleanup()
+
+
+	# all entries with allow_create will be recreated with allow_unlink and allow_read/write entries too
+	# cause there are deny logs frequently coming back for the created files trying to be written, unlinked or trancated
+	# what is created should be allowed to be written or unlinked or truncated
+
+	tdomf2 = ""
+	for i in tdomf.splitlines(1):
+		
+		# on create rule, add read/write, unlink and truncate too if 
+		if i[0:13] == "allow_create ":
+			i2 = re.sub("allow_create ", "allow_read/write ", i, re.M)
+			i3 = re.sub("allow_create ", "allow_unlink ", i, re.M)
+			i4 = re.sub("allow_create ", "allow_truncate ", i, re.M)
+			i = i + i2 + i3 + i4
+
+		tdomf2 += i
+
+	tdomf = tdomf2
+
+
 	domain_cleanup()
 
 	save()
