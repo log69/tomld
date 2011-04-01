@@ -25,6 +25,7 @@
 #
 # changelog:
 # -----------
+# 01/04/2011 - tomld v0.25 - more major bugfixes
 # 31/03/2011 - tomld v0.24 - major bugfixes
 #                          - improve domain cleanup function by making the rules more uniq
 # 29/03/2011 - tomld v0.23 - add feature to try to detect temporary names and wildcard them
@@ -129,7 +130,7 @@ import platform
 # **************************
 
 # program version
-ver = "0.24"
+ver = "0.25"
 
 # home dir
 home = "/home"
@@ -942,10 +943,6 @@ def compare_temp(last1, last2, last3):
 	# create type of rule
 	cre = ["allow_create", "allow_mksock", "allow_mkdir", "allow_rename", "allow_link"]
 
-#	if last3[0:13] == "allow_create ":
-#	# the 2 rules before are create rules too?
-#	if last1[0:13] == "allow_create " and last2[0:13] == "allow_create ":
-
 	# all of them have the same length?
 	if len(last3) == len(last1) and len(last3) == len(last2):
 		# they have parameters?
@@ -1093,8 +1090,10 @@ def compare_temp(last1, last2, last3):
 											w2_ = re.search("\*|\$", ff2_)
 											w3_ = re.search("\*|\$", ff3_)
 
-											new  = ff3  + "/"
-											new_ = ff3_ + "/"
+											new  = ff3
+											new_ = ff3_
+											if flag_dir == 2: new  += "/"
+											if flag_dir == 2: new_ += "/"
 											if (not w1) and (not w2) and (not w3):
 												# if some part of the file matches in them
 												flag = 0
@@ -1132,12 +1131,12 @@ def compare_temp(last1, last2, last3):
 												if flag2 and flag_notall2:
 													new_ = ff3_[0:pos+1] + "\*"
 													if flag_dir == 2: new_ += "/"
+												
 
-
-												# return the result if there was any change
-												if (flag and flag_notall) or (flag2 and flag_notall2):
-													i = a3[0] + " " + dd3 + new + " " + dd3_ + new_ + "\n"
-													return i
+											# return the result if there was any change
+											if (flag and flag_notall) or (flag2 and flag_notall2):
+												i = a3[0] + " " + dd3 + new + " " + dd3_ + new_ + "\n"
+												return i
 
 	return ""
 
