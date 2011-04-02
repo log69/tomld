@@ -25,9 +25,10 @@
 #
 # changelog:
 # -----------
-# 01/04/2011 - tomld v0.25 - more major bugfixes
+# 02/04/2011 - tomld v0.25 - more major bugfixes
 #                          - add sand clock to see when check rutin is working, so we can stop it while sleeping
 #                          - some code cleanup
+#                          - speed up compare rutins a bit
 # 31/03/2011 - tomld v0.24 - major bugfixes
 #                          - improve domain cleanup function by making the rules more unique
 # 29/03/2011 - tomld v0.23 - add feature to try to detect temporary names and wildcard them
@@ -381,11 +382,11 @@ def uniq(list):
 
 # compare paths containing \* wildcard
 def compare_dirs(d1, d2):
+	if (not d1) or (not d2): return 0
 	e1 = d1.split("/")
 	e2 = d2.split("/")
 	l1 = len(e1)
 	l2 = len(e2)
-	if l1 == 0 or l2 == 0: return 0
 	if l1 == l2:
 		for i in range(0, l1):
 			c1 = e1[i]
@@ -400,6 +401,7 @@ def compare_dirs(d1, d2):
 # but recursively, only the beginning of the dir must match
 # d1 must contain the beginning of d2 (d2 is specr)
 def compare_recursive(d1, d2):
+	if (not d1) or (not d2): return ""
 	dd1 = re.search("^.*/", d1, re.M)
 	if not dd1: return ""
 	dd2 = re.search("^.*/", d2, re.M)
@@ -408,7 +410,7 @@ def compare_recursive(d1, d2):
 	e2 = dd2.group().split("/")
 	l1 = len(e1)-1
 	l2 = len(e2)-1
-	if l1 == 0 or l2 == 0 or l1 < l2: return ""
+	if l1 < l2: return ""
 	# compare the dirs
 	flag = 0
 	for i in range(0, l2):
@@ -421,8 +423,8 @@ def compare_recursive(d1, d2):
 
 
 # compare names containing only 1 \* wildcard anywhere
-# returns 1 even if both of them are null
 def compare_names(d1, d2):
+	if (not d1) or (not d2): return 0
 	r1 = re.findall("\*", d1)
 	r2 = re.findall("\*", d2)
 	if (not r1) and (not r2) and (not d1 == d2): return 0
@@ -434,61 +436,62 @@ def compare_names(d1, d2):
 		if len(r2) > 1: return 0
 		e2 = re.sub("\\\\\*", "*", d2)
 		d2 = e2
+	# the length cannot be zero here because it's checked already
 	l1 = len(d1)
 	l2 = len(d2)
-	if l1 == 0 and l2 == 0: return 1
-	if l1 and l2:
 	
-		if r1 and (not r2):
-			w1 = re.search("^[^\*]*", d1, re.M).group()
-			w2 = re.search("[^\*]*$", d1, re.M).group()
-			wl1 = len(w1)
-			wl2 = len(w2)
-			if not (l2 >= wl1 + wl2): return 0
-			if not (w1 == d2[:wl1] and w2 == d2[l2-wl2:l2]): return 0
-			return 1
-	
-		if (not r1) and r2:
-			w1 = re.search("^[^\*]*", d2, re.M).group()
-			w2 = re.search("[^\*]*$", d2, re.M).group()
-			wl1 = len(w1)
-			wl2 = len(w2)
-			# first word's char length must be more or equal than the other's without wildcard
-			if not (l1 >= wl1 + wl2): return 0
-			if not (w1 == d1[:wl1] and w2 == d1[l1-wl2:l1]): return 0
-			return 1
-	
-		if r1 and r2:
-			w1 = re.search("^[^\*]*", d1, re.M).group()
-			w2 = re.search("[^\*]*$", d1, re.M).group()
-			w3 = re.search("^[^\*]*", d2, re.M).group()
-			w4 = re.search("[^\*]*$", d2, re.M).group()
-			wl1 = len(w1)
-			wl2 = len(w2)
-			wl3 = len(w3)
-			wl4 = len(w4)
-			wd1 = wl1
-			wd2 = wl2
-			# compare the less chars beside the wildcard from both sides			
-			if wl1 > wl3: wd1 = wl3
-			if wl2 > wl4: wd2 = wl4
-			if not (d1[:wd1] == d2[:wd1] and d1[l1-wd2:l1] == d2[l2-wd2:l2]): return 0
-			return 1
-	
+	# first name contains wildcard
+	if r1 and (not r2):
+		w1 = re.search("^[^\*]*", d1, re.M).group()
+		w2 = re.search("[^\*]*$", d1, re.M).group()
+		wl1 = len(w1)
+		wl2 = len(w2)
+		if not (l2 >= wl1 + wl2): return 0
+		if not (w1 == d2[:wl1] and w2 == d2[l2-wl2:l2]): return 0
 		return 1
+	
+	# second name contains wildcard
+	if (not r1) and r2:
+		w1 = re.search("^[^\*]*", d2, re.M).group()
+		w2 = re.search("[^\*]*$", d2, re.M).group()
+		wl1 = len(w1)
+		wl2 = len(w2)
+		# first word's char length must be more or equal than the other's without wildcard
+		if not (l1 >= wl1 + wl2): return 0
+		if not (w1 == d1[:wl1] and w2 == d1[l1-wl2:l1]): return 0
+		return 1
+	
+	# both names contains wildcard
+	if r1 and r2:
+		w1 = re.search("^[^\*]*", d1, re.M).group()
+		w2 = re.search("[^\*]*$", d1, re.M).group()
+		w3 = re.search("^[^\*]*", d2, re.M).group()
+		w4 = re.search("[^\*]*$", d2, re.M).group()
+		wl1 = len(w1)
+		wl2 = len(w2)
+		wl3 = len(w3)
+		wl4 = len(w4)
+		wd1 = wl1
+		wd2 = wl2
+		# compare the less chars beside the wildcard from both sides			
+		if wl1 > wl3: wd1 = wl3
+		if wl2 > wl4: wd2 = wl4
+		if not (d1[:wd1] == d2[:wd1] and d1[l1-wd2:l1] == d2[l2-wd2:l2]): return 0
+		return 1
+	
+	return 1
 
-	else:
-		return 0
 
 
 # compare rules containing \* wildcard anywhere
 def compare_rules(d1, d2):
+	if (not d1) or (not d2): return 0
 	e1 = d1.split()
 	e2 = d2.split()
 	l1 = len(e1)-1
 	l2 = len(e2)-1
 	# fail if number of parameters differ
-	if l1 == 0 or l2 == 0 or (not l1 == l2): return 0
+	if not l1 == l2: return 0
 	# fail if rule type differs
 	if not e1[0] == e2[0]: return 0
 	# compare the paths only
@@ -1111,6 +1114,7 @@ def compare_temp(last1, last2, last3):
 											w2_ = re.search("\*|\$", ff2_)
 											w3_ = re.search("\*|\$", ff3_)
 
+											# default new path name is old path name
 											new  = ff3
 											new_ = ff3_
 											if flag_dir == 2: new  += "/"
@@ -2028,7 +2032,6 @@ def check():
 
 
 # ----------------------------------------------------------------------
-
 
 # *********************
 # ******* INIT ********
