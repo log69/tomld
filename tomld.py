@@ -2139,7 +2139,6 @@ if (l > 0):
 					color("error: root directory is not allowed", red)
 					myexit(1)
 				d2 = os.path.realpath(d)
-				print d2
 				if os.path.isdir(d2):
 					if not d2 in specr:
 						specr.append(d2)
