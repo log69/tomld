@@ -313,7 +313,7 @@ def help():
 	print "         --yes              auto confirm with yes"
 	print "    -k   --keep             don't change domain's mode for this run"
 	print "                            (learning mode domains will stay so on exit)"
-	print "    -R   --recursive [dirs] replace subdirs of these dirs in rules with wildcards"
+	print "    -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards"
 	print "    -1   --once             quit after first cycle"
 	print "                            (might be useful for scripts)"
 	print
