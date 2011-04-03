@@ -880,7 +880,10 @@ def info(text = ""):
 								for i3 in i5.splitlines():
 									rr1 = re.search("^allow_read +/lib/", i3, re.M)
 									rr2 = re.search("^allow_read +/usr/lib/", i3, re.M)
-									if rr1 or rr2:
+									rr3 = re.search(" +" + home + "/", i3, re.M)
+									if rr3:
+										color(i3, cyan)
+									elif rr1 or rr2:
 										color(i3, yellow)
 									else:
 										color(i3, red)
