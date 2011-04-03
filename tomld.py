@@ -884,6 +884,7 @@ def info(text = ""):
 										color(i3, yellow)
 									else:
 										color(i3, red)
+								print
 			# print stat
 			l = len(r1)
 			if l > 1:
