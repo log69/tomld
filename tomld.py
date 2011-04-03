@@ -1201,6 +1201,7 @@ def domain_cleanup():
 
 			# make rules unique by wildcard compare too
 			if r2:
+				rule3 = ""
 				ind = -1
 				c = 0
 				for i2 in r2:
@@ -1218,10 +1219,16 @@ def domain_cleanup():
 							if ind >= 0:
 								r3[ind] = i2
 							r4[c2] = i2
+					if compare_rules(rule3, i2):
+						if len(rule3) > len(i2):
+							if ind >= 0:
+								r3[ind] = i2
+							rule3 = i2
 					# if not, then add it to the real container
 					else:
 						if not i2 in r3:
 							r3.append(i2)
+							rule3 = i2
 							r4[c2] = i2
 							ind = c
 							c += 1
