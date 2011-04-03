@@ -875,7 +875,15 @@ def info(text = ""):
 							i4 = i3.group()
 							i5 = i4
 							if i4[-1] == "\n": i5 = i4[:-1]
-							color(i5, red)
+							if i5:
+								# print allow_read libs with different colors
+								for i3 in i5.splitlines():
+									rr1 = re.search("^allow_read +/lib/", i3, re.M)
+									rr2 = re.search("^allow_read +/usr/lib/", i3, re.M)
+									if rr1 or rr2:
+										color(i3, yellow)
+									else:
+										color(i3, red)
 			# print stat
 			l = len(r1)
 			if l > 1:
