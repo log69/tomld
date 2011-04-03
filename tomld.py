@@ -425,8 +425,10 @@ def compare_recursive(d1, d2):
 
 
 # compare names containing only 1 \* wildcard anywhere
+# returns 1 also if both of them are null
 def compare_names(d1, d2):
-	if (not d1) or (not d2): return 0
+	if (not d1) and (not d2): return 1
+	if (not d1) or  (not d2): return 0
 	r1 = re.findall("\*", d1)
 	r2 = re.findall("\*", d2)
 	if (not r1) and (not r2) and (not d1 == d2): return 0
@@ -490,14 +492,14 @@ def compare_rules(d1, d2):
 	if (not d1) or (not d2): return 0
 	e1 = d1.split()
 	e2 = d2.split()
-	l1 = len(e1)-1
-	l2 = len(e2)-1
+	l1 = len(e1)
+	l2 = len(e2)
 	# fail if number of parameters differ
 	if not l1 == l2: return 0
 	# fail if rule type differs
 	if not e1[0] == e2[0]: return 0
 	# compare the paths only
-	for i in range(1, l1+1):
+	for i in range(1, l1):
 		f1 = e1[i]
 		f2 = e2[i]
 		r1 = re.search("\*", f1)
@@ -1201,7 +1203,6 @@ def domain_cleanup():
 
 			# make rules unique by wildcard compare too
 			if r2:
-				rule3 = ""
 				ind = -1
 				c = 0
 				for i2 in r2:
@@ -1219,16 +1220,10 @@ def domain_cleanup():
 							if ind >= 0:
 								r3[ind] = i2
 							r4[c2] = i2
-					if compare_rules(rule3, i2):
-						if len(rule3) > len(i2):
-							if ind >= 0:
-								r3[ind] = i2
-							rule3 = i2
 					# if not, then add it to the real container
 					else:
 						if not i2 in r3:
 							r3.append(i2)
-							rule3 = i2
 							r4[c2] = i2
 							ind = c
 							c += 1
