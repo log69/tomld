@@ -25,6 +25,7 @@
 #
 # changelog:
 # -----------
+# 03/04/2011 - tomld v0.26 - improve domain cleanup function
 # 02/04/2011 - tomld v0.25 - more major bugfixes
 #                          - add sand clock to see when check rutin is working, so we can stop it while sleeping
 #                          - some code cleanup
@@ -113,10 +114,11 @@
 #			wildcard library files version numbers
 #			wildcard pid number in /proc/number/ dirs
 #			wildcard user name in /home/user/ dirs
-#			readd every create rule as unlink, read/write etc. too
 #			domain config cleanup (sort and unique)
 #			wildcard files and dirs with changing names that are not wildcarded yet
 #				(this means dirs in the exception list)
+#			domain config cleanup (sort and unique)
+#			readd every create rule as unlink, read/write etc. too
 #			domain config cleanup (sort and unique)
 #	10)	save policy
 #	11) goto 2
@@ -133,7 +135,7 @@ import platform
 # **************************
 
 # program version
-ver = "0.25"
+ver = "0.26"
 
 # home dir
 home = "/home"
@@ -1190,25 +1192,37 @@ def domain_cleanup():
 							r2.append(i2)
 
 			r2.sort()
+			# create and initialize an array to store the recently checked rules by length
+			r4 = []
+			max_ind = 256
+			for i2 in range(0, max_ind): r4.append("")
+			# array containing the final rules
 			r3 = []
 
 			# make rules unique by wildcard compare too
 			if r2:
-				rule2 = ""
 				ind = -1
 				c = 0
 				for i2 in r2:
-					# if rules match, then replace it with the shorter one (meaning better wildcard)
+					# compare rules to the former ones with the same length already checked
+					# checking them by also their length make sure to not skip rules in compare
+					# because of the wrong alphabetic sort order
+					rule2 = ""
+					c2 = len(i2.split("/"))
+					# check rules under a specific length only to avoid runtime error and out of index error
+					if c2 < max_ind:
+						rule2 = r4[c2]
+					# if recent rules match, then replace it with the shorter one (better wildcard)
 					if compare_rules(rule2, i2):
 						if len(rule2) > len(i2):
 							if ind >= 0:
 								r3[ind] = i2
-							rule2 = i2
+							r4[c2] = i2
 					# if not, then add it to the real container
 					else:
 						if not i2 in r3:
 							r3.append(i2)
-							rule2 = i2
+							r4[c2] = i2
 							ind = c
 							c += 1
 
