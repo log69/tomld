@@ -26,6 +26,7 @@
 # changelog:
 # -----------
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
+#                          - bugfixes
 # 02/04/2011 - tomld v0.25 - more major bugfixes
 #                          - add sand clock to see when check rutin is working, so we can stop it while sleeping
 #                          - some code cleanup
