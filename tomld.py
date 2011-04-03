@@ -26,7 +26,7 @@
 # changelog:
 # -----------
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
-#                          - improve info cuntion
+#                          - improve info function
 #                          - bugfixes
 #                          - add --learn switch to turn learning mode back for all domains on mistake
 # 02/04/2011 - tomld v0.25 - more major bugfixes
