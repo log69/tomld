@@ -28,6 +28,7 @@
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
 #                          - improve info cuntion
 #                          - bugfixes
+#                          - add --learn switch to turn learning mode back for all domains on mistake
 # 02/04/2011 - tomld v0.25 - more major bugfixes
 #                          - add sand clock to see when check rutin is working, so we can stop it while sleeping
 #                          - some code cleanup
@@ -181,8 +182,9 @@ global pidf;  pidf  = "/var/run/tomld.pid"
 
 # options
 global opt_color;		opt_color		= 0
-global opt_reset;		opt_reset		= 0
+global opt_learn;		opt_learn		= 0
 global opt_clear;		opt_clear		= 0
+global opt_reset;		opt_reset		= 0
 global opt_info;		opt_info		= 0
 global opt_info2;		opt_info2		= ""
 global opt_remove;		opt_remove		= 0
@@ -305,6 +307,8 @@ def help():
 	print "                            (all previously learnt rules will be backed up)"
 	print "    -i   --info   [pattern] print domains' rules by pattern"
 	print "                            (without pattern, print a list of main domains)"
+	print "    -l   --learn            turn learning mode back for all domains"
+	print "                            (this is not advised, only for correction purposes)"
 	print "    -r   --remove [pattern] remove domains by pattern"
 	print "         --yes              auto confirm with yes"
 	print "    -k   --keep             don't change domain's mode for this run"
@@ -752,6 +756,16 @@ def learn(prog3):
 			sd1 = re.sub("use_profile +3 *", "use_profile 1", i)
 			sd2 = re.sub(re.escape(i), sd1, tdomf)
 			tdomf = sd2
+
+
+# turn back learning mode for all domains with profile 2-3
+def learn_all():
+	global tdomf
+	load()
+	# change all domains with profile 2 or 3 to 1
+	tdomf2 = re.sub(re.compile("^use_profile +[23] *$", re.M), "use_profile 1", tdomf)
+	tdomf = tdomf2
+	save()
 
 
 # turn on enforcing mode for old domains only with profile 1-2 before exiting
@@ -2070,7 +2084,7 @@ def check():
 # check command line options
 opt_all = ["-v", "--version", "-h", "--help", "--clear", "--reset", "-c", "--color", \
 		   "-i", "--info", "-r", "--remove", "--yes", "-k", "--keep", "-R", "--recursive", \
-		   "-1", "--once"]
+		   "-1", "--once", "-l", "--learn"]
 l = len(sys.argv) - 1
 if (l > 0):
 	op = sys.argv[1:]
@@ -2094,6 +2108,8 @@ if (l > 0):
 		help()
 		flag_exit = 1
 	if flag_exit: myexit()
+	if op.count("-l") or op.count("--learn"):
+		opt_learn = 1
 	if op.count("--clear"):
 		opt_clear = 1
 	if op.count("--reset"):
@@ -2362,6 +2378,15 @@ if (opt_info):
 
 if (opt_remove):
 	remove(opt_remove2)
+	myexit()
+
+if (opt_learn):
+	color("* turning all domains into learning mode on demand", red)
+	if not choice("are you sure?"): myexit()
+	os.system(tsave)
+	color("policy file backups created", green)
+	learn_all()
+	color("all domains turned back to learning mode", red)
 	myexit()
 
 
