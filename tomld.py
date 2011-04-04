@@ -26,6 +26,7 @@
 # changelog:
 # -----------
 # 04/04/2011 - tomld v0.27 - minor bugfixes
+#                          - improve domain cleanup function
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
 #                          - improve info function
 #                          - bugfixes
