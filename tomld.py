@@ -1223,12 +1223,36 @@ def domain_cleanup():
 							r2.append(i2)
 
 			r2.sort()
+
+			# sort r2 list by rule type and then by rule length, so the next function will be more effective
+			r2.sort(key=len)
+			r3 = []
+			r4 = []
+			l = len(r2)
+			for i2 in range(l-1, -1, -1):
+				# get rule
+				rule = r2[i2]
+				# get rule type
+				rule_type = rule.split("/")[0]
+				c2 = 0
+				# is there any rule of that kind in the list yet?
+				c = r3.count(rule_type)
+				# if so, then get the index
+				if c: c2 = r3.index(rule_type)
+				# store the rule at this index
+				r3.insert(c2, rule_type)
+				r4.insert(c2, rule)
+
+			r2 = r4
+
+
 			# create and initialize an array to store the recently checked rules by length
 			r4 = []
 			max_ind = 256
 			for i2 in range(0, max_ind): r4.append("")
 			# array containing the final rules
 			r3 = []
+
 
 			# make rules unique by wildcard compare too
 			if r2:
@@ -1243,6 +1267,17 @@ def domain_cleanup():
 					# check rules under a specific length only to avoid runtime error and out of index error
 					if c2 < max_ind:
 						rule2 = r4[c2]
+					else:
+						color("error: maximum depth reached", red)
+						myexit(1)
+					# if tule types differ, then reset r4 item (shortest rule of that type)
+					if rule2:
+						rule_type1 = i2.split()[0]
+						rule_type2 = rule2.split()[0]
+						if not rule_type1 == rule_type2:
+							rule2 = ""
+					else:
+						r4[c2] = i2
 					# if recent rules match, then replace it with the shorter one (better wildcard)
 					if compare_rules(rule2, i2):
 						if len(rule2) > len(i2):
@@ -1253,15 +1288,15 @@ def domain_cleanup():
 					else:
 						if not i2 in r3:
 							r3.append(i2)
-							r4[c2] = i2
 							ind = c
 							c += 1
+
 
 			tdomf3 +=  "\n".join(r3)
 			tdomf3 += "\n\n"
 
 		tdomf = tdomf3
-		
+
 
 # print domain stat
 def stat():
