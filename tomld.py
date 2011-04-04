@@ -1293,6 +1293,7 @@ def domain_cleanup():
 							c += 1
 
 
+			r3.sort()
 			tdomf3 +=  "\n".join(r3)
 			tdomf3 += "\n\n"
 
