@@ -1151,10 +1151,12 @@ def compare_temp(last1, last2, last3):
 											new_ = ff3_
 											if flag_dir == 2: new  += "/"
 											if flag_dir == 2: new_ += "/"
+											flag = 0
+											flag_notall = 0
+											flag2 = 0
+											flag_notall2 = 0
 											if (not w1) and (not w2) and (not w3):
 												# if some part of the file matches in them
-												flag = 0
-												flag_notall = 0
 												pos = 0
 												l = len(ff1)
 												# check the beginning
@@ -1172,8 +1174,6 @@ def compare_temp(last1, last2, last3):
 
 											if (not w1_) and (not w2_) and (not w3_):
 												# if some part of the file matches in them
-												flag2 = 0
-												flag_notall2 = 0
 												pos = 0
 												l = len(ff1_)
 												# check the beginning
