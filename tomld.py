@@ -25,6 +25,7 @@
 #
 # changelog:
 # -----------
+# 04/04/2011 - tomld v0.27 - minor bugfixes
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
 #                          - improve info function
 #                          - bugfixes
@@ -138,7 +139,7 @@ import platform
 # **************************
 
 # program version
-ver = "0.26"
+ver = "0.27"
 
 # home dir
 home = "/home"
@@ -2096,6 +2097,10 @@ if (l > 0):
 		opt_keep = 1
 	# search for bad option switches
 	for i in op:
+		# i have to check here if option is not null ""
+		if not i:
+			color("error: bad option parameter", red)
+			myexit(1)
 		if i[0] == "-":
 			if not i in opt_all:
 				color("error: bad option parameter", red)
