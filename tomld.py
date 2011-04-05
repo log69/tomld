@@ -26,6 +26,7 @@
 # changelog:
 # -----------
 # 05/04/2011 - tomld v0.27 - rewrite domain cleanup function
+#                          - add feature: check rules only if they changed (based on hash of policy text) and avoid unnecessary work
 #                          - major bugfixes
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
 #                          - improve info function
@@ -134,6 +135,8 @@
 import os, sys
 import time, re
 import platform
+import hashlib
+
 
 # **************************
 # ******* VARIABLES ********
@@ -174,6 +177,9 @@ global tsave1; tsave1 = "/usr/sbin/tomoyo-savepolicy"
 
 # system log
 global tlog;  tlog  = "/var/log/syslog"
+
+# hash for checking change of rules
+global tdomf_hash; tdomf_hash = ""
 
 # this stores the kernel time of last line of the system log
 # to identify it and make sure not to read it twice
@@ -363,9 +369,13 @@ def help():
 def sand_clock(dot = 0):
 	global flag_firstrun
 	global flag_clock
-	if dot:
+	if dot == 1:
 		if not flag_firstrun:
 			sys.stdout.write(".")
+			flag_clock = 0
+	elif dot:
+		if not flag_firstrun:
+			sys.stdout.write("+")
 			flag_clock = 0
 	else:
 		c = flag_clock % 4
@@ -1370,6 +1380,7 @@ def check():
 	global tdomf
 	global texcf
 	load()
+	
 
 # ----------------------------------------------------------------------
 	# print programs already in domain (only profile 1-3 matters), but not in progs list
@@ -1708,6 +1719,27 @@ def check():
 							if flag:
 								color(p + "  ", blue, 1)
 								color("new domains added in learning mode", red)
+
+
+# ----------------------------------------------------------------------
+
+	# ***********************************
+	# **** CHECK HASH OF POLICY TEXT ****
+	# ***********************************
+	# check change of rules based on hash of the policy text
+	global tdomf_hash
+	# create hash in it doesn't exist
+	hash = hashlib.sha1(tdomf).hexdigest()
+	if not tdomf_hash:
+		tdomf_hash = hash
+	# check hash of loaded policy if hash mark exists
+	else:
+		if hash == tdomf_hash:
+			# exit function if they match, don't do unnecessary work
+			sand_clock(1)
+			return
+		else:
+			tdomf_hash = hash
 
 
 # ----------------------------------------------------------------------
@@ -2124,7 +2156,7 @@ def check():
 
 	save()
 
-	sand_clock(1)
+	sand_clock(2)
 
 
 # ----------------------------------------------------------------------
