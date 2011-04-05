@@ -1291,7 +1291,7 @@ def domain_cleanup():
 					if r3:
 						# sort and unique list containing only some types of rules
 						r4 = uniq_rules_more(r3)
-						r4 = r3
+						r4.sort()
 						# store the sorted result
 						tdomf3 +=  "\n".join(r4) + "\n"
 
