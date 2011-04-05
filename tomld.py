@@ -25,8 +25,8 @@
 #
 # changelog:
 # -----------
-# 04/04/2011 - tomld v0.27 - minor bugfixes
-#                          - improve domain cleanup function
+# 05/04/2011 - tomld v0.27 - minor bugfixes
+#                          - rewrite domain cleanup function
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
 #                          - improve info function
 #                          - bugfixes
@@ -363,18 +363,18 @@ def help():
 def sand_clock(dot = 0):
 	global flag_firstrun
 	global flag_clock
-	if not flag_firstrun:
-		if dot:
+	if dot:
+		if not flag_firstrun:
 			sys.stdout.write(".")
 			flag_clock = 0
-		else:
-			c = flag_clock % 4
-			if c == 0: sys.stdout.write("-\b")
-			if c == 1: sys.stdout.write("\\\b")
-			if c == 2: sys.stdout.write("|\b")
-			if c == 3: sys.stdout.write("/\b")
-			flag_clock += 1
-		sys.stdout.flush()
+	else:
+		c = flag_clock % 4
+		if c == 0: sys.stdout.write("-\b")
+		if c == 1: sys.stdout.write("\\\b")
+		if c == 2: sys.stdout.write("|\b")
+		if c == 3: sys.stdout.write("/\b")
+		flag_clock += 1
+	sys.stdout.flush()
 
 
 # sort and unique a list
@@ -872,7 +872,6 @@ def info(text = ""):
 	global tdomf
 	global texcf
 	load()
-	domain_cleanup()
 	if text:
 		# show info about domains and rules
 		r1 = re.findall("^<kernel>.*" + re.escape(text) + ".*$", tdomf, re.M + re.I)
@@ -892,18 +891,24 @@ def info(text = ""):
 							i4 = i3.group()
 							i5 = i4
 							if i4[-1] == "\n": i5 = i4[:-1]
-							if i5:
+							i6 = i5.splitlines()[0]
+							i7 = i5.splitlines()[1:]
+							color(i6, red)
+							if i7:
+								# sort the rules
+								i7.sort()
 								# print allow_read libs with different colors
-								for i3 in i5.splitlines():
-									rr1 = re.search("^allow_read +/lib/", i3, re.M)
-									rr2 = re.search("^allow_read +/usr/lib/", i3, re.M)
-									rr3 = re.search(" +" + home + "/", i3, re.M)
-									if rr3:
-										color(i3, cyan)
-									elif rr1 or rr2:
-										color(i3, yellow)
-									else:
-										color(i3, red)
+								for i3 in i7:
+									if i3:
+										rr1 = re.search("^allow_read +/lib/", i3, re.M)
+										rr2 = re.search("^allow_read +/usr/lib/", i3, re.M)
+										rr3 = re.search(" +" + home + "/", i3, re.M)
+										if rr3:
+											color(i3, cyan)
+										elif rr1 or rr2:
+											color(i3, yellow)
+										else:
+											color(i3, red)
 								print
 			# print stat
 			l = len(r1)
@@ -1200,6 +1205,49 @@ def compare_temp(last1, last2, last3):
 	return ""
 
 
+# sort and unique a list of rules
+def uniq_rules_more(list):
+	# at leat 2 rules needed to run sort on them
+	l = len(list)
+	if l < 2: return list
+	
+	list2 = []
+	# compare all rules with all of them
+	for i1 in range(0, l):
+		new = ""
+		for i2 in range(0, l):
+			if not i1 == i2:
+				rule1 = list[i1]
+				rule2 = list[i2]
+				# check the number of tags in the rules
+				p1 = len(rule1.split("/"))
+				p2 = len(rule2.split("/"))
+				# if tag numberd match:
+				if p1 == p2:
+					# compare rules
+					if compare_rules(rule1, rule2):
+						old = rule1
+						if len(rule1) > len(rule2): old = rule2
+						# store only the shortest one from the matching ones
+						if (not new) or (len(new) > len(old)):
+							new = old
+
+		# store the original rule if there was no match
+		if not new:
+			new = list[i1]
+		if not new in list2:
+			list2.append(new)
+
+	# these 2 sortings are needed for other functions in the main rutins
+	if list2:
+		# first, sort rules by char length
+		list2.sort(key=lambda i: len(i))
+		# second, sort rules by number of path splitter
+		list2.sort(key=lambda i: len(i.split("/")))
+	
+	return list2
+
+
 # sort and unique all rules in all domains
 def domain_cleanup():
 	global tdomf
@@ -1224,79 +1272,37 @@ def domain_cleanup():
 							r2.append(i2)
 
 			r2.sort()
-
-			# sort r2 list by rule type and then by rule length, so the next function will be more effective
-			r2.sort(key=len)
+			
+			# unique and sort rules again in a better way within only the same types
 			r3 = []
-			r4 = []
 			l = len(r2)
-			for i2 in range(l-1, -1, -1):
-				# get rule
-				rule = r2[i2]
-				# get rule type
-				rule_type = rule.split("/")[0]
-				c2 = 0
-				# is there any rule of that kind in the list yet?
-				c = r3.count(rule_type)
-				# if so, then get the index
-				if c: c2 = r3.index(rule_type)
-				# store the rule at this index
-				r3.insert(c2, rule_type)
-				r4.insert(c2, rule)
+			c = 0
+			type1 = ""
+			while (c < l):
+				rule2 = r2[c]
+				type2 = rule2.split()[0]
+				if not type1: type1 = type2
+				# rule types match?
+				if type1 == type2:
+					#if so, then build list from it
+					r3.append(rule2)
+				if (not type1 == type2) or (not c < l-1):
 
-			r2 = r4
+					if r3:
+						# sort and unique list containing only some types of rules
+						r4 = uniq_rules_more(r3)
+						r4 = r3
+						# store the sorted result
+						tdomf3 +=  "\n".join(r4) + "\n"
 
-
-			# create and initialize an array to store the recently checked rules by length
-			r4 = []
-			max_ind = 256
-			for i2 in range(0, max_ind): r4.append("")
-			# array containing the final rules
-			r3 = []
-
-
-			# make rules unique by wildcard compare too
-			if r2:
-				ind = -1
-				c = 0
-				for i2 in r2:
-					# compare rules to the former ones with the same length already checked
-					# checking them by also their length make sure to not skip rules in compare
-					# because of the wrong alphabetic sort order
-					rule2 = ""
-					c2 = len(i2.split("/"))
-					# check rules under a specific length only to avoid runtime error and out of index error
-					if c2 < max_ind:
-						rule2 = r4[c2]
-					else:
-						color("error: maximum depth reached", red)
-						myexit(1)
-					# if tule types differ, then reset r4 item (shortest rule of that type)
-					if rule2:
-						rule_type1 = i2.split()[0]
-						rule_type2 = rule2.split()[0]
-						if not rule_type1 == rule_type2:
-							rule2 = ""
-					else:
-						r4[c2] = i2
-					# if recent rules match, then replace it with the shorter one (better wildcard)
-					if compare_rules(rule2, i2):
-						if len(rule2) > len(i2):
-							if ind >= 0:
-								r3[ind] = i2
-							r4[c2] = i2
-					# if not, then add it to the real container
-					else:
-						if not i2 in r3:
-							r3.append(i2)
-							ind = c
-							c += 1
-
-
-			r3.sort()
-			tdomf3 +=  "\n".join(r3)
-			tdomf3 += "\n\n"
-
+					r3 = []
+					if c < l-1:
+						r3.append(rule2)
+				type1 = type2
+				c += 1
+				
+			tdomf3 += "\n"
+				
 		tdomf = tdomf3
 
 
