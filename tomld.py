@@ -26,7 +26,7 @@
 # changelog:
 # -----------
 # 05/04/2011 - tomld v0.27 - rewrite domain cleanup function
-#                          - add feature: check rules only if they changed (based on hash of policy text) and avoid unnecessary work
+#                          - add feature: check rules only if they changed and avoid unnecessary work
 #                          - major bugfixes
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
 #                          - improve info function
@@ -135,7 +135,6 @@
 import os, sys
 import time, re
 import platform
-import hashlib
 
 
 # **************************
@@ -178,8 +177,8 @@ global tsave1; tsave1 = "/usr/sbin/tomoyo-savepolicy"
 # system log
 global tlog;  tlog  = "/var/log/syslog"
 
-# hash for checking change of rules
-global tdomf_hash; tdomf_hash = ""
+# backup conf for checking change of rules
+global tdomf_bak; tdomf_bak = ""
 
 # this stores the kernel time of last line of the system log
 # to identify it and make sure not to read it twice
@@ -1723,23 +1722,22 @@ def check():
 
 # ----------------------------------------------------------------------
 
-	# ***********************************
-	# **** CHECK HASH OF POLICY TEXT ****
-	# ***********************************
-	# check change of rules based on hash of the policy text
-	global tdomf_hash
-	# create hash in it doesn't exist
-	hash = hashlib.sha1(tdomf).hexdigest()
-	if not tdomf_hash:
-		tdomf_hash = hash
-	# check hash of loaded policy if hash mark exists
+	# *************************************
+	# **** CHECK CHANGE OF POLICY TEXT ****
+	# *************************************
+	# check change of rules
+	global tdomf_bak
+	# backup conf exists yet?
+	if not tdomf_bak:
+		tdomf_bak = tdomf
 	else:
-		if hash == tdomf_hash:
-			# exit function if they match, don't do unnecessary work
+		# exit function if they match, don't do unnecessary work
+		if tdomf_bak == tdomf:
 			sand_clock(1)
 			return
+		# store it if no match
 		else:
-			tdomf_hash = hash
+			tdomf_bak = tdomf
 
 
 # ----------------------------------------------------------------------
