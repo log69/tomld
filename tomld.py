@@ -1396,7 +1396,7 @@ def check():
 	# print output only once if no change happened
 	if flag_firstrun: color("* checking policy and rules", yellow)
 
-	sand_clock()
+#	sand_clock()
 
 	for prog in progs:
 		# does the domain exist for the program?
@@ -1483,7 +1483,7 @@ def check():
 	# ******* GET LOG ********
 	# ************************
 
-	sand_clock()
+#	sand_clock()
 
 	# get recent tomoyo error messages from syslog
 	global tmarkf
@@ -1555,7 +1555,7 @@ def check():
 	# ******* CONVERT LOG AND ADD TO POLICY ********
 	# **********************************************
 
-	sand_clock()
+#	sand_clock()
 	
 	# convert log messages into rules and add them to policy
 	flag_print = 0
@@ -1856,7 +1856,7 @@ def check():
 
 
 
-	sand_clock()
+#	sand_clock()
 
 
 	# the spec predefined dirs and those dirs that have files newly created in them
@@ -2098,7 +2098,7 @@ def check():
 	domain_cleanup()
 
 
-	sand_clock()
+#	sand_clock()
 
 	# all entries with allow_create will be recreated with allow_unlink and allow_read/write entries too
 	# cause there are deny logs frequently coming back for the created files trying to be written, unlinked or trancated
