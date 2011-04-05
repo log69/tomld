@@ -957,12 +957,12 @@ def info(text = ""):
 
 			# print result
 			print
-			r3.sort()
 			r6.sort()
-			for i in r3:
-				color(i, blue)
+			r3.sort()
 			for i in r6:
 				color(i, yellow)
+			for i in r3:
+				color(i, blue)
 			print
 		else:
 			color("error: no domains found", red)
