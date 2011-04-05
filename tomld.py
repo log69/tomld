@@ -25,8 +25,8 @@
 #
 # changelog:
 # -----------
-# 05/04/2011 - tomld v0.27 - minor bugfixes
-#                          - rewrite domain cleanup function
+# 05/04/2011 - tomld v0.27 - rewrite domain cleanup function
+#                          - major bugfixes
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
 #                          - improve info function
 #                          - bugfixes
@@ -536,7 +536,7 @@ def package_d(name):
 		if os.path.isfile(f):
 			try: f2 = open(f).read()
 			except: color("error: cannot open file " + f2, red); myexit(1)
-			p = re.search("^Package: " + re.escape(name) + "$\n^Status: install ok installed$", f2, re.MULTILINE)
+			p = re.search("^Package: " + re.escape(name) + "$\n^Status: install ok installed$", f2, re.M)
 			if p: return 1
 
 	return 0
@@ -749,7 +749,7 @@ def check_prof():
 def learn(prog3):
 	global tdomf
 	# look up all domain with profile 3
-	x = re.findall("^<kernel>.* +" + re.escape(prog3) + " *$\n+use_profile +3 *$", tdomf, re.MULTILINE)
+	x = re.findall("^<kernel>.* +" + re.escape(prog3) + " *$\n+use_profile +[23] *$", tdomf, re.M)
 	# turn back learning mode form enforcing mode for binary
 	if x:
 		color(prog3 + "  ", blue, 1)
@@ -776,28 +776,28 @@ def enforce():
 		global progl
 		global tdomf
 		# look up all domain with profile 1 or 2
-		x = re.findall("^<kernel> +/[^ ]+.*$\n+use_profile +[1-2] *$", tdomf, re.MULTILINE)
+		x = re.findall("^<kernel> +/[^ ]+.*$\n+use_profile +[1-2] *$", tdomf, re.M)
 		x2 = []
 		if x:
 			# check if it's not a standalone exception and not a domain with newly created learning mode
 			for i in x:
-				p = re.search("/[^ ]*$", i, re.MULTILINE).group()[:-1]
-				p2 = re.search("^<kernel> +" + re.escape(p) + " *$", p, re.MULTILINE)
+				p = re.search("/[^ ]*$", i, re.M).group()[:-1]
+				p2 = re.search("^<kernel> +" + re.escape(p) + " *$", p, re.M)
 				if not p in progl:
 					if not p in spec_prog or ((p in spec_prog) and (not p2)):
 						x2.append(i)
 		# check if there are old domains with enforcing mode
 		flag_old = 0
-		if re.search("^<kernel> +/[^ ]+.*$\n+use_profile +3 *$", tdomf, re.MULTILINE): flag_old = 1
+		if re.search("^<kernel> +/[^ ]+.*$\n+use_profile +3 *$", tdomf, re.M): flag_old = 1
 		# turn on enforcing mode for domains
 		if x2:
 			flag_old2 = 0
 			for i in x2:
-				p = re.search("^<kernel> +/[^ ]+ *$", i, re.MULTILINE)
+				p = re.search("^<kernel> +/[^ ]+ *$", i, re.M)
 				if p:
 					if not flag_old2: color("* turn on enforcing mode for old domains", green); flag_old2 = 1
 					# get only binary name
-					p2 = re.search("/[^ ]+", p.group(), re.MULTILINE)
+					p2 = re.search("/[^ ]+", p.group(), re.M)
 					# print it
 					color(p2.group(), blue)
 				sd1 = re.sub("use_profile +[1-2] *", "use_profile 3", i)
@@ -1040,9 +1040,9 @@ def compare_temp(last1, last2, last3):
 								else:
 									b1 = a1[1][:-1]; b2 = a2[1][:-1]; b3 = a3[1][:-1]
 								# get the dir names
-								d1 = re.search("^/.+/", b1, re.MULTILINE)
-								d2 = re.search("^/.+/", b2, re.MULTILINE)
-								d3 = re.search("^/.+/", b3, re.MULTILINE)
+								d1 = re.search("^/.+/", b1, re.M)
+								d2 = re.search("^/.+/", b2, re.M)
+								d3 = re.search("^/.+/", b3, re.M)
 								if d1 and d2 and d3:
 									dd1 = d1.group()
 									dd2 = d2.group()
@@ -1050,9 +1050,9 @@ def compare_temp(last1, last2, last3):
 									# their dirs match?
 									if dd3 == dd1 and dd3 == dd2:
 										# get the file names
-										f1 = re.search("[^/]+$", b1, re.MULTILINE)
-										f2 = re.search("[^/]+$", b2, re.MULTILINE)
-										f3 = re.search("[^/]+$", b3, re.MULTILINE)
+										f1 = re.search("[^/]+$", b1, re.M)
+										f2 = re.search("[^/]+$", b2, re.M)
+										f3 = re.search("[^/]+$", b3, re.M)
 										if f1 and f2 and f3:
 											ff1 = f1.group()
 											ff2 = f2.group()
@@ -1113,12 +1113,12 @@ def compare_temp(last1, last2, last3):
 									b1  = a1[1][:-1]; b2  = a2[1][:-1]; b3  = a3[1][:-1]
 									b1_ = a1[2][:-1]; b2_ = a2[2][:-1]; b3_ = a3[2][:-1]
 								# get the dir names
-								d1  = re.search("^/.+/", b1,  re.MULTILINE)
-								d2  = re.search("^/.+/", b2,  re.MULTILINE)
-								d3  = re.search("^/.+/", b3,  re.MULTILINE)
-								d1_ = re.search("^/.+/", b1_, re.MULTILINE)
-								d2_ = re.search("^/.+/", b2_, re.MULTILINE)
-								d3_ = re.search("^/.+/", b3_, re.MULTILINE)
+								d1  = re.search("^/.+/", b1,  re.M)
+								d2  = re.search("^/.+/", b2,  re.M)
+								d3  = re.search("^/.+/", b3,  re.M)
+								d1_ = re.search("^/.+/", b1_, re.M)
+								d2_ = re.search("^/.+/", b2_, re.M)
+								d3_ = re.search("^/.+/", b3_, re.M)
 								if d1 and d2 and d3 and d1_ and d2_ and d3_:
 									dd1  = d1.group()
 									dd2  = d2.group()
@@ -1129,12 +1129,12 @@ def compare_temp(last1, last2, last3):
 									# their dirs match?
 									if dd3 == dd1 and dd3 == dd2 and dd3_ == dd1_ and dd3_ == dd2_:
 										# get the file names
-										f1  = re.search("[^/]+$", b1, re.MULTILINE)
-										f2  = re.search("[^/]+$", b2, re.MULTILINE)
-										f3  = re.search("[^/]+$", b3, re.MULTILINE)
-										f1_ = re.search("[^/]+$", b1_, re.MULTILINE)
-										f2_ = re.search("[^/]+$", b2_, re.MULTILINE)
-										f3_ = re.search("[^/]+$", b3_, re.MULTILINE)
+										f1  = re.search("[^/]+$", b1, re.M)
+										f2  = re.search("[^/]+$", b2, re.M)
+										f3  = re.search("[^/]+$", b3, re.M)
+										f1_ = re.search("[^/]+$", b1_, re.M)
+										f2_ = re.search("[^/]+$", b2_, re.M)
+										f3_ = re.search("[^/]+$", b3_, re.M)
 										if f1 and f2 and f3 and f1_ and f2_ and f3_:
 											ff1  = f1.group()
 											ff2  = f2.group()
@@ -1255,6 +1255,7 @@ def domain_cleanup():
 	tdomf2 = tdomf + "\n<kernel>"
 	# collect all domains separately
 	r = re.findall("^<kernel>.*?^(?=<kernel>)", tdomf2, re.M + re.DOTALL)
+
 	if r:
 		# cycle through domains
 		for i in r:
@@ -1286,7 +1287,7 @@ def domain_cleanup():
 				if type1 == type2:
 					#if so, then build list from it
 					r3.append(rule2)
-				if (not type1 == type2) or (not c < l-1):
+				if (not type1 == type2):
 
 					if r3:
 						# sort and unique list containing only some types of rules
@@ -1296,13 +1297,19 @@ def domain_cleanup():
 						tdomf3 +=  "\n".join(r4) + "\n"
 
 					r3 = []
-					if c < l-1:
-						r3.append(rule2)
-				type1 = type2
+					r3.append(rule2)
+					type1 = type2
+	
 				c += 1
 				
-			tdomf3 += "\n"
+				# this is the last cycle, so i have to run sort manually
+				if c >= l:
+					r4 = uniq_rules_more(r3)
+					r4.sort()
+					tdomf3 +=  "\n".join(r4) + "\n"
 				
+			tdomf3 += "\n"
+			
 		tdomf = tdomf3
 
 
@@ -1372,10 +1379,10 @@ def check():
 	flag_check3 = 0
 	if not flag_check:
 		flag_check = 1
-		x = re.findall("^<kernel> +/[^ ]+ *$\n+use_profile +[1-3] *$", tdomf, re.MULTILINE)
+		x = re.findall("^<kernel> +/[^ ]+ *$\n+use_profile +[1-3] *$", tdomf, re.M)
 		if x:
 			for i in x:
-				p = re.search("^<kernel> .*$", i, re.MULTILINE).group()[9:]
+				p = re.search("^<kernel> .*$", i, re.M).group()[9:]
 				if not p in progs:
 					if not flag_check2:
 						flag_check2 = 1
@@ -1393,7 +1400,7 @@ def check():
 
 	for prog in progs:
 		# does the domain exist for the program?
-		x = re.search("^initialize_domain *" + re.escape(prog) + " *$", texcf, re.MULTILINE)
+		x = re.search("^initialize_domain *" + re.escape(prog) + " *$", texcf, re.M)
 		if x:
 			# pritn only once
 			if flag_firstrun:
@@ -1409,7 +1416,7 @@ def check():
 			texcf += "\ninitialize_domain " + prog + "\n"
 
 		# does the rule exist for it?
-		x = re.findall("^<kernel> +" + re.escape(prog) + " *$\n+use_profile +[0-9]+ *$", tdomf, re.MULTILINE)
+		x = re.findall("^<kernel> +" + re.escape(prog) + " *$\n+use_profile +[0-9]+ *$", tdomf, re.M)
 		if not x:
 			color(", no rule", "", 1)
 			print ", ",; color("create rule with learning mode on", green, 1)
@@ -1425,17 +1432,17 @@ def check():
 			if flag_firstrun:
 				color(", rule exists", "", 1)
 			# search for all subdomains too
-			xx = re.findall("^<kernel> +" + re.escape(prog) + ".*$\n+use_profile +[0-9]+ *$", tdomf, re.MULTILINE)
+			xx = re.findall("^<kernel> +" + re.escape(prog) + ".*$\n+use_profile +[0-9]+ *$", tdomf, re.M)
 			if not xx: error_conf("102")
 
 			# cycle through the domain and its subdomains
 			for d in xx:
 				# get subdomain binary
-				prog2 = re.search(re.escape(prog) + ".*$", d, re.MULTILINE).group()
+				prog2 = re.search(re.escape(prog) + ".*$", d, re.M).group()
 				# get mode
-				x2 = re.findall("use_profile +[0-9]+", d, re.MULTILINE)
+				x2 = re.findall("use_profile +[0-9]+", d, re.M)
 				if len(x2) > 1: error_conf("103")
-				x3 = re.findall("[0-9]+", x2[0], re.MULTILINE)
+				x3 = re.findall("[0-9]+", x2[0], re.M)
 				profile = int(x3[0])
 				if profile < 0 or profile > 3: error_conf("104")
 
@@ -1491,7 +1498,7 @@ def check():
 	except: color("error: cannot open file " + tlog, red); myexit(1)
 	log2 = []
 	# search for tomoyo error messages
-	s = re.findall(".* TOMOYO-ERROR: +.*$", log, re.MULTILINE)
+	s = re.findall(".* TOMOYO-ERROR: +.*$", log, re.M)
 	l=len(s)
 
 	# check the mark if there are log messages
@@ -1549,7 +1556,7 @@ def check():
 	# **********************************************
 
 	sand_clock()
-
+	
 	# convert log messages into rules and add them to policy
 	flag_print = 0
 	prog3 = []
@@ -1610,7 +1617,7 @@ def check():
 				l = len(rule4)
 				flag_choice = 0
 				for i in range(0, l):
-					xx = re.findall("^<kernel>.* " + re.escape(prog4[i]) + "$\n+use_profile +3 *$", tdomf, re.MULTILINE)
+					xx = re.findall("^<kernel>.* +" + re.escape(prog4[i]) + "$\n+use_profile +3 *$", tdomf, re.M)
 					# check if log entry contains a domain that doesn't exist
 					if xx:
 						# print log messages
@@ -1630,7 +1637,8 @@ def check():
 							flag_choice = 1
 							# always add rule to all domain's binary, not only who have their own domains
 							for d in xx:
-								s = re.sub(re.escape(d), d + "\n" + rule4[i], tdomf)
+								d2 = d + "\n" + rule4[i]
+								s = re.sub(re.escape(d), d2, tdomf, re.M)
 								tdomf = s
 
 						if flag_choice:
@@ -1885,7 +1893,7 @@ def check():
 				# check params from number 2 (first is only the allow_)
 				for i3 in range(1, l):
 					# get the dir name only (cannot be root dir /)
-					r = re.search("^/.+/", i2[i3], re.MULTILINE)
+					r = re.search("^/.+/", i2[i3], re.M)
 					if r:
 						r2 = r.group()
 						flag = 0
@@ -1901,7 +1909,7 @@ def check():
 				# check params from number 2 (first is only the allow_)
 				for i3 in range(1, l):
 					# get the dir name only (cannot be root dir /)
-					r = re.search("^/.+/", i2[i3], re.MULTILINE)
+					r = re.search("^/.+/", i2[i3], re.M)
 					if r:
 						r2 = r.group()
 						flag = 0
@@ -1946,10 +1954,10 @@ def check():
 						# get parent dir of param (if file or dir)
 						paramd = ""
 						if not param[-1] == "/":
-							r = re.search("^/.+/", param, re.MULTILINE)
+							r = re.search("^/.+/", param, re.M)
 							if r: paramd = r.group()
 						else:
-							r = re.search("^/.+/", param[:-1], re.MULTILINE)
+							r = re.search("^/.+/", param[:-1], re.M)
 							if r: paramd = r.group()
 						
 						param2 = ""
@@ -2014,7 +2022,7 @@ def check():
 
 
 						# wildcard library files version numbers
-						if re.search("/lib.+[\.0-9]*\.so[\.0-9]*$", param, re.MULTILINE):
+						if re.search("/lib.+[\.0-9]*\.so[\.0-9]*$", param, re.M):
 							r = re.sub("[\.0-9]+\.so\.[\.0-9]+$", "\\\\*.so.\\\\*", param)
 							param = r
 							r = re.sub("[\.0-9]+\.so$", "\\\\*.so", param)
@@ -2356,9 +2364,9 @@ if pl1 == "debian" or pl1 == "ubuntu":
 					color("error: no such file: " + i, red); myexit(1)
 				f2 = open(f).read()
 				# kernel parameter set yet?
-				p0 = re.search("^GRUB_CMDLINE_LINUX=\".*" + re.escape(tkern) + ".*\"$", f2, re.MULTILINE)
+				p0 = re.search("^GRUB_CMDLINE_LINUX=\".*" + re.escape(tkern) + ".*\"$", f2, re.M)
 				if not p0:
-					p = re.search("^GRUB_CMDLINE_LINUX=\".*\"$", f2, re.MULTILINE)
+					p = re.search("^GRUB_CMDLINE_LINUX=\".*\"$", f2, re.M)
 					if p:
 						p1 = p.group()
 						p2 = re.sub("\"$", " " + tkern + "\"", p1)
