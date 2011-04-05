@@ -26,7 +26,9 @@
 # changelog:
 # -----------
 # 05/04/2011 - tomld v0.27 - rewrite domain cleanup function
+#                          - speed up the new domain cleanup function by skipping rules reading libs
 #                          - add feature: check rules only if they changed and avoid unnecessary work
+#                          - improve info() function: show main domains and subdomains with different colors
 #                          - major bugfixes
 # 03/04/2011 - tomld v0.26 - improve domain cleanup function
 #                          - improve info function
@@ -909,12 +911,11 @@ def info(text = ""):
 								# print allow_read libs with different colors
 								for i3 in i7:
 									if i3:
-										rr1 = re.search("^allow_read +/lib/", i3, re.M)
-										rr2 = re.search("^allow_read +/usr/lib/", i3, re.M)
-										rr3 = re.search(" +" + home + "/", i3, re.M)
-										if rr3:
+										rr1 = re.search("^allow_read +/lib/|^allow_read +/usr/lib/", i3, re.M)
+										rr2 = re.search(" +" + home + "/", i3, re.M)
+										if rr2:
 											color(i3, cyan)
-										elif rr1 or rr2:
+										elif rr1:
 											color(i3, yellow)
 										else:
 											color(i3, red)
@@ -931,20 +932,37 @@ def info(text = ""):
 		# search for all active domains
 		r = re.findall("^<kernel>.+$\n+use_profile +[1-3] *$", tdomf, re.M)
 		if r:
+			# select main domains and print
 			r3 = []
+			for i in r:
+				r2 = re.search("^<kernel> +[^ ]+", i, re.M)
+				if r2:
+					r7 = r2.group().splitlines()[0]
+					r4 = re.search("[^ ]+$", r7, re.M).group()
+					r5 = r4
+					if r4[-1] == "\n": r5 = r4[:-1]
+					if not r5 in r3:
+						r3.append(r5)
+
+			# select the rest of the subdomains and print with other color
+			r6 = []
 			for i in r:
 				r2 = re.search("[^ ]+$", i, re.M)
 				if r2:
 					r4 = r2.group()
 					r5 = r4
 					if r4[-1] == "\n": r5 = r4[:-1]
-					if not r5 in r3:
-						r3.append(r5)
+					if (not r5 in r6) and (not r5 in r3):
+						r6.append(r5)
+
 			# print result
 			print
 			r3.sort()
+			r6.sort()
 			for i in r3:
 				color(i, blue)
+			for i in r6:
+				color(i, yellow)
 			print
 		else:
 			color("error: no domains found", red)
@@ -1223,29 +1241,39 @@ def uniq_rules_more(list):
 	list2 = []
 	# compare all rules with all of them
 	for i1 in range(0, l):
-		new = ""
-		for i2 in range(0, l):
-			if not i1 == i2:
-				rule1 = list[i1]
-				rule2 = list[i2]
-				# check the number of tags in the rules
-				p1 = len(rule1.split("/"))
-				p2 = len(rule2.split("/"))
-				# if tag numberd match:
-				if p1 == p2:
-					# compare rules
-					if compare_rules(rule1, rule2):
-						old = rule1
-						if len(rule1) > len(rule2): old = rule2
-						# store only the shortest one from the matching ones
-						if (not new) or (len(new) > len(old)):
-							new = old
+		# speed up this part here a bit and reduce number of cycles by skipping rules reading libs
+		rr1 = re.search("^allow_read +/lib/|^allow_read +/usr/lib/", list[i1], re.M)
+		if not rr1:
+			new = ""
+			# inside cycle
+			for i2 in range(0, l):
+				# skip the part checking the rule with itself
+				if not i1 == i2:
+					rule1 = list[i1]
+					rule2 = list[i2]
+					# check the number of tags in the rules
+					p1 = len(rule1.split("/"))
+					p2 = len(rule2.split("/"))
+					# if tag numberd match:
+					if p1 == p2:
+						# compare rules
+						if compare_rules(rule1, rule2):
+							old = rule1
+							if len(rule1) > len(rule2): old = rule2
+							# store only the shortest one from the matching ones
+							if (not new) or (len(new) > len(old)):
+								new = old
 
-		# store the original rule if there was no match
-		if not new:
+			# store the original rule if there was no match
+			if not new:
+				new = list[i1]
+			if not new in list2:
+				list2.append(new)
+		# add it if if it's a rule reading libs
+		else:
 			new = list[i1]
-		if not new in list2:
-			list2.append(new)
+			if not new in list2:
+				list2.append(new)
 
 	# these 2 sortings are needed for other functions in the main rutins
 	if list2:
