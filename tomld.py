@@ -25,6 +25,7 @@
 #
 # changelog:
 # -----------
+# 06/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 # 05/04/2011 - tomld v0.27 - rewrite domain cleanup function
 #                          - speed up the new domain cleanup function by skipping rules reading libs
 #                          - add feature: check rules only if they changed and avoid unnecessary work
@@ -137,6 +138,7 @@
 import os, sys
 import time, re
 import platform
+import termios
 
 
 # **************************
@@ -221,6 +223,11 @@ global red;    red		= "\033[31;48m"
 global yellow; yellow	= "\033[33;48m"
 global bold;   bold		= "\033[1m"
 global clr;    clr		= "\033[0m"
+
+# terminal
+global term_fd, term_old, term_new
+global term_flag; term_flag = 0
+
 
 # all binaries with domains
 global progs; progs = []
@@ -346,7 +353,7 @@ def help():
 	print "to force a rule for all kinds of behave"
 	print "- on --reset switch the config files will be backed up and the former log entries",
 	print "still won't be considered, so it really means a new start"
-	print "- the program can be stopped any time by Ctrl+C whereafter all old domains (learning and permissive)",
+	print "- the program can be stopped any time by pressing q whereafter all old domains (learning and permissive)",
 	print "are turned into enforcing mode"
 	print "- tomld files: " + tmark + " (this contains a mark to identify the end of the recently read message logs),",
 	print pidf + " (pid file to avoid multpiple instances of the program to be running at the same time)"
@@ -1348,6 +1355,36 @@ def domain_cleanup():
 			tdomf3 += "\n"
 			
 		tdomf = tdomf3
+
+
+# get 1 key and wait for it for 1 second
+# http://docs.python.org/library/termios.html
+def getkey():
+	global term_fd, term_old, term_new, term_flag
+	term_fd = sys.stdin.fileno()
+	term_old = termios.tcgetattr(term_fd)
+	term_new = termios.tcgetattr(term_fd)
+	term_new[3] = term_new[3] & ~termios.ICANON & ~termios.ECHO
+	# do not wait (value 1) but poll it (value 0)
+	term_new[6][termios.VMIN] = 0
+	# wait 1 second (10 times 0.1 second)
+	term_new[6][termios.VTIME] = 10
+	termios.tcsetattr(term_fd, termios.TCSANOW, term_new)
+	c = None
+	term_flag = 1
+	try:
+		c = os.read(term_fd, 1)
+	finally:
+		termios.tcsetattr(term_fd, termios.TCSAFLUSH, term_old)
+	return c
+
+
+# set back normal terminal attributes
+def clearkey():
+	global term_flag
+	if term_flag:
+		termios.tcsetattr(term_fd, termios.TCSAFLUSH, term_old)
+		term_flag = 0
 
 
 # print domain stat
@@ -2637,7 +2674,7 @@ try:
 			# print time of sleeping period only when --once switch is not set
 			if not opt_once: sl = ", sleeping " + str(count) + "s between every cycle"
 			color("* whole running cycle took " + str(time.clock() - speed) + "s" + sl, green)
-			if not opt_once: color("(press ctrl+c to stop)", red)
+			if not opt_once: color("(press q to quit)", red)
 		# now it's safe to enforce mode and save config on interrupt, cause check() finished running
 		flag_safe = 1
 
@@ -2649,7 +2686,18 @@ try:
 
 	# wait some time then rerun
 	try:
-		time.sleep(1)
+#		time.sleep(1)
+		# get 1 key and wait for it for 1 second
+		try:
+			key = getkey()
+		finally:
+			clearkey()
+		# if key is "q" then quit
+		if key == "q":
+			print
+			myfinish()
+
+
 	except KeyboardInterrupt:
 		print
 		myfinish()
