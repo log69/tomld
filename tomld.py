@@ -25,7 +25,8 @@
 #
 # changelog:
 # -----------
-# 06/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
+# 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
+#                          - bugfix: do not turn on enforcing mode for newly created domains
 # 05/04/2011 - tomld v0.27 - rewrite domain cleanup function
 #                          - speed up the new domain cleanup function by skipping rules reading libs
 #                          - add feature: check rules only if they changed and avoid unnecessary work
@@ -238,7 +239,8 @@ global progl; progl = []
 global speed; speed = 0
 
 # supported platforms
-supp = ["debian 6.", "ubuntu 10.10."]
+#supp = ["debian 6.", "ubuntu 10.10."]
+supp = ["debian 6.", "ubuntu 10.10.", "ubuntu 11.04"]
 
 # this will contain the dirs to be fully wildcarded resursively with --recursive switch on
 global specr;  specr  = []
@@ -797,11 +799,13 @@ def enforce():
 		x = re.findall("^<kernel> +/[^ ]+.*$\n+use_profile +[1-2] *$", tdomf, re.M)
 		x2 = []
 		if x:
-			# check if it's not a standalone exception and not a domain with newly created learning mode
+			# check if it's not a standalone domain and not a domain with newly created learning mode
 			for i in x:
-				p = re.search("/[^ ]*$", i, re.M).group()[:-1]
-				p2 = re.search("^<kernel> +" + re.escape(p) + " *$", p, re.M)
+				p = re.search("/[^ ]*$", i, re.M).group()
+				p2 = re.search("^<kernel> +" + re.escape(p) + " *$", tdomf, re.M)
+				# if it's not a newly created domain
 				if not p in progl:
+					# if not an exception domain or an exceptin domain but not a main domain
 					if not p in spec_prog or ((p in spec_prog) and (not p2)):
 						x2.append(i)
 		# check if there are old domains with enforcing mode
@@ -1498,7 +1502,7 @@ def check():
 			if not flag_firstrun: print
 			# create a rule for it
 			tdomf += "\n<kernel> " + prog + "\n\nuse_profile 1\n\n"
-			# store prog name to know not to turn on enforcing mode for these ones
+			# store prog name to know not to turn on enforcing mode for these ones on exit
 			progl.append(prog)
 		else:
 			# only 1 rule should exist
