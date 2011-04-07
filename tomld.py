@@ -27,6 +27,7 @@
 # -----------
 # 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 #                          - bugfix: do not turn on enforcing mode for newly created domains
+#                          - add compatibility to tomoyo version 2.3
 # 05/04/2011 - tomld v0.27 - rewrite domain cleanup function
 #                          - speed up the new domain cleanup function by skipping rules reading libs
 #                          - add feature: check rules only if they changed and avoid unnecessary work
@@ -240,7 +241,8 @@ global speed; speed = 0
 
 # supported platforms
 #supp = ["debian 6.", "ubuntu 10.10."]
-supp = ["debian 6.", "ubuntu 10.10.", "ubuntu 11.04"]
+# expanded platforms, mostly for testing currently
+supp = ["debian 6.", "debian wheezy/sid", "ubuntu 10.10.", "ubuntu 11.04"]
 
 # this will contain the dirs to be fully wildcarded resursively with --recursive switch on
 global specr;  specr  = []
@@ -1577,7 +1579,9 @@ def check():
 	except: color("error: cannot open file " + tlog, red); myexit(1)
 	log2 = []
 	# search for tomoyo error messages
-	s = re.findall(".* TOMOYO-ERROR: +.*$", log, re.M)
+#	s = re.findall(".* TOMOYO-ERROR: +.*$", log, re.M)
+	# updating log format from tomoyo version 2.2 to 2.3
+	s = re.findall(".*[\- ]ERROR: Access +.*$|.*[\- ]ERROR: Domain +.*$", log, re.M)
 	l=len(s)
 
 	# check the mark if there are log messages
@@ -1651,16 +1655,23 @@ def check():
 		# 2 kinds of message types:
 		# TOMOYO-ERROR: Access 'read(...) /etc/file' denied for /bin/program
 		# TOMOYO-ERROR: Domain '<kernel> /bin/this/program /bin/other/program' not defined.
-		log3 = re.findall(".* TOMOYO-ERROR: Access \'.*$", logall, re.M)
-		log4 = re.findall(".* TOMOYO-ERROR: Domain \'.*$", logall, re.M)
+#		log3 = re.findall(".* TOMOYO-ERROR: Access \'.*$", logall, re.M)
+#		log4 = re.findall(".* TOMOYO-ERROR: Domain \'.*$", logall, re.M)
+
+		# updating log format from tomoyo version 2.2 to 2.3
+		# 2 kinds of message types:
+		# ERROR: Access read(...) /etc/file' denied for /bin/program
+		# ERROR: Domain <kernel> /bin/this/program /bin/other/program' not defined.
+		log3 = re.findall(".*[\- ]ERROR: Access \'*.*$", logall, re.M)
+		log4 = re.findall(".*[\- ]ERROR: Domain \'*.*$", logall, re.M)
 
 		# log type 1
 		if log3:
 			# collect logs and create rules from it
 			for i in log3:
-				s1 = re.sub(".* TOMOYO-ERROR: Access \'", "", i)
-				s2 = re.sub("\' denied for .*$", "", s1)
-				prog2 = re.sub(".*\' denied for ", "", s1)
+				s1 = re.sub(".*[\- ]ERROR: Access \'*", "", i)
+				s2 = re.sub("\'* denied for .*$", "", s1)
+				prog2 = re.sub(".*\'* denied for ", "", s1)
 				comm2 = "allow_" + re.search("^[^ \(]*", s2).group()
 				ff    = re.search("[ ].*$", s2).group()
 				ff2   = re.sub("^[ ]*", "", ff)
@@ -1737,8 +1748,8 @@ def check():
 			log5 = []
 			for i in log4:
 				# get the domain name that was denied
-				s1 = re.sub(".* TOMOYO-ERROR: Domain \'", "", i)
-				s2 = re.sub("\' not defined\..*$", "", s1)
+				s1 = re.sub(".*[\- ]ERROR: Domain \'*", "", i)
+				s2 = re.sub("\'* not defined\..*$", "", s1)
 				if s2 not in log5:
 					log5.append(s2)
 
@@ -2033,18 +2044,37 @@ def check():
 				s = i2[0]
 
 				# handle some of the special allow_ entries differently whose parameters are not dirs
-				if s == "allow_ioctl":
+				if i2[0] == "allow_ioctl":
 					for i3 in range(1, l):
-						param = i2[i3]
-						r = re.sub("socket:\[[0-9]+\]", "socket:[\\\\$]", param)
-						param = r
+						if i3 == 1:
+							param = i2[i3]
+#							r = re.sub("socket:\[[0-9]+\]", "socket:[\\\\$]", param)
+							# updating policy format from tomoyo version 2.2 to 2.3
+							r = re.sub("socket:\[.*\].*$", "socket:[\\\\*]", param)
+							param = r
 
-						s += " " + param
+						# remove second parameter at allow_ioctl rule (tomoyo version 2.3)
+						if i3 >= 2:
+							param = "0x0000-0xFFFF"
+
+						# add param if not nothing
+						if param:
+							s += " " + param
 
 				# handle params that are dirs
 				else:
 					# check params from number 2 (first is only the allow_)
 					for i3 in range(1, l):
+					
+					  # remove second parameter at allow_create rule (tomoyo version 2.3)
+					  if (i2[0] == "allow_create") and (i3 >= 2):
+					  	param = "7777"
+
+						# add param if not nothing
+#						if param:
+						s += " " + param
+
+					  else:
 
 						# is param dir among spec or spec2 or specr dirs?
 						# only one of them is enough to find
@@ -2138,7 +2168,10 @@ def check():
 						i4 = re.sub("^" + re.escape(home) + "/[^/]+/", home + "/\\\\*/", param)
 						param = i4
 
-						s += " " + param
+
+						# add param if not nothing
+						if param:
+							s += " " + param
 
 				i = s + "\n"
 
@@ -2208,9 +2241,12 @@ def check():
 		
 		# on create rule, add read/write, unlink and truncate too if 
 		if i[0:13] == "allow_create ":
-			i2 = re.sub("allow_create ", "allow_read/write ", i, re.M)
-			i3 = re.sub("allow_create ", "allow_unlink ", i, re.M)
-			i4 = re.sub("allow_create ", "allow_truncate ", i, re.M)
+			# remove second number parameter at allow_create rule for the rest of the rules (tomoyo version 2.3)
+			i1 = re.sub(" +[0-9]+$", "", i, re.M)
+			
+			i2 = re.sub("allow_create ", "allow_read/write ", i1, re.M)
+			i3 = re.sub("allow_create ", "allow_unlink ", i1, re.M)
+			i4 = re.sub("allow_create ", "allow_truncate ", i1, re.M)
 			i = i + i2 + i3 + i4
 
 		tdomf2 += i
