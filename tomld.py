@@ -2066,16 +2066,6 @@ def check():
 					# check params from number 2 (first is only the allow_)
 					for i3 in range(1, l):
 					
-					  # remove second parameter at allow_create rule (tomoyo version 2.3)
-					  if (i2[0] == "allow_create") and (i3 >= 2):
-					  	param = "7777"
-
-						# add param if not nothing
-#						if param:
-						s += " " + param
-
-					  else:
-
 						# is param dir among spec or spec2 or specr dirs?
 						# only one of them is enough to find
 						
