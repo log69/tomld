@@ -254,7 +254,7 @@ global spec; spec = [home + "/", "/usr/share/", "/etc/fonts/", "/var/cache/"]
 
 # just like the above, but these are the exception dirs
 # exact match needs on these dirs for the leaf dir or file not to get wildcarded
-global spec_ex; spec_ex = ["/etc/", home + "/\*/"]
+global spec_ex; spec_ex = ["/etc/", home + "/\*/", "/root/"]
 
 # exception programs - these programs will never get a standalone enforcing mode domain
 global spec_prog; spec_prog = ["/bin/sh", "/bin/bash", "/bin/dash", "/usr/sbin/sshd"]
