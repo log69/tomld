@@ -240,9 +240,7 @@ global progl; progl = []
 global speed; speed = 0
 
 # supported platforms
-#supp = ["debian 6.", "ubuntu 10.10."]
-# expanded platforms, mostly for testing currently
-supp = ["debian 6.", "debian wheezy/sid ", "ubuntu 10.10.", "ubuntu 11.04."]
+supp = ["debian 6", "debian wheezy/sid", "ubuntu 10.10", "ubuntu 11.04"]
 
 # this will contain the dirs to be fully wildcarded resursively with --recursive switch on
 global specr;  specr  = []
@@ -340,7 +338,7 @@ def help():
 	print "*executables are additonal programs to create domains for"
 	print
 	print "supported platforms are:"
-	for i in supp: print "  ", i[:-1]
+	for i in supp: print "  ", i
 	print
 	print
 	print "REMARKS:"
@@ -2422,11 +2420,21 @@ if not platform.system().lower() == "linux": color("error: this platform is unsu
 # store platform name and version
 r = platform.linux_distribution()[0].lower() + " " + platform.linux_distribution()[1].lower()
 pl = re.sub("  +", " ", r)
+r = pl
+pl = re.sub(" *$", "", r, re.M)
+
 print "platform is", pl
 
 # check if it's supported platform
 flag = 0
 for i in supp:
+	# add a "." char to the end of the platform name if the last chars are numbers
+	# so minor version numbers won't be problems
+	if i[-1] in "0123456789":
+		i += "."
+	print i
+	# check which name is shorter, and compare to the shortest only
+	# so "debian 6." fits to "debian 6.0.1"
 	l1 = len(i)
 	l2 = len(pl)
 	if l1 < l2:
@@ -2436,7 +2444,7 @@ for i in supp:
 if flag == 0:
 	color("error: this platform is unsupported", red)
 	print "supported platforms are:"
-	for i in supp: print "  ", i[:-1]
+	for i in supp: print "  ", i
 	myexit(1)
 
 
