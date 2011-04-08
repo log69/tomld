@@ -242,7 +242,7 @@ global speed; speed = 0
 # supported platforms
 #supp = ["debian 6.", "ubuntu 10.10."]
 # expanded platforms, mostly for testing currently
-supp = ["debian 6.", "debian wheezy/sid", "ubuntu 10.10.", "ubuntu 11.04"]
+supp = ["debian 6.", "debian wheezy/sid ", "ubuntu 10.10.", "ubuntu 11.04."]
 
 # this will contain the dirs to be fully wildcarded resursively with --recursive switch on
 global specr;  specr  = []
