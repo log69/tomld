@@ -2432,7 +2432,6 @@ for i in supp:
 	# so minor version numbers won't be problems
 	if i[-1] in "0123456789":
 		i += "."
-	print i
 	# check which name is shorter, and compare to the shortest only
 	# so "debian 6." fits to "debian 6.0.1"
 	l1 = len(i)
