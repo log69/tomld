@@ -148,7 +148,7 @@ import termios
 # **************************
 
 # program version
-ver = "0.27"
+ver = "0.28"
 
 # home dir
 home = "/home"

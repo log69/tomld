@@ -1,40 +1,23 @@
-tomld (tomoyo learning daemon) 0.26
+tomld (tomoyo learning daemon) 0.27
 Copyright (C) 2011 Andras Horvath
 E-mail: mail@log69.com - suggestions & feedbacks are welcome
 URL: http://log69.com - the official site
 
 LICENSE:
-This program is free software; you can redistribute it and/or modify it under 
-the terms of the GNU General Public License as published by the Free Software 
-Foundation; either version 3 of the License, or (at your option) any later 
-version.
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY 
-WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A 
-PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with 
-this program.  If not, see <http://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 DESCRIPTION:
-tomld (tomoyo learning daemon) is an extension to the Tomoyo security module to 
-ease and automate the setup process of a MAC (Mandatory Access Control) aware 
-system to increase security of the system by closing applications and services 
-into a domain with their rules. It helps the user harden his system easily. 
-Starts domains in learning mode, collects rules, then later changes these rules 
-and enforces the policy.
+tomld (tomoyo learning daemon) is an extension to the Tomoyo security module to ease and automate the setup process of a MAC (Mandatory Access Control) aware system to increase security of the system by closing applications and services into a domain with their rules. It helps the user harden his system easily. Starts domains in learning mode, collects rules, then later changes these rules and enforces the policy.
 
-Tomoyo module contains already the learning ability to automatically setup 
-rules while the processes are running in learning mode. Only, there are 
-continously changing files and directory names that the processes use, so those 
-have to be replaced with wildcarded rules. This needs a rather advanced 
-knowledge of the system.
+Tomoyo module contains already the learning ability to automatically setup rules while the processes are running in learning mode. Only, there are continously changing files and directory names that the processes use, so those have to be replaced with wildcarded rules. This needs a rather advanced knowledge of the system.
 
-This tool tries to fully automate the MAC setup, hoping the average users would 
-be able to use a much more secure system on their own with minimal efforts.
+This tool tries to fully automate the MAC setup, hoping the average users would be able to use a much more secure system on their own with minimal efforts.
 
-Tomoyo security module is part of the mainline Linux kernel since version 
-2.6.30. Currently this solution targets Linux systems only.
+Tomoyo security module is part of the mainline Linux kernel since version 2.6.30. Currently this solution targets Linux systems only.
 
 *TOMOYO(r) is a registered trademark of NTT DATA Corporation
 
@@ -69,45 +52,31 @@ The following options are supported:
 
 supported platforms are:
    debian 6
+   debian wheezy/sid
    ubuntu 10.10
+   ubuntu 11.04
 
 
 REMARKS:
 - it is written in python, tested with version 2.6
 - the program assumes to be run in a fully trusted environment
-- processes in the domains should run in learning mode for quite some time to 
-collect all the necessary rules to avoid malfunctioning by access deny later
-- before reboot, the rules should be stored manually by running 
-"tomoyo-savepolicy" or "tomld -k -1" as root if there are still domains in 
-learning mode, because Tomoyo forgets the learned rules on system restart
+- processes in the domains should run in learning mode for quite some time to collect all the necessary rules to avoid malfunctioning by access deny later
+- before reboot, the rules should be stored manually by running "tomoyo-savepolicy" or "tomld -k -1" as root if there are still domains in learning mode, because Tomoyo forgets the learned rules on system restart
 - enforcing mode should never be switched back off for security reason
 - exception domains means programs with no rules at all
-- programs should be used in a maximum possible way during the learning phase 
-to force a rule for all kinds of behave
-- on --reset switch the config files will be backed up and the former log 
-entries still won't be considered, so it really means a new start
-- the program can be stopped any time by Ctrl+C whereafter all old domains 
-(learning and permissive) are turned into enforcing mode
-- tomld files: /var/local/tomld.logmark (this contains a mark to identify the 
-end of the recently read message logs), /var/run/tomld.pid (pid file to avoid 
-multpiple instances of the program to be running at the same time)
-- in case a software or its settings change with a new version, the rules can 
-be regenerated easily
+- programs should be used in a maximum possible way during the learning phase to force a rule for all kinds of behave
+- on --reset switch the config files will be backed up and the former log entries still won't be considered, so it really means a new start
+- the program can be stopped any time by pressing q whereafter all old domains (learning and permissive) are turned into enforcing mode
+- tomld files: /var/local/tomld.logmark (this contains a mark to identify the end of the recently read message logs), /var/run/tomld.pid (pid file to avoid multpiple instances of the program to be running at the same time)
+- in case a software or its settings change with a new version, the rules can be regenerated easily
 - the running processes need to be restarted on newly created domains
 
 HOW TO USE:
-- download, move it to a directory that root owns only, change its owner to 
-root, change writeable only by root, make it executable, and run it as root
-- run it the 1st time, now it will offer to install all missing packages and 
-setup grub with kernel parameter
+- download, move it to a directory that root owns only, change its owner to root, change writeable only by root, make it executable, and run it as root
+- run it the 1st time, now it will offer to install all missing packages and setup grub with kernel parameter
 - system reboot is necessary now
-- run it the 2nd time, now it will create domains for the processes 
-automatically with learning mode
-- stop it now, cause the domains will stay in learning mode and the tomoyo 
-module will collect all rules
-- reboot the system or at least all the services and applications that have 
-domains now
-- hours or days later let's run it the 3rd time, now the access denied logs 
-will be converted to rules, and on exit all remaining domains will be turned 
-into enforcing mode
+- run it the 2nd time, now it will create domains for the processes automatically with learning mode
+- stop it now, cause the domains will stay in learning mode and the tomoyo module will collect all rules
+- reboot the system or at least all the services and applications that have domains now
+- hours or days later let's run it the 3rd time, now the access denied logs will be converted to rules, and on exit all remaining domains will be turned into enforcing mode
 
