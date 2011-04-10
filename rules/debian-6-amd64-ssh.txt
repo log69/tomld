@@ -1,0 +1,62 @@
+<kernel> /usr/bin/ssh
+use_profile 3
+allow_execute /bin/dash
+allow_execute /usr/lib/ssh/x11-ssh-askpass
+allow_read /dev/urandom
+allow_read /etc/gai.conf
+allow_read /etc/host.conf
+allow_read /etc/hosts
+allow_read /etc/ld.so.cache
+allow_read /etc/nsswitch.conf
+allow_read /etc/passwd
+allow_read /etc/resolv.conf
+allow_read /etc/services
+allow_read /etc/ssh/ssh_config
+allow_read /etc/ssl/openssl.cnf
+allow_read /lib/libc-\*.so
+allow_read /lib/libcom_err.so.\*
+allow_read /lib/libdl-\*.so
+allow_read /lib/libkeyutils.so.\*
+allow_read /lib/libnsl-\*.so
+allow_read /lib/libnss_compat-\*.so
+allow_read /lib/libnss_dns-\*.so
+allow_read /lib/libnss_files-\*.so
+allow_read /lib/libnss_nis-\*.so
+allow_read /lib/libpthread-\*.so
+allow_read /lib/libresolv-\*.so
+allow_read /usr/lib/libcrypto.so.\*
+allow_read /usr/lib/libgssapi_krb\*.so.\*
+allow_read /usr/lib/libk5crypto.so.\*
+allow_read /usr/lib/libkrb5support.so.\*
+allow_read /usr/lib/libkrb\*.so.\*
+allow_read /usr/lib/libz.so.\*
+allow_read/write /dev/null
+allow_read/write /dev/tty
+allow_read/write /home/\*/.ssh/\*
+
+<kernel> /usr/bin/ssh /bin/dash
+use_profile 3
+allow_execute /usr/bin/xauth
+allow_read /etc/ld.so.cache
+allow_read /lib/libc-\*.so
+allow_truncate /dev/null
+allow_write /dev/null
+
+<kernel> /usr/bin/ssh /bin/dash /usr/bin/xauth
+use_profile 3
+allow_create /home/\*/.Xauthority-c
+allow_link /home/\*/.Xauthority-c /home/\*/.Xauthority-l
+allow_read /etc/ld.so.cache
+allow_read /home/\*/.Xauthority
+allow_read /lib/libc-\*.so
+allow_read /lib/libdl-\*.so
+allow_read /usr/lib/libX\*.so.\*
+allow_read /usr/lib/libXau.so.\*
+allow_read /usr/lib/libXdmcp.so.\*
+allow_read /usr/lib/libXext.so.\*
+allow_read /usr/lib/libXmuu.so.\*
+allow_read /usr/lib/libxcb.so.\*
+allow_read/write /home/\*/.Xauthority-c
+allow_truncate /home/\*/.Xauthority-c
+allow_unlink /home/\*/.Xauthority-c
+allow_unlink /home/\*/.Xauthority-l
