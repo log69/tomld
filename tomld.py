@@ -377,7 +377,6 @@ def help():
 
 # print sand clock
 def sand_clock(dot = 0):
-	print time.clock()
 	global flag_firstrun
 	global flag_clock
 	if dot == 1:
