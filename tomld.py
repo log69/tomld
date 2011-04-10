@@ -377,6 +377,7 @@ def help():
 
 # print sand clock
 def sand_clock(dot = 0):
+	print time.clock()
 	global flag_firstrun
 	global flag_clock
 	if dot == 1:
@@ -2218,7 +2219,7 @@ def check():
 	domain_cleanup()
 
 
-	sand_clock()
+#	sand_clock()
 
 	# all entries with allow_create will be recreated with allow_unlink and allow_read/write entries too
 	# cause there are deny logs frequently coming back for the created files trying to be written, unlinked or trancated
