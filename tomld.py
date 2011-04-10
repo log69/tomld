@@ -1636,7 +1636,7 @@ def check():
 	# ******* CONVERT LOG AND ADD TO POLICY ********
 	# **********************************************
 
-	sand_clock()
+#	sand_clock()
 	
 	# convert log messages into rules and add them to policy
 	flag_print = 0
