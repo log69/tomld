@@ -1463,6 +1463,7 @@ def myfinish():
 	elif flag_firstrun:
 		color("* haven't finished to run at least once", red)
 	stat()
+	clearkey()
 	myexit()
 
 
