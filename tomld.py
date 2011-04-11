@@ -261,8 +261,10 @@ global spec; spec = [home + "/", "/usr/share/", "/etc/fonts/", "/var/cache/"]
 # exact match needs on these dirs for the leaf dir or file not to get wildcarded
 global spec_ex; spec_ex = ["/etc/", home + "/\*/", "/root/"]
 
-# exception programs (shells) - these programs will never get a standalone enforcing mode domain
-global spec_prog; spec_prog = []
+# exception programs - these programs and all the shells will never get a standalone enforcing mode domain
+# sshd must be an exception yet, cause it creates a subdomain of bash that would close us out
+global spec_prog;  spec_prog  = ["/usr/sbin/sshd"]
+global spec_prog2; spec_prog2 = []
 
 
 
@@ -854,7 +856,7 @@ def enforce():
 				# if it's not a newly created domain
 				if not p in progl:
 					# if not an exception domain or an exceptin domain but not a main domain
-					if not p in spec_prog or ((p in spec_prog) and (not p2)):
+					if not p in spec_prog2 or ((p in spec_prog2) and (not p2)):
 						x2.append(i)
 		# check if there are old domains with enforcing mode
 		flag_old = 0
@@ -1516,7 +1518,7 @@ def check():
 						flag_check2 = 1
 						color("* already existing main domains", green)
 					# store if not an exception
-					if not p in spec_prog:
+					if not p in spec_prog2:
 						progs.append(p)
 
 						# get program name without full path, and print that one for better readability
@@ -1525,11 +1527,12 @@ def check():
 							progs2.append(p2.group())
 
 			# print existing domain names without full path and in alphabet order
-			progs2.sort()
-			for i in progs2:
-				color(i + " ", blue, 1)
-			# new line
-			color("")
+			if progs2:
+				progs2.sort()
+				for i in progs2:
+					color(i + " ", blue, 1)
+				# new line
+				color("")
 
 # ----------------------------------------------------------------------
 	# print output only once if no change happened
@@ -2461,7 +2464,7 @@ if (l > 0):
 			# does the file exist on the path?
 			if os.path.isfile(i2):
 				# store it if not an exception and not in the list yet either
-				if (not i2 in spec_prog) and (not i2 in progs):
+				if (not i2 in spec_prog2) and (not i2 in progs):
 					progs.append(i2)
 			else:
 				color_("error: no such file: " + i2, red)
@@ -2655,18 +2658,18 @@ if os.path.isfile(f):
 	except:
 		# create default shell name list on failure
 		shells = s
+# add shell exceptions
 for i in shells:
 	if os.path.isfile(i):
 		p = os.path.realpath(i)
-		if not p in spec_prog:
-			spec_prog.append(p)
-
-# is tomld being run through an ssh connection?
-# if so, then add sshd daemon to the exception domains list too
-# so we cannot close ourselves out
-sshd = which("sshd")
-if sshd:
-	spec_prog.append(sshd)
+		if not p in spec_prog2:
+			spec_prog2.append(p)
+# add manual exceptions
+for i in spec_prog:
+	if os.path.isfile(i):
+		p = os.path.realpath(i)
+		if not p in spec_prog2:
+			spec_prog2.append(p)
 
 
 # ----------------------------------------------------------------------
@@ -2712,9 +2715,9 @@ mypid = os.getpid()
 d = "/proc"
 
 
-if spec_prog:
+if spec_prog2:
 	color("* exception domains", green)
-	for i in spec_prog: color(i + " ", purple, 1)
+	for i in spec_prog2: color(i + " ", purple, 1)
 	print
 
 if progs:
@@ -2778,7 +2781,7 @@ try:
 											flag_ok = 1
 										except: None
 										if flag_ok:
-											if (not progs.count(f2)) and (not f2 in spec_prog):
+											if (not progs.count(f2)) and (not f2 in spec_prog2):
 												# print info once
 												if flag2 == 0:
 													flag2 = 1
