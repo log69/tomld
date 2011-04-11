@@ -30,6 +30,7 @@
 #                          - bugfix: don't count additional programs more than once if the same is specified more times
 #                          - bugfix: check running instance at the very beginning of the program
 #                          - bugfix: adding extra check for existence and content of manager.conf
+#                          - mark all shells in /etc/shells as domain exceptions if their binary exist
 # 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 #                          - bugfix: do not turn on enforcing mode for newly created domains
 #                          - add compatibility to tomoyo version 2.3
