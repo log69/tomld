@@ -25,6 +25,11 @@
 #
 # changelog:
 # -----------
+# 11/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
+#                            so to print only rules into a file is easy now: tomld -i pattern 1>output
+#                          - bugfix: don't count additional programs more than once if the same is specified more times
+#                          - bugfix: check running instance at the very beginning of the program
+#                          - bugfix: adding extra check for existence and content of manager.conf
 # 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 #                          - bugfix: do not turn on enforcing mode for newly created domains
 #                          - add compatibility to tomoyo version 2.3
@@ -148,7 +153,7 @@ import termios
 # **************************
 
 # program version
-ver = "0.28"
+ver = "0.29"
 
 # home dir
 home = "/home"
@@ -169,10 +174,12 @@ global tpak2d; tpak2d = "tomoyo-tools"
 global tdomf; tdomf   = ""
 global texcf; texcf   = ""
 global tprof; tprof   = ""
+global tmanf; tmanf   = ""
 global tdir;  tdir    = "/etc/tomoyo"
 global tdom;  tdom    = "/etc/tomoyo/domain_policy.conf"
 global texc;  texc    = "/etc/tomoyo/exception_policy.conf"
 global tpro;  tpro    = "/etc/tomoyo/profile.conf"
+global tman;  tman    = "/etc/tomoyo/manager.conf"
 global tinit
 global tload
 global tsave
@@ -254,8 +261,8 @@ global spec; spec = [home + "/", "/usr/share/", "/etc/fonts/", "/var/cache/"]
 # exact match needs on these dirs for the leaf dir or file not to get wildcarded
 global spec_ex; spec_ex = ["/etc/", home + "/\*/", "/root/"]
 
-# exception programs - these programs will never get a standalone enforcing mode domain
-global spec_prog; spec_prog = ["/bin/sh", "/bin/bash", "/bin/dash", "/usr/sbin/sshd"]
+# exception programs (shells) - these programs will never get a standalone enforcing mode domain
+global spec_prog; spec_prog = []
 
 
 
@@ -555,7 +562,7 @@ def package_d(name):
 		f = "/var/lib/dpkg/status"
 		if os.path.isfile(f):
 			try: f2 = open(f).read()
-			except: color("error: cannot open file " + f2, red); myexit(1)
+			except: color_("error: cannot open file " + f2, red); myexit(1)
 			p = re.search("^Package: " + re.escape(name) + "$\n^Status: install ok installed$", f2, re.M)
 			if p: return 1
 
@@ -587,7 +594,7 @@ def which(file):
 	return ""
 
 
-# print colored text
+# print colored text to stdout
 def color(text, col = "", newline = 0):
 	if opt_color:
 		if col == "": t = text
@@ -605,10 +612,30 @@ def color(text, col = "", newline = 0):
 			sys.stdout.flush()
 
 
+# print colored text to stderr
+def color_(text, col = "", newline = 0):
+	if opt_color:
+		if col == "": t = text
+		else: t = col + text + clr
+		if newline == 0:
+			sys.stderr.write(t + "\n")
+			sys.stderr.flush()
+		# print without new line
+		else:
+			sys.stderr.write(t)
+			sys.stderr.flush()
+	else:
+		if newline == 0:
+			print text
+		else:
+			sys.stderr.write(text)
+			sys.stderr.flush()
+
+
 # print error message on corrupt config file
 # normally this should never run
 def error_conf(num):
-	color("error " + num + ": config file is corrupt", red); myexit(1)
+	color_("error " + num + ": config file is corrupt", red); myexit(1)
 
 
 # choice
@@ -635,9 +662,9 @@ def load():
 
 	# load config from memory to variables
 	try: tdomf = os.popen(tsave + " d -").read()
-	except: color("error: cannot load domain policy from memory", red); myexit(1)
+	except: color_("error: cannot load domain policy from memory", red); myexit(1)
 	try: texcf = os.popen(tsave + " e -").read()
-	except: color("error: cannot load exception policy from memory", red); myexit(1)
+	except: color_("error: cannot load exception policy from memory", red); myexit(1)
 
 	# remove disabled mode entries so runtime will be faster
 	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
@@ -679,7 +706,7 @@ def save():
 		f.flush()
 		f.close
 	except:
-		color("error: cannot write exception policy file", red)
+		color_("error: cannot write file " + texc, red)
 		myexit(1)
 	try:
 		f = open(tdom, "w")
@@ -687,7 +714,7 @@ def save():
 		f.flush()
 		f.close
 	except:
-		color("error: cannot write domain policy file", red)
+		color_("error: cannot write file " + tdom, red)
 		myexit(1)
 	# load config from disk to memory
 	os.system(tload + " fa")
@@ -701,7 +728,7 @@ def clear():
 		f.flush()
 		f.close
 	except:
-		color("error: cannot create exception policy file", red)
+		color_("error: cannot create exception policy file", red)
 		myexit(1)
 	try:
 		f = open(tdom, "w")
@@ -709,7 +736,7 @@ def clear():
 		f.flush()
 		f.close
 	except:
-		color("error: cannot create domain policy file", red)
+		color_("error: cannot create domain policy file", red)
 		myexit(1)
 	# load config files from disk to memory
 	os.system(tload + " fa")
@@ -718,12 +745,12 @@ def clear():
 # check profile config
 def check_prof():
 	global maxe
-	global tprof
-	# save config from memory to disk
+	global tprof, tpro
+	# save profile config from memory to disk
 	os.system(tsave + " p")
 	# load config file
 	try: tprof = open(tpro).read()
-	except: color("error: cannot open file " + tpro, red); myexit(1)
+	except: color_("error: cannot open file " + tpro, red); myexit(1)
 	# store default entries
 	p = []
 	p.append("0-MAC_FOR_FILE=disabled")
@@ -759,10 +786,31 @@ def check_prof():
 		f.flush()
 		f.close
 	except:
-		color("error: cannot write profile config file", red)
+		color_("error: cannot write file " + tpro, red)
 		myexit(1)
 	os.system(tload + " p")
 	os.system(tsave + " p")
+
+	global tmanf, tman
+	# save manager config from memory to disk
+	os.system(tsave + " m")
+	# load config file
+	try: tmanf = open(tman).read()
+	except: color_("error: cannot open file " + tman, red); myexit(1)
+	# search for tload entrys and add it if missing
+	if not re.search("^ *" + re.escape(tload) + " *$", tmanf, re.M):
+		tmanf += tload + "\n"
+	# save config file and load to memory
+	try:
+		f = open(tman, "w")
+		f.write(tmanf)
+		f.flush()
+		f.close
+	except:
+		color_("error: cannot write file " + tman, red)
+		myexit(1)
+	os.system(tload + " m")
+	os.system(tsave + " m")
 
 
 # turn back learning mode from enforcing mode
@@ -856,7 +904,7 @@ def check_instance():
 			pid = f.read()
 			f.close
 		except:
-			color("error: cannot open pid file", red)
+			color_("error: cannot open pid file", red)
 			myexit(1)
 		# is it me?
 		if pid == mypid: return 0
@@ -873,7 +921,7 @@ def check_instance():
 					f.flush()
 					f.close
 				except:
-					color("error: cannot write pid file", red)
+					color_("error: cannot write file " + pidf, red)
 					myexit(1)
 	# create pid file
 	else:
@@ -883,7 +931,7 @@ def check_instance():
 			f.flush()
 			f.close
 		except:
-			color("error: cannot write pid file", red)
+			color_("error: cannot write file " + pidf, red)
 			myexit(1)
 
 	return 0
@@ -898,7 +946,7 @@ def info(text = ""):
 		# show info about domains and rules
 		r1 = re.findall("^<kernel>.*" + re.escape(text) + ".*$", tdomf, re.M + re.I)
 		if r1:
-			print
+			color_("")
 			# how many domains are found?
 			for i in r1:
 				color(i, blue)
@@ -934,11 +982,11 @@ def info(text = ""):
 			# print stat
 			l = len(r1)
 			if l > 1:
-				color("(found " + str(l) + " domains)")
+				color_("(found " + str(l) + " domains)")
 			else:
-				color("(found " + str(l) + " domain)")
+				color_("(found " + str(l) + " domain)")
 		else:
-			color("error: no domains found", red)
+			color_("error: no domains found", red)
 	else:
 		# search for all active domains
 		r = re.findall("^<kernel>.+$\n+use_profile +[1-3] *$", tdomf, re.M)
@@ -976,7 +1024,7 @@ def info(text = ""):
 				color(i, blue)
 			print
 		else:
-			color("error: no domains found", red)
+			color_("error: no domains found", red)
 
 
 # remove domains by a pattern
@@ -992,9 +1040,9 @@ def remove(text):
 			# how many domains are found?
 			l = len(r1)
 			if l > 1:
-				color("(found " + str(l) + " domains)")
+				color_("(found " + str(l) + " domains)")
 			else:
-				color("(found " + str(l) + " domain)")
+				color_("(found " + str(l) + " domain)")
 			flag_count = 0
 			for i in r1:
 				color(i, blue, 1)
@@ -1036,7 +1084,7 @@ def remove(text):
 				color("no domain was removed", green)
 				print
 		else:
-			color("error: no domains by pattern", red)
+			color_("error: no domains by pattern", red)
 
 
 # compare 3 files or dirs and give back a wildcarded name if they seem to be the same (but contain random part)
@@ -1460,16 +1508,28 @@ def check():
 		flag_check = 1
 		x = re.findall("^<kernel> +/[^ ]+ *$\n+use_profile +[1-3] *$", tdomf, re.M)
 		if x:
+			progs2 = []
 			for i in x:
 				p = re.search("^<kernel> .*$", i, re.M).group()[9:]
 				if not p in progs:
 					if not flag_check2:
 						flag_check2 = 1
-						color("* already existing domains", green)
+						color("* already existing main domains", green)
 					# store if not an exception
 					if not p in spec_prog:
 						progs.append(p)
-						color(p, blue)
+
+						# get program name without full path, and print that one for better readability
+						p2 = re.search("[^/]+$", p, re.M)
+						if p2:
+							progs2.append(p2.group())
+
+			# print existing domain names without full path and in alphabet order
+			progs2.sort()
+			for i in progs2:
+				color(i + " ", blue, 1)
+			# new line
+			color("")
 
 # ----------------------------------------------------------------------
 	# print output only once if no change happened
@@ -1503,7 +1563,8 @@ def check():
 			# create a rule for it
 			tdomf += "\n<kernel> " + prog + "\n\nuse_profile 1\n\n"
 			# store prog name to know not to turn on enforcing mode for these ones on exit
-			progl.append(prog)
+			if not prog in progl:
+				progl.append(prog)
 		else:
 			# only 1 rule should exist
 			if len(x) > 1: error_conf("101")
@@ -1569,12 +1630,12 @@ def check():
 	# load log mark from file
 	if os.path.isfile(tmark):
 		try: tmarkf = open(tmark).read()
-		except: color("error: cannot open file " + tmark, red); myexit(1)
+		except: color_("error: cannot open file " + tmark, red); myexit(1)
 	else:
 		tmarkf = ""
 	# read the log in
 	try: log = open(tlog).read()
-	except: color("error: cannot open file " + tlog, red); myexit(1)
+	except: color_("error: cannot open file " + tlog, red); myexit(1)
 	log2 = []
 	# search for tomoyo error messages
 #	s = re.findall(".* TOMOYO-ERROR: +.*$", log, re.M)
@@ -1602,7 +1663,7 @@ def check():
 			# replace mark with last line's kernel time
 			# get the kernel time from the last result of the former search
 			s2 = re.search(" kernel: \[[0-9 ]+\.[0-9 ]+\] ", s[l-1])
-			if not s2: color("error: unexpected error, log message format is not correct", red); myexit(1)
+			if not s2: color_("error: unexpected error, log message format is not correct", red); myexit(1)
 			m2 = re.search("[0-9 ]+\.[0-9 ]+", s2.group()).group()
 			# replace old mark with this new one
 			tmarkf = m2
@@ -1611,7 +1672,7 @@ def check():
 		else:
 			# get the kernel time from the last result of the former search
 			s2 = re.search(" kernel: \[[0-9 ]+\.[0-9 ]+\] ", s[l-1])
-			if not s2: color("error: unexpected error, log message format is not correct", red); myexit(1)
+			if not s2: color_("error: unexpected error, log message format is not correct", red); myexit(1)
 			m2 = re.search("[0-9 ]+\.[0-9 ]+", s2.group()).group()
 			# add new mark
 			tmarkf = m2
@@ -1628,7 +1689,7 @@ def check():
 		f.flush()
 		f.close
 	except:
-		color("error: cannot create file " + tmark, red)
+		color_("error: cannot create file " + tmark, red)
 		myexit(1)
 	
 
@@ -1762,7 +1823,7 @@ def check():
 					s1 = re.sub("^<kernel> +", "", log5[i], re.M)
 					s2 = re.search("^[^ ]+", s1, re.M)
 					if not s2:
-						color("error: not expected format of error log", red)
+						color_("error: not expected format of error log", red)
 						myexit(1)
 					s3 = s2.group()
 					prog4.append(s3)
@@ -2256,6 +2317,15 @@ def check():
 # ******* INIT ********
 # *********************
 
+# check if i am root
+if not os.getuid() == 0: color_("error: root privileges needed", red); myexit(1)
+
+# check already running instance of the program
+if check_instance():
+	color_("error: tomld is running already", red)
+	myexit(1)
+
+
 # check command line options
 opt_all = ["-v", "--version", "-h", "--help", "--clear", "--reset", "-c", "--color", \
 		   "-i", "--info", "-r", "--remove", "--yes", "-k", "--keep", "-R", "--recursive", \
@@ -2273,11 +2343,11 @@ if (l > 0):
 	for i in op:
 		# i have to check here if option is not null ""
 		if not i:
-			color("error: bad option parameter", red)
+			color_("error: bad option parameter", red)
 			myexit(1)
 		if i[0] == "-":
 			if not i in opt_all:
-				color("error: bad option parameter", red)
+				color_("error: bad option parameter", red)
 				myexit(1)
 	flag_exit = 0
 	if op.count("-v") or op.count("--version"):
@@ -2301,7 +2371,7 @@ if (l > 0):
 	ind1 = op.count("-i")
 	ind2 = op.count("--info")
 	if ind1 + ind2 > 1:
-		color("error: bad option parameter", red)
+		color_("error: bad option parameter", red)
 		myexit(1)
 	if ind1:
 		ind_info = op.index("-i")
@@ -2322,7 +2392,7 @@ if (l > 0):
 	ind1 = op.count("-r")
 	ind2 = op.count("--remove")
 	if ind1 + ind2 > 1:
-		color("error: bad option parameter", red)
+		color_("error: bad option parameter", red)
 		myexit(1)
 	if ind1:
 		ind_remove = op.index("-r")
@@ -2336,17 +2406,17 @@ if (l > 0):
 			# error if the second parameter is a switch too
 			if opt_remove2[0] == "-":
 				opt_remove2 = ""
-				color("error: bad option parameter", red)
+				color_("error: bad option parameter", red)
 				myexit(1)
 		else:
-			color("error: bad option parameter", red)
+			color_("error: bad option parameter", red)
 			myexit(1)
 
 	ind_recursive = -1
 	ind1 = op.count("-R")
 	ind2 = op.count("--recursive")
 	if ind1 + ind2 > 1:
-		color("error: bad option parameter", red)
+		color_("error: bad option parameter", red)
 		myexit(1)
 	if ind1:
 		ind_recursive = op.index("-R")
@@ -2361,7 +2431,7 @@ if (l > 0):
 				d = op[i]
 				# dir / is not allowed
 				if d == "/":
-					color("error: root directory is not allowed", red)
+					color_("error: root directory is not allowed", red)
 					myexit(1)
 				d2 = os.path.realpath(d)
 				if os.path.isdir(d2):
@@ -2369,14 +2439,14 @@ if (l > 0):
 						specr.append(d2)
 						op[i] = d2
 				else:
-					color("error: no such directory: " + d2, red)
+					color_("error: no such directory: " + d2, red)
 					myexit(1)
 			# error if the second parameter is a switch too
 			if not len(specr):
-				color("error: bad option parameter", red)
+				color_("error: bad option parameter", red)
 				myexit(1)
 		else:
-			color("error: bad option parameter", red)
+			color_("error: bad option parameter", red)
 			myexit(1)
 	specr.sort()
 	
@@ -2390,11 +2460,11 @@ if (l > 0):
 			i2 = which(op[i])
 			# does the file exist on the path?
 			if os.path.isfile(i2):
-				# store it if not an exception
-				if not i2 in spec_prog:
+				# store it if not an exception and not in the list yet either
+				if (not i2 in spec_prog) and (not i2 in progs):
 					progs.append(i2)
 			else:
-				color("error: no such file: " + i2, red)
+				color_("error: no such file: " + i2, red)
 				myexit(1)
 
 	# expand dir names in specr with "/" char
@@ -2403,27 +2473,20 @@ if (l > 0):
 	
 
 # print some info
-print "tomld (tomoyo learning daemon)", ver
+color_("tomld (tomoyo learning daemon) " + ver)
 
-# check if i am root
-if not os.getuid() == 0: color("error: root privileges needed", red); myexit(1)
-
-# check already running instance of the program
-if check_instance():
-	color("error: tomld is running already", red)
-	myexit(1)
 
 
 # check system type and print system info
 # is it Linux?
-if not platform.system().lower() == "linux": color("error: this platform is unsupported", red); myexit(1)
+if not platform.system().lower() == "linux": color_("error: this platform is unsupported", red); myexit(1)
 # store platform name and version
 r = platform.linux_distribution()[0].lower() + " " + platform.linux_distribution()[1].lower()
 pl = re.sub("  +", " ", r)
 r = pl
 pl = re.sub(" *$", "", r, re.M)
 
-print "platform is", pl
+color_("platform is " + pl)
 
 # check if it's supported platform
 flag = 0
@@ -2441,9 +2504,9 @@ for i in supp:
 	else:
 		if i.startswith(pl): flag = 1
 if flag == 0:
-	color("error: this platform is unsupported", red)
-	print "supported platforms are:"
-	for i in supp: print "  ", i
+	color_("error: this platform is unsupported", red)
+	color_("supported platforms are:")
+	for i in supp: color_("   " + i)
 	myexit(1)
 
 
@@ -2451,12 +2514,12 @@ if flag == 0:
 # check status of tomoyo
 f = "/proc/cmdline"
 try: cmdl = open(f).read()
-except: color("error: cannot open file " + f, red); myexit(1)
+except: color_("error: cannot open file " + f, red); myexit(1)
 
 
-if tkern in cmdl: print "tomoyo kernel mode is active"
+if tkern in cmdl: color_("tomoyo kernel mode is active")
 else:
-	color("error: tomoyo is not activated", red)
+	color_("error: tomoyo is not activated", red)
 
 # auto install missing packages
 pl1 = platform.linux_distribution()[0].lower()
@@ -2471,7 +2534,7 @@ if pl1 == "debian" or pl1 == "ubuntu":
 
 	#if not (package_d(tpak1) and package_d(tpak2)):
 	if not package_d(tpak2):
-		color("error: tomoyo packages are missing", red)
+		color_("error: tomoyo packages are missing", red)
 		color("install packages (" + tpak2 + ") and reboot the system with " \
 			+ tkern + " kernel parameter", red)
 		if choice("should i do that for you?"):
@@ -2480,7 +2543,7 @@ if pl1 == "debian" or pl1 == "ubuntu":
 			color("ok, installing packages", yellow)
 			comm = "/usr/bin/apt-get"
 			if not os.path.isfile(comm):
-				color("error: command not found: " + comm, red); myexit(1)
+				color_("error: command not found: " + comm, red); myexit(1)
 			os.system(comm + " update")
 			os.system(comm + " install " + tpak2)
 			color("installation finished", yellow)
@@ -2488,12 +2551,12 @@ if pl1 == "debian" or pl1 == "ubuntu":
 			# check grub
 			color("checking grub", yellow)
 			if not package_d("grub-pc"):
-				color("error: no grub found, you must manually set " + tkern + " kernel parameter on boot", red)
+				color_("error: no grub found, you must manually set " + tkern + " kernel parameter on boot", red)
 			else:
 				# add grub parameter
 				f = "/etc/default/grub"
 				if not os.path.isfile(f):
-					color("error: no such file: " + i, red); myexit(1)
+					color_("error: no such file: " + i, red); myexit(1)
 				f2 = open(f).read()
 				# kernel parameter set yet?
 				p0 = re.search("^GRUB_CMDLINE_LINUX=\".*" + re.escape(tkern) + ".*\"$", f2, re.M)
@@ -2512,12 +2575,12 @@ if pl1 == "debian" or pl1 == "ubuntu":
 						f.flush()
 						f.close
 					except:
-						color("error: could not write grub config file, you must manually set " + tkern + " kernel parameter on boot", red)
+						color_("error: could not write grub config file, you must manually set " + tkern + " kernel parameter on boot", red)
 					# update grub
 					comm = "/usr/sbin/update-grub"
 					if not os.path.isfile(comm):
-						color("error: command not found: " + comm, red)
-						color("error: could not update grub config, you must manually set " + tkern + " kernel parameter on boot", red)
+						color_("error: command not found: " + comm, red)
+						color_("error: could not update grub config, you must manually set " + tkern + " kernel parameter on boot", red)
 					color("updating grub config", yellow)
 					os.system(comm)
 
@@ -2529,8 +2592,8 @@ if pl1 == "debian" or pl1 == "ubuntu":
 
 # ----------------------------------------------------------------------
 # check tomoyo tool files
-if not os.path.isfile(tload): color("error: " + tload + " executable binary missing", red); myexit(1)
-if not os.path.isfile(tsave): color("error: " + tsave + " executable binary missing", red); myexit(1)
+if not os.path.isfile(tload): color_("error: " + tload + " executable binary missing", red); myexit(1)
+if not os.path.isfile(tsave): color_("error: " + tsave + " executable binary missing", red); myexit(1)
 
 # create tomoyo dir if it doesn't exist yet
 if not os.path.isdir(tdir):
@@ -2576,6 +2639,34 @@ if (opt_learn):
 	learn_all()
 	color("all domains turned back to learning mode", red)
 	myexit()
+
+
+# ----------------------------------------------------------------------
+
+# collect shell paths for exception domains list from /etc/shells, if it exsist
+f = "/etc/shells"
+s = ["/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbash", \
+     "/bin/sh", "/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish", \
+     "/usr/bin/ksh", "/usr/bin/rc", "/usr/bin/screen"]
+if os.path.isfile(f):
+	try:
+		# load shell names form file
+		shells = open(f).read().splitlines()
+	except:
+		# create default shell name list on failure
+		shells = s
+for i in shells:
+	if os.path.isfile(i):
+		p = os.path.realpath(i)
+		if not p in spec_prog:
+			spec_prog.append(p)
+
+# is tomld being run through an ssh connection?
+# if so, then add sshd daemon to the exception domains list too
+# so we cannot close ourselves out
+sshd = which("sshd")
+if sshd:
+	spec_prog.append(sshd)
 
 
 # ----------------------------------------------------------------------
@@ -2646,7 +2737,7 @@ try:
 	netf2 = ""
 	for i in netf:
 		try: netf2 += open(i).read()
-		except: color("error: cannot open file " + i, red); myexit(1)
+		except: color_("error: cannot open file " + i, red); myexit(1)
 
 	netf3 = []
 	for i in netf2.splitlines():
