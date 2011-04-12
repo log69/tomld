@@ -2534,6 +2534,7 @@ except: color_("error: cannot open file " + f, red); myexit(1)
 if tkern in cmdl: color_("tomoyo kernel mode is active")
 else:
 	color_("error: tomoyo is not activated", red)
+	myexit(1)
 
 # auto install missing packages
 pl1 = platform.linux_distribution()[0].lower()
