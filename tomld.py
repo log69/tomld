@@ -31,7 +31,7 @@
 #                          - bugfix: check running instance at the very beginning of the program
 #                          - bugfix: adding extra check for existence and content of manager.conf
 #                          - mark all shells in /etc/shells as domain exceptions if their binary exist
-#                          - bugfix: remove deleted entries not only on load, but during the process too
+#                          - bugfix in removing deleted entries
 # 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 #                          - bugfix: do not turn on enforcing mode for newly created domains
 #                          - add compatibility to tomoyo version 2.3
@@ -660,24 +660,24 @@ def choice(text):
 
 # remove deleted domains and rules from domain policy
 def remove_deleted():
+	global tdomf
 	# remove deleted entries too
-	s2 = re.findall("^.*\(deleted\)$", tdomf, re.M)
+	s2 = re.findall("^.*\(deleted\) *$", tdomf, re.M)
 	if s2:
 		for i in s2:
 			# domain is marked as "(deleted)"
 			if re.search("^<kernel>", i, re.M):
 				tdomf2 = tdomf + "\n<kernel>"
-				r2 = re.findall(re.escape(i) + "\n.*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
+				r2 = re.findall(re.escape(i) + "\n.*?^(?=<kernel>)", tdomf2, re.M + re.DOTALL)
 				if r2:
 					for i2 in r2:
 						# remove domain from config
-						r6 = re.sub(re.escape(r5), "", s, re.M)
-						s = r6
+						s = re.sub(re.escape(i2), "", tdomf, re.M)
+						tdomf = s
 			# rule is marked with "(deleted)"
 			else:
-				s3 = re.sub(re.escape(i), "", s)
-				s = s3
-	tdomf = s
+				s = re.sub(re.escape(i), "", s)
+				tdomf = s
 
 
 # load config files
@@ -709,9 +709,6 @@ def save():
 	# remove disabled mode entries so runtime will be faster
 	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
 	tdomf = s
-	# remove deleted entries
-	remove_deleted()
-	
 	# write back policy files to disk
 	try:
 		f = open(texc, "w")
@@ -1065,7 +1062,7 @@ def remove(text):
 				# ask for confirmation
 				if choice("remove domain?"):
 					tdomf2 = tdomf + "\n\n<kernel>\n"
-					r2 = re.findall("^" + re.escape(i) + "\n.*?^(?=<kernel>)", tdomf2, re.M + re.I + re.DOTALL)
+					r2 = re.findall("^" + re.escape(i) + "\n.*?^(?=<kernel>)", tdomf2, re.M + re.DOTALL)
 					if r2:
 						for i2 in r2:
 							# remove domain from domain policy
