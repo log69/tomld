@@ -2530,11 +2530,11 @@ f = "/proc/cmdline"
 try: cmdl = open(f).read()
 except: color_("error: cannot open file " + f, red); myexit(1)
 
-
+flag_err = 0
 if tkern in cmdl: color_("tomoyo kernel mode is active")
 else:
 	color_("error: tomoyo is not activated", red)
-	myexit(1)
+	flag_err = 1
 
 # auto install missing packages
 pl1 = platform.linux_distribution()[0].lower()
@@ -2604,6 +2604,7 @@ if pl1 == "debian" or pl1 == "ubuntu":
 
 		myexit(1)
 
+if flag_err: myexit(1)
 
 # ----------------------------------------------------------------------
 # check tomoyo tool files
