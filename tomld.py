@@ -25,12 +25,13 @@
 #
 # changelog:
 # -----------
-# 11/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
+# 12/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
 #                            so to print only rules into a file is easy now: tomld -i pattern 1>output
 #                          - bugfix: don't count additional programs more than once if the same is specified more times
 #                          - bugfix: check running instance at the very beginning of the program
 #                          - bugfix: adding extra check for existence and content of manager.conf
 #                          - mark all shells in /etc/shells as domain exceptions if their binary exist
+#                          - bugfix: remove deleted entries not only on load, but during the process too
 # 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 #                          - bugfix: do not turn on enforcing mode for newly created domains
 #                          - add compatibility to tomoyo version 2.3
@@ -657,20 +658,8 @@ def choice(text):
 	return 0
 
 
-# load config files
-# kernel memory --> variables
-def load():
-	global tdomf
-	global texcf
-
-	# load config from memory to variables
-	try: tdomf = os.popen(tsave + " d -").read()
-	except: color_("error: cannot load domain policy from memory", red); myexit(1)
-	try: texcf = os.popen(tsave + " e -").read()
-	except: color_("error: cannot load exception policy from memory", red); myexit(1)
-
-	# remove disabled mode entries so runtime will be faster
-	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
+# remove deleted domains and rules from domain policy
+def remove_deleted():
 	# remove deleted entries too
 	s2 = re.findall("^.*\(deleted\)$", tdomf, re.M)
 	if s2:
@@ -689,9 +678,27 @@ def load():
 				s3 = re.sub(re.escape(i), "", s)
 				s = s3
 	tdomf = s
+
+
+# load config files
+# kernel memory --> variables
+def load():
+	global tdomf
+	global texcf
+
+	# load config from memory to variables
+	try: tdomf = os.popen(tsave + " d -").read()
+	except: color_("error: cannot load domain policy from memory", red); myexit(1)
+	try: texcf = os.popen(tsave + " e -").read()
+	except: color_("error: cannot load exception policy from memory", red); myexit(1)
+
+	# remove disabled mode entries so runtime will be faster
+	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
+	tdomf = s
+	# remove deleted entries
+	remove_deleted()
 	# remove quota_exceeded entries too
 	s = re.sub(re.compile("^quota_exceeded *$\n", re.M), "", tdomf)
-
 	tdomf = s
 
 
@@ -702,6 +709,9 @@ def save():
 	# remove disabled mode entries so runtime will be faster
 	s = re.sub(re.compile("^<kernel>.+$\n+use_profile +0 *$\n+", re.M), "", tdomf)
 	tdomf = s
+	# remove deleted entries
+	remove_deleted()
+	
 	# write back policy files to disk
 	try:
 		f = open(texc, "w")
@@ -846,6 +856,8 @@ def enforce():
 	if not opt_keep:
 		global progl
 		global tdomf
+		# remove deleted entries
+		remove_deleted()
 		# look up all domain with profile 1 or 2
 		x = re.findall("^<kernel> +/[^ ]+.*$\n+use_profile +[1-2] *$", tdomf, re.M)
 		x2 = []
