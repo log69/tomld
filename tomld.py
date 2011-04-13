@@ -37,6 +37,7 @@
 #                            a dir like this is /var/run/gdm/ of gdm3
 #                          - support in settings for debian testing and ubuntu beta is removed temporary
 #                            because of bugs in those versions until they get fixed
+#                          - improve checking profile config
 # 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 #                          - bugfix: do not turn on enforcing mode for newly created domains
 #                          - add compatibility to tomoyo version 2.3
@@ -169,7 +170,7 @@ home = "/home"
 global count; count = 10
 
 # max entries variable in profile config
-global maxe; maxe = 10000
+global maxent; maxent = 10000
 
 # tomoyo kernel parameter
 global tkern; tkern = "security=tomoyo"
@@ -761,41 +762,30 @@ def clear():
 
 # check profile config
 def check_prof():
-	global maxe
+	global maxent
 	global tprof, tpro
 	# save profile config from memory to disk
 	os.system(tsave + " p")
 	# load config file
 	try: tprof = open(tpro).read()
 	except: color_("error: cannot open file " + tpro, red); myexit(1)
-	# store default entries
-	p = []
-	p.append("0-MAC_FOR_FILE=disabled")
-	p.append("0-TOMOYO_VERBOSE=disabled")
-	p.append("0-MAX_ACCEPT_ENTRY=" + str(maxe))
-	p.append("1-MAC_FOR_FILE=learning")
-	p.append("1-TOMOYO_VERBOSE=disabled")
-	p.append("1-MAX_ACCEPT_ENTRY=" + str(maxe))
-	p.append("2-MAC_FOR_FILE=permissive")
-	p.append("2-TOMOYO_VERBOSE=enabled")
-	p.append("2-MAX_ACCEPT_ENTRY=" + str(maxe))
-	p.append("3-MAC_FOR_FILE=enforcing")
-	p.append("3-TOMOYO_VERBOSE=enabled")
-	p.append("3-MAX_ACCEPT_ENTRY=" + str(maxe))
-	# search for max entries
-	flag = 0
-	for i in p:
-		r = re.search("^[^=]*=", i, re.M)
-		if r:
-			r2 = r.group()
-			s = re.search("^" + re.escape(r2), tprof, re.M)
-			# add missing entry
-			if not s:
-				flag = 1
-				tprof += i
-	# replace all max entry values with predefined one
-	s = re.sub("MAX_ACCEPT_ENTRY=.*", "MAX_ACCEPT_ENTRY=" + str(maxe),  tprof)
-	tprof = s
+	
+	# check for profile in tomoyo version 2.2
+	if re.search("^1-MAC_FOR_FILE=learning", tprof, re.I + re.M):
+		# remove max entry
+		s = re.sub("^1-MAX_ACCEPT_ENTRY=[0-9]+.*$", "", tprof, re.I + re.M)
+		tprof = s
+		# add my max entry
+		tprof += "1-MAX_ACCEPT_ENTRY=" + str(maxent) + "\n"
+	# check for profile in tomoyo version 2.3
+	elif re.search("^PREFERENCE::learning", tprof, re.I + re.M):
+		# remove max entry
+		s = re.sub("max_entry=[0-9]+ *", "", tprof, re.I + re.M)
+		tprof = s
+		# add my max entry
+		s = re.sub("PREFERENCE::learning *= *\{", "PREFERENCE::learning={ max_entry=" + str(maxent) + " ", tprof, re.I + re.M)
+		tprof = s
+
 	# save config file and load to memory
 	try:
 		f = open(tpro, "w")
