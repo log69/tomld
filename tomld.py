@@ -35,6 +35,8 @@
 #                          - change in recursive dir handling
 #                          - add custom default recursive directories that may have random part in their names
 #                            a dir like this is /var/run/gdm/ of gdm3
+#                          - support in settings for debian testing and ubuntu beta is removed temporary
+#                            because of bugs in those versions until they get fixed
 # 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 #                          - bugfix: do not turn on enforcing mode for newly created domains
 #                          - add compatibility to tomoyo version 2.3

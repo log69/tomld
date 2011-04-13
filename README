@@ -1,4 +1,4 @@
-tomld (tomoyo learning daemon) 0.28
+tomld (tomoyo learning daemon) 0.29
 Copyright (C) 2011 Andras Horvath
 E-mail: mail@log69.com - suggestions & feedbacks are welcome
 URL: http://log69.com - the official site
@@ -52,9 +52,7 @@ The following options are supported:
 
 supported platforms are:
    debian 6
-   debian wheezy/sid
    ubuntu 10.10
-   ubuntu 11.04
 
 
 REMARKS:
