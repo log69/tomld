@@ -252,7 +252,8 @@ global progl; progl = []
 global speed; speed = 0
 
 # supported platforms
-supp = ["debian 6", "debian wheezy/sid", "ubuntu 10.10", "ubuntu 11.04"]
+#supp = ["debian 6", "debian wheezy/sid", "ubuntu 10.10", "ubuntu 11.04"]
+supp = ["debian 6", "ubuntu 10.10"]
 
 # this will contain the dirs to be fully wildcarded resursively with --recursive switch on
 # it has some predefined ones because they might have random part in their names
