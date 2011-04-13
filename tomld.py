@@ -25,13 +25,16 @@
 #
 # changelog:
 # -----------
-# 12/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
+# 13/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
 #                            so to print only rules into a file is easy now: tomld -i pattern 1>output
 #                          - bugfix: don't count additional programs more than once if the same is specified more times
 #                          - bugfix: check running instance at the very beginning of the program
 #                          - bugfix: adding extra check for existence and content of manager.conf
 #                          - mark all shells in /etc/shells as domain exceptions if their binary exist
 #                          - bugfix in removing deleted entries
+#                          - change in recursive dir handling
+#                          - add custom default recursive directories that may have random part in their names
+#                            a dir like this is /var/run/gdm/ of gdm3
 # 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 #                          - bugfix: do not turn on enforcing mode for newly created domains
 #                          - add compatibility to tomoyo version 2.3
@@ -252,7 +255,8 @@ global speed; speed = 0
 supp = ["debian 6", "debian wheezy/sid", "ubuntu 10.10", "ubuntu 11.04"]
 
 # this will contain the dirs to be fully wildcarded resursively with --recursive switch on
-global specr;  specr  = []
+# it has some predefined ones because they might have random part in their names
+global specr;  specr  = ["/var/run/gdm/"]
 # this will show the full dir depths in numbers to all recursive dirs
 global specr2_count; specr2_count = []
 
@@ -1906,6 +1910,9 @@ def check():
 	# -----------------------------------------------------------------------------------------------------------
 
 	# recursive dir handling: change all subdir names of all dir in specr to fully wildcarded
+	global specr
+	global specr2_count
+	
 	tdomf2 = ""
 	l = len(specr)
 	if l > 0:
@@ -1933,6 +1940,19 @@ def check():
 					# if so
 					if dir1:
 						c = specr2_count[ind1]
+						# c being -1 means the depth hasn't been calculated yet
+						# so calculate it now
+						if c == -1:
+							c = 0
+							c1 = len(re.findall("/", dir1))
+							for dirpath, dirnames, filenames in os.walk(dir1):
+								c2 = len(re.findall("/", dirpath))
+								if c2 > c: c = c2
+							c = c - c1 + 1
+							# add one plus extra
+							c += 1
+							specr2_count[ind1] = c
+						# if we have the depth already, then create wildcarded recursive dir names
 						if c > 0:
 							s = ""
 							for i4 in range(1, c+1):
@@ -2687,20 +2707,10 @@ for i in spec_prog:
 
 # ----------------------------------------------------------------------
 
-# calculate dir depths of all recursive dirs
+# initialize recursive dir variables
 if specr:
-	color("calculating directory depths for recursive dirs...", yellow, 1)
 	for i in specr:
-		c = 0
-		c1 = len(re.findall("/", i))
-		for dirpath, dirnames, filenames in os.walk(i):
-			c2 = len(re.findall("/", dirpath))
-			if c2 > c: c = c2
-		c = c - c1 + 1
-		# add one plus extra
-		c += 1
-		specr2_count.append(c)
-	color("done", yellow)
+		specr2_count.append(-1)
 
 
 
