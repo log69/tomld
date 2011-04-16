@@ -26,7 +26,7 @@
 # changelog:
 # -----------
 # 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
-#                          - use special recursive wildcard in dir handling that is available from tomoyo version 2.3
+#                          - use special recursive wildcard in dir handling that is available since tomoyo version 2.3
 # 14/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
 #                            so to print only rules into a file is easy now: tomld -i pattern 1>output
 #                          - bugfix: don't count additional programs more than once if the same is specified more times
@@ -150,7 +150,6 @@
 #	10)	save policy
 #	11) goto 2
 #	12) on exit, turn all old domains with profile 1-2 into enforcing mode
-
 
 
 import os, sys
@@ -277,6 +276,9 @@ global spec_ex; spec_ex = ["/etc/", home + "/\*/", "/root/"]
 # sshd must be an exception yet, cause it creates a subdomain of bash that would close us out
 global spec_prog;  spec_prog  = ["/usr/sbin/sshd"]
 global spec_prog2; spec_prog2 = []
+
+global flag_kernel_version_2633; flag_kernel_version_2633 = ""
+global const_recur; const_recur = "\{\*\}"
 
 
 
@@ -463,21 +465,40 @@ def uniq(list):
 			c+=1
 
 
+# return true if path ends with special recursive wildcard
+def dir_recursive_wildcard(d1):
+	global const_recur
+	if not d1: return 0
+	d2 = d1
+	if d1[-1] == "/": d2 = d1[0:-1]
+	if not d2[0] == "/": return 0
+	l1 = len(d2)
+	l2 = len(const_recur)
+	if l1 < l2+1: return 0
+	if not d2[l1-l2-1:] == "/" + const_recur: return 0
+	return 1
+
+
 # compare paths containing \* wildcard
 def compare_dirs(d1, d2):
+	global const_recur
+	global flag_kernel_version_2633
 	if (not d1) or (not d2): return 0
 	e1 = d1.split("/")
 	e2 = d2.split("/")
 	l1 = len(e1)
 	l2 = len(e2)
-	if l1 == l2:
-		for i in range(0, l1):
-			c1 = e1[i]
-			c2 = e2[i]
-			if (not c1 == "\*") and (not c2 == "\*") and (not c1 == c2):
-				return 0
-		return 1
-	return 0
+	if (not flag_kernel_version_2633) and (not l1 == l2): return 0
+	for i in range(0, l1):
+		c1 = e1[i]
+		c2 = e2[i]
+		# if the dirname contains special recursive wildcard, then fail
+		if flag_kernel_version_2633:
+			if c1 == const_recur or c2 == const_recur:
+				return 1
+		if (not c1 == "\*") and (not c2 == "\*") and (not c1 == c2):
+			return 0
+	return 1
 
 
 # compare paths containing \* wildcard
@@ -1527,7 +1548,9 @@ def myexit(num = 0):
 def check():
 # ----------------------------------------------------------------------
 
+	global const_recur
 	global flag_firstrun
+	global flag_kernel_version_2633
 
 	sand_clock()
 
@@ -1940,7 +1963,6 @@ def check():
 	global specr
 	global specr2_count
 	
-	const_recur = "\{\*\}"
 	
 	tdomf2 = ""
 	l = len(specr)
@@ -1969,13 +1991,13 @@ def check():
 					# if so
 					if dir1:
 						# on tomoyo version 2.3 or above, there is a special recursive wildcard to use
-						if kernel_version_2633():
-							# add recursive wildcard to path
+						if flag_kernel_version_2633:
+							# add special recursive wildcard to path
 							dr = dir1 + const_recur
 							# append "/" char if path was a dir
 							if r[1][-1] == "/": dr += "/"
 							# store new rule
-							s += r[0] + " " + dr + "\n"
+							s = r[0] + " " + dr + "\n"
 						else:
 							c = specr2_count[ind1]
 							# c being -1 means the depth hasn't been calculated yet
@@ -2005,7 +2027,7 @@ def check():
 										for i5 in range(c-i4, c):
 											dr += "/\*"
 							
-									s += r[0] + " " + dr + "\n"
+									s = r[0] + " " + dr + "\n"
 
 				# 2 parameters in the rule
 				elif l2 == 3:
@@ -2024,52 +2046,33 @@ def check():
 
 					# if any of them yes and refer to the same recursive dir
 					if dir1 or dir2:
-				
-#						if dir1 and (not dir2):
-#							c = specr2_count[ind1]
-#							if c > 0:
-#								s = ""
-#								for i4 in range(1, c+1):
-#									dr = ""
-#									# is it a dir or file originally
-#									if r[1][-1] == "/":
-#										dr = dir1
-#										for i5 in range(c-i4, c):
-#											dr += "\*/"
-#									else:
-#										dr = dir1[:-1]
-#										for i5 in range(c-i4, c):
-#											dr += "/\*"
-#							
-#									s += r[0] + " " + dr + " " + r[2] + "\n"
 
-#						if (not dir1) and dir2:
-#							c = specr2_count[ind2]
-#							if c > 0:
-#								s = ""
-#								for i4 in range(1, c+1):
-#									dr = ""
-#									# is it a dir or file originally
-#									if r[2][-1] == "/":
-#										dr = dir2
-#										for i5 in range(c-i4, c):
-#											dr += "\*/"
-#									else:
-#										dr = dir2[:-1]
-#										for i5 in range(c-i4, c):
-#											dr += "/\*"
-#							
-#									s += r[0] + " " + r[1] + " " + dr + "\n"
+						# if only 1 dir is recursive, and kernel version is above 2.6.33
+						if dir1 and (not dir2) and flag_kernel_version_2633:
+							# add special recursive wildcard to path
+							dr = dir1 + const_recur
+							# append "/" char if path was a dir
+							if r[1][-1] == "/": dr += "/"
+							# store new rule
+							s = r[0] + " " + dr + " " + r[2] + "\n"
+
+						if (not dir1) and dir2 and flag_kernel_version_2633:
+							# add special recursive wildcard to path
+							dr = dir2 + const_recur
+							# append "/" char if path was a dir
+							if r[2][-1] == "/": dr += "/"
+							# store new rule
+							s = r[0] + " " + r[1] + " " + dr + "\n"
 
 						if (dir1 and dir2) and (ind1 == ind2):
 							# on tomoyo version 2.3 or above, there is a special recursive wildcard to use
-							if kernel_version_2633():
-								# add recursive wildcard to path
+							if flag_kernel_version_2633:
+								# add special recursive wildcard to path
 								dr = dir1 + const_recur
 								# append "/" char if path was a dir
 								if r[1][-1] == "/": dr += "/"
 								# store new rule
-								s += r[0] + " " + dr + " " + dr + "\n"
+								s = r[0] + " " + dr + " " + dr + "\n"
 							else:
 								c = specr2_count[ind1]
 								# c being -1 means the depth hasn't been calculated yet
@@ -2099,11 +2102,18 @@ def check():
 											for i5 in range(c-i4, c):
 												dr += "/\*"
 
-										s += r[0] + " " + dr + " " + dr + "\n"
+										s = r[0] + " " + dr + " " + dr + "\n"
 
 
-#						if (dir1 and dir2) and (not ind1 == ind2):
-#							pass
+						if (dir1 and dir2) and (not ind1 == ind2) and flag_kernel_version_2633:
+							# add special recursive wildcard to path
+							dr1 = dir1 + const_recur
+							dr2 = dir2 + const_recur
+							# append "/" char if path was a dir
+							if r[1][-1] == "/": dr1 += "/"
+							if r[2][-1] == "/": dr2 += "/"
+							# store new rule
+							s = r[0] + " " + dr1 + " " + dr2 + "\n"
 	
 
 				# insert rule only if the former rule was not the same
@@ -2117,8 +2127,7 @@ def check():
 				s2 = ""
 
 		tdomf = tdomf2
-
-
+		
 
 	sand_clock()
 
@@ -2202,7 +2211,6 @@ def check():
 					for i3 in range(1, l):
 						if i3 == 1:
 							param = i2[i3]
-#							r = re.sub("socket:\[[0-9]+\]", "socket:[\\\\$]", param)
 							# updating policy format from tomoyo version 2.2 to 2.3
 							r = re.sub("socket:\[.*\].*$", "socket:[\\\\*]", param)
 							param = r
@@ -2224,6 +2232,7 @@ def check():
 						# only one of them is enough to find
 						
 						param = i2[i3]
+						
 						# get parent dir of param (if file or dir)
 						paramd = ""
 						if not param[-1] == "/":
@@ -2236,7 +2245,6 @@ def check():
 						param2 = ""
 						flag  = 0
 						flag3 = 0
-
 
 						flag_ex = 0
 						# check dir in exception						
@@ -2278,20 +2286,28 @@ def check():
 
 						# path is in spec or spec2
 						if flag:
-							# is it a file or dir?
-							if param[-1] == "/":
-								r = re.sub("/[^/]+/$", "/\\\\*/", param)
-							else:
-								r = re.sub("/[^/]+$", "/\\\\*", param)
-							param = r
+							# change ending only if it doesn't end with a special recursive wildcard
+							if not dir_recursive_wildcard(param):
+								# is it a file or dir?
+								if param[-1] == "/":
+									r = re.sub("/[^/]+/$", "/\\\\*/", param)
+								else:
+									r = re.sub("/[^/]+$", "/\\\\*", param)
+								param = r
 
 						# path is in spec3
 						if flag3:
 							# is it a file? (dir is managed before with spec and spec2 code)
 							if not param[-1] == "/":
-								# wildcard file with parent dir too
-								r = re.sub("/[^/]+/[^/]+$", "/\\\\*/\\\\*", param)
-								param = r
+								# put special recursive wildcard if param ends with a special recursive wildcard
+								if dir_recursive_wildcard(param):
+									# wildcard file with parent dir too
+									r = re.sub("/[^/]+/[^/]+$", "/\\\\*/" + const_recur, param)
+									param = r
+								else:
+									# wildcard file with parent dir too
+									r = re.sub("/[^/]+/[^/]+$", "/\\\\*/\\\\*", param)
+									param = r
 
 
 						# wildcard library files version numbers
@@ -2309,8 +2325,13 @@ def check():
 							param = r
 
 						# change /home/user/ dir to /home/\*/ form to support multiple users
-						i4 = re.sub("^" + re.escape(home) + "/[^/]+/", home + "/\\\\*/", param)
-						param = i4
+						# check if param's second subdir is a special recursive wildcard
+						rr = re.search("/[^/]+/[^/]+$", param, re.M)
+						if rr:
+							# if so, then don't change /home/user/ to /home/\*/
+							if not dir_recursive_wildcard(rr.group()):
+								i4 = re.sub("^" + re.escape(home) + "/[^/]+/", home + "/\\\\*/", param)
+								param = i4
 
 
 						# add param if not nothing
@@ -2412,6 +2433,9 @@ def check():
 # ******* INIT ********
 # *********************
 
+# store flag if it's kernel version 2.6.33 or above
+flag_kernel_version_2633 = kernel_version_2633()
+
 # check if i am root
 if not os.getuid() == 0: color_("error: root privileges needed", red); myexit(1)
 
@@ -2419,7 +2443,6 @@ if not os.getuid() == 0: color_("error: root privileges needed", red); myexit(1)
 if check_instance():
 	color_("error: tomld is running already", red)
 	myexit(1)
-
 
 # check command line options
 opt_all = ["-v", "--version", "-h", "--help", "--clear", "--reset", "-c", "--color", \
