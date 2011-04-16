@@ -367,6 +367,7 @@ def help():
 	print "REMARKS:"
 	print "- it is written in python, tested with version 2.6"
 	print "- the program assumes to be run in a fully trusted environment"
+	print "- it is advised to start with new rules instead of keeping any manually created ones"
 	print "- processes in the domains should run in learning mode for quite some time to collect",
 	print "all the necessary rules to avoid malfunctioning by access deny later"
 	print "- before reboot, the rules should be stored manually by running \"tomoyo-savepolicy\"",
