@@ -25,7 +25,9 @@
 #
 # changelog:
 # -----------
-# 13/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
+# 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
+#                          - use special recursive wildcard in dir handling that is available from tomoyo version 2.3
+# 14/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
 #                            so to print only rules into a file is easy now: tomld -i pattern 1>output
 #                          - bugfix: don't count additional programs more than once if the same is specified more times
 #                          - bugfix: check running instance at the very beginning of the program
@@ -38,6 +40,7 @@
 #                          - support in settings for debian testing and ubuntu beta is removed temporary
 #                            because of bugs in those versions until they get fixed
 #                          - improve checking profile config
+#                          - reenable ubuntu beta support
 # 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
 #                          - bugfix: do not turn on enforcing mode for newly created domains
 #                          - add compatibility to tomoyo version 2.3
@@ -161,7 +164,7 @@ import termios
 # **************************
 
 # program version
-ver = "0.29"
+ver = "0.30"
 
 # home dir
 home = "/home"
@@ -255,8 +258,7 @@ global progl; progl = []
 global speed; speed = 0
 
 # supported platforms
-#supp = ["debian 6", "debian wheezy/sid", "ubuntu 10.10", "ubuntu 11.04"]
-supp = ["debian 6", "debian wheezy/sid", "ubuntu 10.10"]
+supp = ["debian 6", "debian wheezy/sid", "ubuntu 10.10", "ubuntu 11.04"]
 
 # this will contain the dirs to be fully wildcarded resursively with --recursive switch on
 # it has some predefined ones because they might have random part in their names
@@ -392,6 +394,38 @@ def help():
 	print "- hours or days later let's run it the 3rd time, now the access denied logs will be converted to rules,",
 	print "and on exit all remaining domains will be turned into enforcing mode"
 	print
+
+
+# check kernel version, is it 2.6.33 or above?
+def kernel_version_2633():
+	# get kernel version
+	kernel = platform.release()
+	# get first major number
+	k1 = re.search("^[0-9]+", kernel, re.M)
+	if not k1: return 0
+	k2 = re.search("^[0-9]+\.[0-9]+", kernel, re.M)
+	if not k2: return 0
+	# get second major number
+	k3 = re.search("[0-9]+$", k2.group(), re.M)
+	if not k3: return 0
+	k4 = re.search("^[0-9]+\.[0-9]+\.[0-9]+", kernel, re.M)
+	if not k4: return 0
+	# get minor number
+	k5 = re.search("[0-9]+$", k4.group(), re.M)
+	if not k5: return 0
+	
+	kk1 = int(k1.group())
+	kk3 = int(k3.group())
+	kk5 = int(k5.group())
+
+	# is it not a 2.6.x kernel version?	
+	if not (kk1 == 2 and kk3 == 6): return 0
+	# is it kernel version 2.6.32 and below?
+	if kk5 <= 32: return 0
+
+	# return 1 only if kernel version if greater than 2.6.32
+	# special recursive wildcard is available from 2.6.33 and above
+	return 1
 
 
 # print sand clock
@@ -1906,6 +1940,8 @@ def check():
 	global specr
 	global specr2_count
 	
+	const_recur = "\{\*\}"
+	
 	tdomf2 = ""
 	l = len(specr)
 	if l > 0:
@@ -1922,7 +1958,7 @@ def check():
 				dir1 = ""
 				dir2 = ""
 
-				# 1 or 2 parameters?
+				# 1 parameter only
 				if l2 == 2:
 					ind1 = 0
 					# is the dir in specr?
@@ -1932,36 +1968,46 @@ def check():
 						ind1 += 1
 					# if so
 					if dir1:
-						c = specr2_count[ind1]
-						# c being -1 means the depth hasn't been calculated yet
-						# so calculate it now
-						if c == -1:
-							c = 0
-							c1 = len(re.findall("/", dir1))
-							for dirpath, dirnames, filenames in os.walk(dir1):
-								c2 = len(re.findall("/", dirpath))
-								if c2 > c: c = c2
-							c = c - c1 + 1
-							# add one plus extra
-							c += 1
-							specr2_count[ind1] = c
-						# if we have the depth already, then create wildcarded recursive dir names
-						if c > 0:
-							s = ""
-							for i4 in range(1, c+1):
-								dr = ""
-								# is it a dir or file originally
-								if r[1][-1] == "/":
-									dr = dir1
-									for i5 in range(c-i4, c):
-										dr += "\*/"
-								else:
-									dr = dir1[:-1]
-									for i5 in range(c-i4, c):
-										dr += "/\*"
+						# on tomoyo version 2.3 or above, there is a special recursive wildcard to use
+						if kernel_version_2633():
+							# add recursive wildcard to path
+							dr = dir1 + const_recur
+							# append "/" char if path was a dir
+							if r[1][-1] == "/": dr += "/"
+							# store new rule
+							s += r[0] + " " + dr + "\n"
+						else:
+							c = specr2_count[ind1]
+							# c being -1 means the depth hasn't been calculated yet
+							# so calculate it now
+							if c == -1:
+								c = 0
+								c1 = len(re.findall("/", dir1))
+								for dirpath, dirnames, filenames in os.walk(dir1):
+									c2 = len(re.findall("/", dirpath))
+									if c2 > c: c = c2
+								c = c - c1 + 1
+								# add one plus extra
+								c += 1
+								specr2_count[ind1] = c
+							# if we have the depth already, then create wildcarded recursive dir names
+							if c > 0:
+								s = ""
+								for i4 in range(1, c+1):
+									dr = ""
+									# is it a dir or file originally
+									if r[1][-1] == "/":
+										dr = dir1
+										for i5 in range(c-i4, c):
+											dr += "\*/"
+									else:
+										dr = dir1[:-1]
+										for i5 in range(c-i4, c):
+											dr += "/\*"
 							
-								s += r[0] + " " + dr + "\n"
+									s += r[0] + " " + dr + "\n"
 
+				# 2 parameters in the rule
 				elif l2 == 3:
 					ind1 = 0
 					ind2 = 0
@@ -2016,23 +2062,45 @@ def check():
 #									s += r[0] + " " + r[1] + " " + dr + "\n"
 
 						if (dir1 and dir2) and (ind1 == ind2):
-							c = specr2_count[ind1]
-							if c > 0:
-								s = ""
-								for i4 in range(1, c+1):
-									dr = ""
-									# is it a dir or file originally
-									if r[1][-1] == "/":
-										dr = dir1
-										for i5 in range(c-i4, c):
-											dr += "\*/"
-									else:
-										dr = dir1[:-1]
-										for i5 in range(c-i4, c):
-											dr += "/\*"
-							
-									s += r[0] + " " + dr + " " + dr + "\n"
-	
+							# on tomoyo version 2.3 or above, there is a special recursive wildcard to use
+							if kernel_version_2633():
+								# add recursive wildcard to path
+								dr = dir1 + const_recur
+								# append "/" char if path was a dir
+								if r[1][-1] == "/": dr += "/"
+								# store new rule
+								s += r[0] + " " + dr + " " + dr + "\n"
+							else:
+								c = specr2_count[ind1]
+								# c being -1 means the depth hasn't been calculated yet
+								# so calculate it now
+								if c == -1:
+									c = 0
+									c1 = len(re.findall("/", dir1))
+									for dirpath, dirnames, filenames in os.walk(dir1):
+										c2 = len(re.findall("/", dirpath))
+										if c2 > c: c = c2
+									c = c - c1 + 1
+									# add one plus extra
+									c += 1
+									specr2_count[ind1] = c
+								# if we have the depth already, then create wildcarded recursive dir names
+								if c > 0:
+									s = ""
+									for i4 in range(1, c+1):
+										dr = ""
+										# is it a dir or file originally
+										if r[1][-1] == "/":
+											dr = dir1
+											for i5 in range(c-i4, c):
+												dr += "\*/"
+										else:
+											dr = dir1[:-1]
+											for i5 in range(c-i4, c):
+												dr += "/\*"
+
+										s += r[0] + " " + dr + " " + dr + "\n"
+
 
 #						if (dir1 and dir2) and (not ind1 == ind2):
 #							pass
