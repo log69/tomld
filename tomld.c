@@ -154,6 +154,9 @@ flow chart:
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <dirent.h>
 
 
 
@@ -264,6 +267,7 @@ void version() {
 	printf ("\n");
 }
 
+
 /* print help info */
 void help() {
 	printf ("DESCRIPTION:\n");
@@ -351,6 +355,15 @@ void help() {
 	printf ("\n");
 }
 
+
+/* convert integer to ascii */
+/* custom implementation because itoa function is missing from standard libs */
+void itoa(int num, char *buf)
+{
+	sprintf(buf, "%d", num);
+}
+
+
 /* compare two strings and return 1 if true */
 int cmp_str(char *text1, char *text2)
 {
@@ -364,6 +377,7 @@ int cmp_str(char *text1, char *text2)
 	if (text1[i] != text2[i]) return 0;
 	return 1;
 }
+
 
 /* print colored output to stdout */
 void color(char *text, char *col)
@@ -380,6 +394,7 @@ void color(char *text, char *col)
 	}
 }
 
+
 /* print colored output to stderr */
 void color_(char *text, char *col)
 {
@@ -395,10 +410,108 @@ void color_(char *text, char *col)
 	}
 }
 
+
+/* check if process with the given name is running */
+int running(char *name){
+	DIR *mydir;
+	struct dirent *mydir_entry;
+	char mydir_name[256] = "";
+	char mypid[32] = "";
+	
+	/* open /proc dir */
+	mydir = opendir("/proc/");
+	if (!mydir){ color_("error: cannot open /proc/ directory\n", red); return 0; }
+	/* cycle through dirs in /proc */
+	while((mydir_entry = readdir(mydir))) {
+		/* get the dir names inside /proc dir */
+		strcpy(mypid, mydir_entry->d_name);
+		/* does it contain numbers only meaning they are pids? */
+		if (strspn(mypid, "0123456789") == strlen(mypid)) {
+			int res;
+			char buff[256] = "";
+			/* create dirname like /proc/pid/exe */
+			strcpy(mydir_name, "/proc/");
+			strcat(mydir_name, mypid);
+			strcat(mydir_name, "/exe");
+			/* resolv the link pointing from the exe name */
+			res = readlink(mydir_name, buff, sizeof(buff)-1);
+			if (res > 0){
+				/* put a zero end mark to the end of the string after string length */
+				buff[res] = 0;
+				/* compare the link to the process name */
+				/* gives back zero on full match */
+				if (strcmp(buff, name) == 0) {
+					closedir(mydir);
+					return 1;
+				}
+			}
+		}
+	}
+	closedir(mydir);
+
+	return 0;
+	
+}
+
+
+/* check if file exists */
+int file_exist(char *name){
+	FILE *f = fopen(name, "r");
+	if (f) { fclose(f); return 1; }
+	return 0;
+}
+
+
+/* check if dir exists */
+int dir_exist(char *name){
+	DIR *d;
+	d = opendir(name);
+	if (d) { closedir(d); return 1; }
+	return 0;
+}
+
+
 /* check if only one instance of the program is running */
 int check_instance(){
+	char mypid[32] = "";
+	/* get my pid number and convert it */
+	itoa(getpid(), mypid);
+	/* check if my pid file exists */
+	if (file_exist(pidf)){
+		char pid2[32] = "";
+		/* read pid number from pid file */
+		FILE *f = fopen(pidf, "r");
+		if (!f){ color_("error: cannot open pid file for reading\n", red); exit(1); }
+		fread(pid2, sizeof(pid2), 1, f);
+		fclose(f);
+		/* is it me? */
+		if (strcmp(mypid, pid2) == 0) return 0;
+		else{
+			/* is the process with the foreign pid still running? */
+			char path[256] = "/proc/";
+			strcat(path, pid2);
+			/* if running, then return false */
+			if (dir_exist(path)) return 1;
+			/* if not running, then overwrite pid number in pid file */
+			else{
+				FILE *f = fopen(pidf, "w");
+				if (!f){ color_("error: cannot open pid file for writing\n", red); exit(1); }
+				fprintf(f, mypid);
+				fclose(f);
+			}
+		}
+	}
+	/* create pid file if it doesn't exist */
+	else{
+		FILE *f = fopen(pidf, "w");
+		if (!f){ color_("error: cannot open pid file for writing\n", red); exit(1); }
+		fprintf(f, mypid);
+		fclose(f);
+	}
+
 	return 1;
 }
+
 
 
 /* ----------------------------------- */
@@ -409,10 +522,10 @@ int main(int argc, char **argv){
 
 	/* check if i am root */
 	char *user; user = getenv("USER");
-	if (!cmp_str(user, "root")) { color_("error: root privileges needed\n", red); return 1; }
+	if (!cmp_str(user, "root")) { color_("error: root privileges needed\n", red); exit(1); }
 
 	/* check already running instance of the program */
-	if (!check_instance()) { color_("error: tomld is running already\n", red); return 1; }
+	if (!check_instance()) { color_("error: tomld is running already\n", red); exit(1); }
 
 	/* check command line options */
 	/* more than 1 argument? */
