@@ -351,7 +351,7 @@ void help() {
 	printf ("\n");
 }
 
-/* compare two strings and returns 1 if true */
+/* compare two strings and return 1 if true */
 int cmp_str(char *text1, char *text2)
 {
 	int i = 0;
@@ -395,7 +395,7 @@ void color_(char *text, char *col)
 	}
 }
 
-/* check if this is the only instance of the program */
+/* check if only one instance of the program is running */
 int check_instance(){
 	return 1;
 }
