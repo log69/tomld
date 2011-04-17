@@ -158,11 +158,14 @@ flow chart:
 #include <string.h>
 #include <dirent.h>
 
+#define max_char  1024
+#define max_num   32
+#define max_array 1024
 
 
-/* ----------------------------------- */
-/* ------------ VARIABLES ------------ */
-/* ----------------------------------- */
+/* ------------------------------------------ */
+/* ------------ GLOBAL VARIABLES ------------ */
+/* ------------------------------------------ */
 
 /* program version */
 char *ver = "0.30";
@@ -211,13 +214,16 @@ int opt_learn		= 0;
 int opt_clear		= 0;
 int opt_reset		= 0;
 int opt_info		= 0;
-char *opt_info2		= "";
 int opt_remove		= 0;
-char *opt_remove2	= "";
 int opt_yes			= 0;
 int opt_keep		= 0;
 int opt_recursive	= 0;
 int opt_once		= 0;
+
+char opt_info2     [max_char]  = "";
+char opt_remove2   [max_char]  = "";
+char opt_recursive2[max_array][max_char];
+int  opt_recursive2_counter = 0;
 
 int flag_reset		= 0;
 int flag_check		= 0;
@@ -238,6 +244,9 @@ char *yellow	= "\033[33;48m";
 char *bold		= "\033[1m";
 char *clr		= "\033[0m";
 
+/* arrays */
+char progs[max_array][max_char];
+int  progs_counter = 0;
 
 
 /* ----------------------------------- */
@@ -415,8 +424,8 @@ void color_(char *text, char *col)
 int running(char *name){
 	DIR *mydir;
 	struct dirent *mydir_entry;
-	char mydir_name[256] = "";
-	char mypid[32] = "";
+	char mydir_name[max_char] = "";
+	char mypid[max_num] = "";
 	
 	/* open /proc dir */
 	mydir = opendir("/proc/");
@@ -428,7 +437,7 @@ int running(char *name){
 		/* does it contain numbers only meaning they are pids? */
 		if (strspn(mypid, "0123456789") == strlen(mypid)) {
 			int res;
-			char buff[256] = "";
+			char buff[max_char] = "";
 			/* create dirname like /proc/pid/exe */
 			strcpy(mydir_name, "/proc/");
 			strcat(mydir_name, mypid);
@@ -454,14 +463,6 @@ int running(char *name){
 }
 
 
-/* check if file exists */
-int file_exist(char *name){
-	FILE *f = fopen(name, "r");
-	if (f) { fclose(f); return 1; }
-	return 0;
-}
-
-
 /* check if dir exists */
 int dir_exist(char *name){
 	DIR *d;
@@ -471,14 +472,23 @@ int dir_exist(char *name){
 }
 
 
+/* check if file exists */
+int file_exist(char *name){
+	FILE *f = fopen(name, "r+");
+	if (!f) return 0;
+	fclose(f);
+	return 1;
+}
+
+
 /* check if only one instance of the program is running */
 int check_instance(){
-	char mypid[32] = "";
+	char mypid[max_num] = "";
 	/* get my pid number and convert it */
 	itoa(getpid(), mypid);
 	/* check if my pid file exists */
 	if (file_exist(pidf)){
-		char pid2[32] = "";
+		char pid2[max_num] = "";
 		/* read pid number from pid file */
 		FILE *f = fopen(pidf, "r");
 		if (!f){ color_("error: cannot open pid file for reading\n", red); exit(1); }
@@ -488,7 +498,7 @@ int check_instance(){
 		if (strcmp(mypid, pid2) == 0) return 0;
 		else{
 			/* is the process with the foreign pid still running? */
-			char path[256] = "/proc/";
+			char path[max_char] = "/proc/";
 			strcat(path, pid2);
 			/* if running, then return false */
 			if (dir_exist(path)) return 1;
@@ -513,6 +523,12 @@ int check_instance(){
 }
 
 
+/* get absolute pathname of a file from a name */
+/* first the current directory is checked, then the path list on the path env variable */
+int which(char *name){
+	return 1;
+}
+
 
 /* ----------------------------------- */
 /* ------------ MAIN PART ------------ */
@@ -527,31 +543,102 @@ int main(int argc, char **argv){
 	/* check already running instance of the program */
 	if (!check_instance()) { color_("error: tomld is running already\n", red); exit(1); }
 
-	/* check command line options */
+
+	/* -------------------------------------- */
+	/* ----- CHECK COMMAND LINE OPTIONS ----- */
+	/* -------------------------------------- */
 	/* more than 1 argument? */
 	if (argc > 1) {
+		int flag_type = 0;
+		int flag_last = 0;
 		int c = 1;
 		char *myarg;
 		/* don't count the first argument that is the executable name itself */
 		argc--;
 		/* cycle through the arguments */
 		while (argc--){
+			int flag_ok = 0;
 			myarg = argv[c];
 			
-			if (cmp_str(myarg, "-v") || cmp_str(myarg, "--verson"))	{ version(); }
-			if (cmp_str(myarg, "-h") || cmp_str(myarg, "--help"))	{ help();    }
+			if (cmp_str(myarg, "-v") || cmp_str(myarg, "--verson"))	{ version();	flag_ok = 1; }
+			if (cmp_str(myarg, "-h") || cmp_str(myarg, "--help"))	{ help();		flag_ok = 1; }
 			
-			if (cmp_str(myarg, "-1") || cmp_str(myarg, "--once" ))	opt_once   = 1;
-			if (cmp_str(myarg, "-c") || cmp_str(myarg, "--color"))	opt_color  = 1;
-			if (cmp_str(myarg, "-k") || cmp_str(myarg, "--keep" ))	opt_keep   = 1;
-			if (cmp_str(myarg, "-l") || cmp_str(myarg, "--learn"))	opt_learn  = 1;
+			if (cmp_str(myarg, "-1") || cmp_str(myarg, "--once" ))	{ opt_once   = 1; flag_ok = 1; }
+			if (cmp_str(myarg, "-c") || cmp_str(myarg, "--color"))	{ opt_color  = 1; flag_ok = 1; }
+			if (cmp_str(myarg, "-k") || cmp_str(myarg, "--keep" ))	{ opt_keep   = 1; flag_ok = 1; }
+			if (cmp_str(myarg, "-l") || cmp_str(myarg, "--learn"))	{ opt_learn  = 1; flag_ok = 1; }
 
-			if (cmp_str(myarg, "--yes"  )) opt_yes   = 1;
-			if (cmp_str(myarg, "--clear")) opt_clear = 1;
-			if (cmp_str(myarg, "--reset")) { opt_reset = 1; flag_reset = 1; }
+			if (cmp_str(myarg, "-i") || cmp_str(myarg, "--info"     ))	{ opt_info       = 1; flag_ok = 2; }
+			if (cmp_str(myarg, "-r") || cmp_str(myarg, "--remove"   ))	{ opt_remove     = 1; flag_ok = 3; }
+			if (cmp_str(myarg, "-R") || cmp_str(myarg, "--recursive"))	{ opt_recursive  = 1; flag_ok = 4; }
+
+			if (cmp_str(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
+			if (cmp_str(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
+			if (cmp_str(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
+
+			/* store option type if it was any of --info, --remove or --recursive */
+			/* so if the next argument is not an option, then i know which former one it belongs to */
+			if (flag_ok > 1) flag_type = flag_ok;
+			/* if argument doesn't start with "-" char */
+			if (myarg[0] != '-'){
+				int flag_progs = 0;
+				/* if last option arg was --info, then this belongs to it */
+				if (flag_type == 2){
+					/* if former arg was an option, then it belongs to it */
+					if (flag_last){
+						/* store as --info parameter */
+						strcpy(opt_info2, myarg);
+					}
+					/* it belongs to the extra executables, so store it */
+					else flag_progs = 1;
+				}
+				/* if last option arg was --remove, then this belongs to it */
+				if (flag_type == 3){
+					/* if former arg was an option, then it belongs to it */
+					if (flag_last){
+						/* store as --remove parameter */
+						strcpy(opt_remove2, myarg);
+					}
+					/* it belongs to the extra executables, so store it */
+					else flag_progs = 1;
+				}
+				/* if last option arg was --recursive, then this belongs to it */
+				if (flag_type == 4){
+					char path[max_char] = "";
+					flag_progs = 0;
+					strcpy(path, myarg);
+					/* root "/" dir not allowed */
+					if (strcmp(myarg, "/") == 0){ color_("error: root directory is not allowed", red); exit(1); }
+					/* check if dir name exist */
+					if (!dir_exist(path)){
+						color_("error: no such directory: ", red); color_(myarg, red); color_("\n", red); exit(1); }
+					/* if so, store it in recursive dir array */
+					strcat(opt_recursive2[opt_recursive2_counter++], myarg);
+				}
+				/* if argument doesn't belong to any option, then it goes to the extra executables */
+				if (!flag_type || flag_progs){
+					char path[max_char] = "";
+					strcpy(path, myarg);
+					which(path);
+					/* check if executable name exist */
+					if (!file_exist(path)){
+						color_("error: no such file: ", red); color_(path, red); color_("\n", red); exit(1); }
+					/* if so, store it in extra executables */
+					strcat(progs[progs_counter++], myarg);
+				}
+			}
+
+			/* store the last option type */
+			flag_last = flag_ok;
 
 			c++;
 		}
+
+		/* fail if no arguments for --remove option */
+		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); exit(1); }
+		/* tail if no arguments for --recursive option */
+		if (opt_recursive && !opt_recursive2_counter){ color_("error: bad argument\n", red); exit(1); }
+
 	}
 
 
