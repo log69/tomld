@@ -7,4 +7,4 @@
 - make it a boot service
 - entirely automatize all setup regarding Tomoyo
 - create debian package
-- create manual and expend docs
+- create manual and expand docs
