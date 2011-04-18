@@ -23,6 +23,7 @@
 changelog:
 -----------
 17/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
+                         - drop platform check
 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
                          - use special recursive wildcard in dir handling that is available since tomoyo version 2.3
 14/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
@@ -210,6 +211,8 @@ char *tmark	= "/var/local/tomld.logmark";
 char *pidf	= "/var/run/tomld.pid";
 
 /* options */
+int opt_version		= 0;
+int opt_help		= 0;
 int opt_color		= 0;
 int opt_learn		= 0;
 int opt_clear		= 0;
@@ -248,6 +251,14 @@ char *clr		= "\033[0m";
 /* arrays */
 char progs[max_array][max_char];
 int  progs_counter = 0;
+
+char netf[][max_char] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6"};
+int  netf_counter = 4;
+
+char shell[][max_char] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbash",
+"/bin/sh", "/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish",
+"/usr/bin/ksh", "/usr/bin/rc", "/usr/bin/screen"};
+int  shell_counter = 13;
 
 
 /* ----------------------------------- */
@@ -383,21 +394,6 @@ void itoa(int num, char *buf)
 }
 
 
-/* compare two strings and return 1 if true */
-int cmp_str(char *text1, char *text2)
-{
-	int i = 0;
-	/* compare strings char by char and exit cycle if any of them is zero */
-	while ((text1[i]) && (text2[i])) {
-		if (text1[i] != text2[i]) return 0;
-		i++;
-	}
-	/* their last chars must match too, one of them being zero */
-	if (text1[i] != text2[i]) return 0;
-	return 1;
-}
-
-
 /* print colored output to stdout */
 void color(char *text, char *col)
 {
@@ -427,6 +423,45 @@ void color_(char *text, char *col)
 		fprintf(stderr, "%s", text);
 		fflush(stderr);
 	}
+}
+
+
+/* check kernel version, is it 2.6.33 or above? */
+int kernel_version_2633()
+{
+	char v[] = "/proc/sys/kernel/osrelease";
+	char buff[max_char] = "";
+	char buff2[max_char] = "";
+	char buff3[10] = "";
+	int c;
+	/* read in kernel version from /proc */
+	FILE *f = fopen(v, "r");
+	if (!f){ color_("error: cannot read kernel version\n", red); exit(1); }
+	fread(buff, sizeof(buff), 1, f);
+	fclose(f);
+	/* is the length of the output bigger then 6? just like 2.6.33 */
+	if (strlen(buff) <= 6) return 0;
+	strcpy(buff2, buff);
+	/* clear 5th byte to compare the first 4 bytes */
+	buff2[4] = 0;
+	/* does it start with 2.6.? */
+	if (strcmp(buff2, "2.6.")) return 0;
+	/* get the minor version number */
+	c = 0;
+	while (c < 10){
+		char n;
+		/* get next char */
+		n = buff[c + 4];
+		/* exit loop if char is not a number or end of string */
+		if (n < '0' || n > '9' || !n) break;
+		/* store char */
+		buff3[c] = n;
+		c++;
+	}
+	c = atoi(buff3);
+	/* is minor version greater or equal than 33? */
+	if (c < 33) return 0;
+	return 1;
 }
 
 
@@ -586,14 +621,14 @@ int main(int argc, char **argv){
 		char *myarg;
 		while (argc2--){
 			myarg = argv[c];
-			if (cmp_str(myarg, "-c") || cmp_str(myarg, "--color"))	{ opt_color  = 1; }
+			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color  = 1; }
 		}
 	}
 	
 
 	/* check if i am root */
 	user = getenv("USER");
-	if (!cmp_str(user, "root")) { color_("error: root privileges needed\n", red); exit(1); }
+	if (!!strcmp(user, "root")) { color_("error: root privileges needed\n", red); exit(1); }
 
 	/* check already running instance of the program */
 	if (!check_instance()) { color_("error: tomld is running already\n", red); exit(1); }
@@ -616,21 +651,21 @@ int main(int argc, char **argv){
 			int flag_ok = 0;
 			myarg = argv[c];
 			
-			if (cmp_str(myarg, "-v") || cmp_str(myarg, "--verson"))	{ version();	flag_ok = 1; }
-			if (cmp_str(myarg, "-h") || cmp_str(myarg, "--help"))	{ help();		flag_ok = 1; }
+			if (!strcmp(myarg, "-v") || !strcmp(myarg, "--verson"))	{ opt_version = 1;	flag_ok = 1; }
+			if (!strcmp(myarg, "-h") || !strcmp(myarg, "--help"))	{ opt_help    = 1;	flag_ok = 1; }
 			
-			if (cmp_str(myarg, "-1") || cmp_str(myarg, "--once" ))	{ opt_once   = 1; flag_ok = 1; }
-			if (cmp_str(myarg, "-c") || cmp_str(myarg, "--color"))	{ opt_color  = 1; flag_ok = 1; }
-			if (cmp_str(myarg, "-k") || cmp_str(myarg, "--keep" ))	{ opt_keep   = 1; flag_ok = 1; }
-			if (cmp_str(myarg, "-l") || cmp_str(myarg, "--learn"))	{ opt_learn  = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "-1") || !strcmp(myarg, "--once" ))	{ opt_once   = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color  = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "-k") || !strcmp(myarg, "--keep" ))	{ opt_keep   = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	{ opt_learn  = 1; flag_ok = 1; }
 
-			if (cmp_str(myarg, "-i") || cmp_str(myarg, "--info"     ))	{ opt_info       = 1; flag_ok = 2; }
-			if (cmp_str(myarg, "-r") || cmp_str(myarg, "--remove"   ))	{ opt_remove     = 1; flag_ok = 3; }
-			if (cmp_str(myarg, "-R") || cmp_str(myarg, "--recursive"))	{ opt_recursive  = 1; flag_ok = 4; }
+			if (!strcmp(myarg, "-i") || !strcmp(myarg, "--info"     ))	{ opt_info       = 1; flag_ok = 2; }
+			if (!strcmp(myarg, "-r") || !strcmp(myarg, "--remove"   ))	{ opt_remove     = 1; flag_ok = 3; }
+			if (!strcmp(myarg, "-R") || !strcmp(myarg, "--recursive"))	{ opt_recursive  = 1; flag_ok = 4; }
 
-			if (cmp_str(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
-			if (cmp_str(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
-			if (cmp_str(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
+			if (!strcmp(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
 
 			/* store option type if it was any of --info, --remove or --recursive */
 			/* so if the next argument is not an option, then i know which former one it belongs to */
@@ -693,6 +728,13 @@ int main(int argc, char **argv){
 			c++;
 		}
 
+		/* exit after --version or --help option */
+		if (opt_version || opt_help){
+			if (opt_version) version();
+			if (opt_help)    help();
+			exit(0);
+		}
+
 		/* fail if no arguments for --remove option */
 		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); exit(1); }
 		/* tail if no arguments for --recursive option */
@@ -713,8 +755,9 @@ int main(int argc, char **argv){
 	/* check status of tomoyo */
 	strcpy(comm, tsave); strcat(comm, " u - 2>/dev/null");
 	p = popen(comm, "r");
-	if (!p){ color_("error: cannot run save command\n", red); exit(1); }
+	if (!p){ color_("error: cannot check tomoyo memory stat\n", red); exit(1); }
 	fread(buff, sizeof(buff), 1, p);
+	pclose(p);
 	if (!strstr(buff, "Total:")){ color_("error: tomoyo kernel mode is not activated\n", red); exit(1); }
 	else{ color_("tomoyo kernel mode is active\n", clr); }
 	/* create tomoyo dir if it doesn't exist yet */
