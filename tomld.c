@@ -157,6 +157,7 @@ flow chart:
 #include <unistd.h>
 #include <string.h>
 #include <dirent.h>
+#include <sys/stat.h>
 
 #define max_char  1024
 #define max_num   32
@@ -168,7 +169,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.30";
+char *ver = "0.31";
 
 /* home dir */
 char *home = "/home";
@@ -362,6 +363,15 @@ void help() {
 	printf ("- hours or days later let's run it the 3rd time, now the access denied logs will be converted to rules, ");
 	printf ("and on exit all remaining domains will be turned into enforcing mode\n");
 	printf ("\n");
+}
+
+
+/* print debug info about a string */
+void debug(char *text)
+{
+	printf("--\n");
+	printf(text); printf("\nlen=%ld\n", strlen(text));
+	printf("--\n");
 }
 
 
@@ -563,8 +573,26 @@ int which(char *name){
 
 int main(int argc, char **argv){
 
+	/* init */
+	char *user;
+	FILE *p;
+	char comm[max_char] = "";
+	char buff[max_char] = "";
+
+	/* is output colored? set color option before anything else */
+	int argc2 = argc - 1;
+	int c = 1;
+	if (argc2 > 0) {
+		char *myarg;
+		while (argc2--){
+			myarg = argv[c];
+			if (cmp_str(myarg, "-c") || cmp_str(myarg, "--color"))	{ opt_color  = 1; }
+		}
+	}
+	
+
 	/* check if i am root */
-	char *user; user = getenv("USER");
+	user = getenv("USER");
 	if (!cmp_str(user, "root")) { color_("error: root privileges needed\n", red); exit(1); }
 
 	/* check already running instance of the program */
@@ -574,16 +602,17 @@ int main(int argc, char **argv){
 	/* -------------------------------------- */
 	/* ----- CHECK COMMAND LINE OPTIONS ----- */
 	/* -------------------------------------- */
+
 	/* more than 1 argument? */
-	if (argc > 1) {
+	/* don't count the first argument that is the executable name itself */
+	argc2 = argc - 1;
+	if (argc2 > 0) {
 		int flag_type = 0;
 		int flag_last = 0;
 		int c = 1;
 		char *myarg;
-		/* don't count the first argument that is the executable name itself */
-		argc--;
 		/* cycle through the arguments */
-		while (argc--){
+		while (argc2--){
 			int flag_ok = 0;
 			myarg = argv[c];
 			
@@ -632,15 +661,19 @@ int main(int argc, char **argv){
 				/* if last option arg was --recursive, then this belongs to it */
 				if (flag_type == 4){
 					char path[max_char] = "";
+					int l;
 					flag_progs = 0;
-					strcpy(path, myarg);
 					/* root "/" dir not allowed */
 					if (strcmp(myarg, "/") == 0){ color_("error: root directory is not allowed", red); exit(1); }
 					/* check if dir name exist */
-					if (!dir_exist(path)){
+					if (!dir_exist(myarg)){
 						color_("error: no such directory: ", red); color_(myarg, red); color_("\n", red); exit(1); }
+					/* expand recursive dir names with "/" char if missing */
+					strcpy(path, myarg);
+					l = strlen(myarg);
+					if (path[l-1] != '/'){ path[l] = '/'; path[l+1] = 0; }
 					/* if so, store it in recursive dir array */
-					strcat(opt_recursive2[opt_recursive2_counter++], myarg);
+					strcpy(opt_recursive2[opt_recursive2_counter++], path);
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (!flag_type || flag_progs){
@@ -650,7 +683,7 @@ int main(int argc, char **argv){
 					if(!which(path)){
 						color_("error: no such file: ", red); color_(path, red); color_("\n", red); exit(1); }
 					/* if so, store it in extra executables */
-					strcat(progs[progs_counter++], myarg);
+					strcpy(progs[progs_counter++], myarg);
 				}
 			}
 
@@ -666,6 +699,26 @@ int main(int argc, char **argv){
 		if (opt_recursive && !opt_recursive2_counter){ color_("error: bad argument\n", red); exit(1); }
 
 	}
+
+
+	/* ---------------- */
+	/* ----- INIT ----- */
+	/* ---------------- */
+
+	/* print version info */
+	printf("tomld (tomoyo learning daemon) "); printf(ver); printf("\n");
+	/* check tomoyo tool files */
+	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); exit(1); }
+	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); exit(1); }
+	/* check status of tomoyo */
+	strcpy(comm, tsave); strcat(comm, " u - 2>/dev/null");
+	p = popen(comm, "r");
+	if (!p){ color_("error: cannot run save command\n", red); exit(1); }
+	fread(buff, sizeof(buff), 1, p);
+	if (!strstr(buff, "Total:")){ color_("error: tomoyo kernel mode is not activated\n", red); exit(1); }
+	else{ color_("tomoyo kernel mode is active\n", clr); }
+	/* create tomoyo dir if it doesn't exist yet */
+	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
 
 
 	return 0;

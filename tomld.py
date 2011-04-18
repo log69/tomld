@@ -2639,7 +2639,7 @@ except: color_("error: cannot open file " + f, red); myexit(1)
 flag_err = 0
 if tkern in cmdl: color_("tomoyo kernel mode is active")
 else:
-	color_("error: tomoyo is not activated", red)
+	color_("error: tomoyo kernel mode is not activated", red)
 	flag_err = 1
 
 # auto install missing packages
