@@ -526,7 +526,34 @@ int check_instance(){
 /* get absolute pathname of a file from a name */
 /* first the current directory is checked, then the path list on the path env variable */
 int which(char *name){
-	return 1;
+	char *res;
+	char *path;
+	char full[max_char] = "";
+
+	/* does the name contain any "/" char? */
+	/* if so, then it's whether a relative or a full path, so i don't check it any further */
+	if (strpbrk(name, "/")){
+		/* is the file exist? if not, then fail */
+		if (file_exist(name)) return 1;
+		return 0;
+	}
+
+	/* does the file exist in the current dir? */
+	strcpy(full, "./");
+	strcat(full, name);
+	if (file_exist(full)){ strcpy(name, full); return 1; }
+
+	/* does the file exist in the paths from path env? */
+	path = getenv("PATH");
+	while((res = strtok(path, ":"))){
+		strcpy(full, res);
+		strcat(full, "/");
+		strcat(full, name);
+		if (file_exist(full)){ strcpy(name, full); return 1; }
+		path = 0;
+	}
+
+	return 0;
 }
 
 
@@ -619,9 +646,8 @@ int main(int argc, char **argv){
 				if (!flag_type || flag_progs){
 					char path[max_char] = "";
 					strcpy(path, myarg);
-					which(path);
-					/* check if executable name exist */
-					if (!file_exist(path)){
+					/* search for name in path env and check if file exist */
+					if(!which(path)){
 						color_("error: no such file: ", red); color_(path, red); color_("\n", red); exit(1); }
 					/* if so, store it in extra executables */
 					strcat(progs[progs_counter++], myarg);
