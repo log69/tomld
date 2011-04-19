@@ -1,4 +1,4 @@
-tomld (tomoyo learning daemon) 0.29
+tomld (tomoyo learning daemon) 0.31
 Copyright (C) 2011 Andras Horvath
 E-mail: mail@log69.com - suggestions & feedbacks are welcome
 URL: http://log69.com - the official site
@@ -50,14 +50,11 @@ The following options are supported:
 
 *executables are additonal programs to create domains for
 
-supported platforms are:
-   debian 6
-   ubuntu 10.10
-
 
 REMARKS:
 - it is written in python, tested with version 2.6
 - the program assumes to be run in a fully trusted environment
+- it is advised to start with new rules instead of keeping any manually created ones
 - processes in the domains should run in learning mode for quite some time to collect all the necessary rules to avoid malfunctioning by access deny later
 - before reboot, the rules should be stored manually by running "tomoyo-savepolicy" or "tomld -k -1" as root if there are still domains in learning mode, because Tomoyo forgets the learned rules on system restart
 - enforcing mode should never be switched back off for security reason
