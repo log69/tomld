@@ -159,6 +159,7 @@ flow chart:
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #define max_char  1024
 #define max_num   32
@@ -236,6 +237,7 @@ int flag_check3		= 0;
 int flag_firstrun	= 1;
 int flag_clock		= 0;
 int flag_safe		= 0;
+int flag_kernel_version = 0;
 
 /* colors */
 char *gray		= "\033[37;48m";
@@ -427,41 +429,64 @@ void color_(char *text, char *col)
 
 
 /* check kernel version, is it 2.6.33 or above? */
-int kernel_version_2633()
+int kernel_version()
 {
 	char v[] = "/proc/sys/kernel/osrelease";
 	char buff[max_char] = "";
-	char buff2[max_char] = "";
-	char buff3[10] = "";
-	int c;
-	/* read in kernel version from /proc */
+	int c, c2;
+	int ver = 0;
+	char n;
+	/* read in kernel version from /proc in a format as 2.6.32-5-amd64 */
 	FILE *f = fopen(v, "r");
 	if (!f){ color_("error: cannot read kernel version\n", red); exit(1); }
 	fread(buff, sizeof(buff), 1, f);
 	fclose(f);
-	/* is the length of the output bigger then 6? just like 2.6.33 */
-	if (strlen(buff) <= 6) return 0;
-	strcpy(buff2, buff);
-	/* clear 5th byte to compare the first 4 bytes */
-	buff2[4] = 0;
-	/* does it start with 2.6.? */
-	if (strcmp(buff2, "2.6.")) return 0;
-	/* get the minor version number */
+	
 	c = 0;
-	while (c < 10){
-		char n;
-		/* get next char */
-		n = buff[c + 4];
-		/* exit loop if char is not a number or end of string */
-		if (n < '0' || n > '9' || !n) break;
-		/* store char */
-		buff3[c] = n;
-		c++;
+	/* read in version numbers in a format where 2.6.33 will be 263300 */
+	c2 = 100000;
+	while (c2){
+		n = buff[c++];
+		if (n != '.'){
+			char conv[2] = "";
+			/* exit if no numbers or end of string */
+			if (!(n >= '0' && n <= '9') || !n) return ver;
+			/* convert char to string */
+			conv[0] = n; conv[1] = 0;
+			/* convert string to integer and add it to result */
+			ver += c2 * atoi(conv);
+			c2 /= 10;
+		}
 	}
-	c = atoi(buff3);
-	/* is minor version greater or equal than 33? */
-	if (c < 33) return 0;
-	return 1;
+
+	return ver;
+}
+
+
+/* print sand clock */
+void sand_clock(int dot)
+{
+	if (dot == 1){
+		if (!flag_firstrun){
+			printf(".");
+			flag_clock = 0;
+		}
+	}
+	else if (dot){
+		if (!flag_firstrun){
+			printf("+");
+			flag_clock = 0;
+		}
+	}
+	else{
+		int c = flag_clock % 4;
+		if (c == 0) printf("-\b");
+		if (c == 1) printf("\\\b");
+		if (c == 2) printf("|\b");
+		if (c == 3) printf("/\b");
+		flag_clock += 1;
+	}
+	fflush(stdout);
 }
 
 
@@ -602,45 +627,20 @@ int which(char *name){
 }
 
 
-/* ----------------------------------- */
-/* ------------ MAIN PART ------------ */
-/* ----------------------------------- */
-
-int main(int argc, char **argv){
-
-	/* init */
-	char *user;
-	FILE *p;
-	char comm[max_char] = "";
-	char buff[max_char] = "";
-
-	/* is output colored? set color option before anything else */
-	int argc2 = argc - 1;
-	int c = 1;
-	if (argc2 > 0) {
-		char *myarg;
-		while (argc2--){
-			myarg = argv[c];
-			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color  = 1; }
-		}
-	}
+void check_prof()
+{
 	
-
-	/* check if i am root */
-	user = getenv("USER");
-	if (!!strcmp(user, "root")) { color_("error: root privileges needed\n", red); exit(1); }
-
-	/* check already running instance of the program */
-	if (!check_instance()) { color_("error: tomld is running already\n", red); exit(1); }
+}
 
 
-	/* -------------------------------------- */
-	/* ----- CHECK COMMAND LINE OPTIONS ----- */
-	/* -------------------------------------- */
+/* -------------------------------------- */
+/* ----- CHECK COMMAND LINE OPTIONS ----- */
+/* -------------------------------------- */
 
+void check_options(int argc, char **argv){
 	/* more than 1 argument? */
 	/* don't count the first argument that is the executable name itself */
-	argc2 = argc - 1;
+	int argc2 = argc - 1;
 	if (argc2 > 0) {
 		int flag_type = 0;
 		int flag_last = 0;
@@ -741,6 +741,48 @@ int main(int argc, char **argv){
 		if (opt_recursive && !opt_recursive2_counter){ color_("error: bad argument\n", red); exit(1); }
 
 	}
+}
+
+
+void check_options_colored(int argc, char **argv)
+{
+	/* is output colored? set color option before anything else */
+	int argc2 = argc - 1;
+	int c = 1;
+	if (argc2 > 0) {
+		char *myarg;
+		while (argc2--){
+			myarg = argv[c];
+			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color  = 1; }
+		}
+	}
+}
+
+
+/* ----------------------------------- */
+/* ------------ MAIN PART ------------ */
+/* ----------------------------------- */
+
+int main(int argc, char **argv){
+
+	/* vars */
+	char *user;
+	FILE *p;
+	char comm[max_char] = "";
+	char buff[max_char] = "";
+
+	/* check if colored output is needed */
+	check_options_colored(argc, argv);
+
+	/* check if i am root */
+	user = getenv("USER");
+	if (!!strcmp(user, "root")) { color_("error: root privileges needed\n", red); exit(1); }
+
+	/* check already running instance of the program */
+	if (!check_instance()) { color_("error: tomld is running already\n", red); exit(1); }
+
+	/* check command line options */
+	check_options(argc, argv);
 
 
 	/* ---------------- */
@@ -749,6 +791,10 @@ int main(int argc, char **argv){
 
 	/* print version info */
 	printf("tomld (tomoyo learning daemon) "); printf(ver); printf("\n");
+	
+	/* get kernel version in a format where 2.6.32 is 263200 */
+	flag_kernel_version = kernel_version();
+
 	/* check tomoyo tool files */
 	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); exit(1); }
 	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); exit(1); }
@@ -762,6 +808,9 @@ int main(int argc, char **argv){
 	else{ color_("tomoyo kernel mode is active\n", clr); }
 	/* create tomoyo dir if it doesn't exist yet */
 	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
+
+	/* check profile.conf and manager.conf files */
+	check_prof();
 
 
 	return 0;
