@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-17/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
+19/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
                          - use special recursive wildcard in dir handling that is available since tomoyo version 2.3
@@ -161,9 +161,10 @@ flow chart:
 #include <sys/stat.h>
 #include <time.h>
 
-#define max_char  1024
-#define max_num   32
-#define max_array 1024
+#define max_char	1024
+#define max_num		32
+#define max_array	1024
+#define max_file	1*1024*1024
 
 
 /* ------------------------------------------ */
@@ -188,7 +189,19 @@ char *tkern = "security=tomoyo";
 /* tomoyo vars and files */
 char *tdomf	= "";
 char *texcf	= "";
-char *tprof	= "";
+char *tprof	= ""
+"PROFILE_VERSION=20090903\n"
+"PREFERENCE::enforcing={ verbose=yes }\n"
+"PREFERENCE::learning={ verbose=no max_entry=2048 }\n"
+"PREFERENCE::permissive={ verbose=yes }\n"
+"0-COMMENT=-----Disabled Mode-----\n"
+"0-CONFIG={ mode=disabled }\n"
+"1-COMMENT=-----Learning Mode-----\n"
+"1-CONFIG={ mode=learning }\n"
+"2-COMMENT=-----Permissive Mode-----\n"
+"2-CONFIG={ mode=permissive }\n"
+"3-COMMENT=-----Enforcing Mode-----\n"
+"3-CONFIG={ mode=enforcing }\n";
 char *tmanf	= "";
 char *tdir	= "/etc/tomoyo";
 char *tdom	= "/etc/tomoyo/domain_policy.conf";
@@ -261,6 +274,9 @@ char shell[][max_char] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bi
 "/bin/sh", "/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish",
 "/usr/bin/ksh", "/usr/bin/rc", "/usr/bin/screen"};
 int  shell_counter = 13;
+
+/* default profile.conf */
+
 
 
 /* ----------------------------------- */
@@ -382,9 +398,19 @@ void help() {
 /* print debug info about a string */
 void debug(char *text)
 {
+	unsigned long i;
+	unsigned long c = 0;
+	unsigned long l = strlen(text);
+	/* count lines of text */
+	for (i = 0; i < l; i++){ if (text[i] == '\n') c++; }
+	/* print text and info */
 	printf("--\n");
-	printf(text); printf("\nlen=%ld\n", strlen(text));
+	printf(text);
+	/* print newline if missing from the end of string */
+	if (text[l-1] != '\n') printf("\n");
 	printf("--\n");
+	printf("len = %ld, ", strlen(text));
+	printf("lines = %ld\n", c);
 }
 
 
@@ -428,6 +454,51 @@ void color_(char *text, char *col)
 }
 
 
+/* open pipe and read content */
+void pipe_read(char *comm, char *buff, int len)
+{
+	FILE *p = popen(comm, "r");
+	if (!p){
+		color_("error: cannot read pipe from ", red);
+		color_(comm, red);
+		color_("\n", red);
+		exit(1);
+	}
+	fread(buff, len, 1, p);
+	pclose(p);
+}
+
+
+/* open file and read content */
+void file_read(char *name, char *buff, int len)
+{
+	FILE *f = fopen(name, "r");
+	if (!f){
+		color_("error: cannot read file ", red);
+		color_(name, red);
+		color_("\n", red);
+		exit(1);
+	}
+	fread(buff, len, 1, f);
+	fclose(f);
+}
+
+
+/* open file and write content */
+void file_write(char *name, char *buff)
+{
+	FILE *f = fopen(name, "w");
+	if (!f){
+		color_("error: cannot write file ", red);
+		color_(name, red);
+		color_("\n", red);
+		exit(1);
+	}
+	fprintf(f, buff);
+	fclose(f);
+}
+
+
 /* check kernel version, is it 2.6.33 or above? */
 int kernel_version()
 {
@@ -437,10 +508,7 @@ int kernel_version()
 	int ver = 0;
 	char n;
 	/* read in kernel version from /proc in a format as 2.6.32-5-amd64 */
-	FILE *f = fopen(v, "r");
-	if (!f){ color_("error: cannot read kernel version\n", red); exit(1); }
-	fread(buff, sizeof(buff), 1, f);
-	fclose(f);
+	file_read(v, buff, sizeof buff);
 	
 	c = 0;
 	/* read in version numbers in a format where 2.6.33 will be 263300 */
@@ -513,7 +581,7 @@ int running(char *name){
 			strcat(mydir_name, mypid);
 			strcat(mydir_name, "/exe");
 			/* resolv the link pointing from the exe name */
-			res = readlink(mydir_name, buff, sizeof(buff)-1);
+			res = readlink(mydir_name, buff, (sizeof buff) - 1);
 			if (res > 0){
 				/* put a zero end mark to the end of the string after string length */
 				buff[res] = 0;
@@ -560,10 +628,7 @@ int check_instance(){
 	if (file_exist(pidf)){
 		char pid2[max_num] = "";
 		/* read pid number from pid file */
-		FILE *f = fopen(pidf, "r");
-		if (!f){ color_("error: cannot open pid file for reading\n", red); exit(1); }
-		fread(pid2, sizeof(pid2), 1, f);
-		fclose(f);
+		file_read(pidf, pid2, sizeof pid2);
 		/* is it me? */
 		if (strcmp(mypid, pid2) == 0) return 0;
 		else{
@@ -574,19 +639,13 @@ int check_instance(){
 			if (dir_exist(path)) return 1;
 			/* if not running, then overwrite pid number in pid file */
 			else{
-				FILE *f = fopen(pidf, "w");
-				if (!f){ color_("error: cannot open pid file for writing\n", red); exit(1); }
-				fprintf(f, mypid);
-				fclose(f);
+				file_write(pidf, mypid);
 			}
 		}
 	}
 	/* create pid file if it doesn't exist */
 	else{
-		FILE *f = fopen(pidf, "w");
-		if (!f){ color_("error: cannot open pid file for writing\n", red); exit(1); }
-		fprintf(f, mypid);
-		fclose(f);
+		file_write(pidf, mypid);
 	}
 
 	return 1;
@@ -629,7 +688,6 @@ int which(char *name){
 
 void check_prof()
 {
-	
 }
 
 
@@ -759,6 +817,26 @@ void check_options_colored(int argc, char **argv)
 }
 
 
+/* check status of tomoyo (kernel mode and tools) */
+void check_tomoyo()
+{
+	char comm[max_char] = "";
+	char buff[max_char] = "";
+	/* check tomoyo tool files */
+	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); exit(1); }
+	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); exit(1); }
+	/* check status of tomoyo */
+	strcpy(comm, tsave); strcat(comm, " u - 2>/dev/null");
+	/* get the output of command "tomoyo-savepolicy u -" giving back memory stat */
+	pipe_read(comm, buff, sizeof buff);
+	/* if no "total" part, then tomoyo is not activated */
+	if (!strstr(buff, "Total:")){ color_("error: tomoyo kernel mode is not activated\n", red); exit(1); }
+	else{ color_("tomoyo kernel mode is active\n", clr); }
+	/* create tomoyo dir if it doesn't exist yet */
+	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
+}
+
+
 /* ----------------------------------- */
 /* ------------ MAIN PART ------------ */
 /* ----------------------------------- */
@@ -767,9 +845,6 @@ int main(int argc, char **argv){
 
 	/* vars */
 	char *user;
-	FILE *p;
-	char comm[max_char] = "";
-	char buff[max_char] = "";
 
 	/* check if colored output is needed */
 	check_options_colored(argc, argv);
@@ -795,19 +870,8 @@ int main(int argc, char **argv){
 	/* get kernel version in a format where 2.6.32 is 263200 */
 	flag_kernel_version = kernel_version();
 
-	/* check tomoyo tool files */
-	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); exit(1); }
-	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); exit(1); }
-	/* check status of tomoyo */
-	strcpy(comm, tsave); strcat(comm, " u - 2>/dev/null");
-	p = popen(comm, "r");
-	if (!p){ color_("error: cannot check tomoyo memory stat\n", red); exit(1); }
-	fread(buff, sizeof(buff), 1, p);
-	pclose(p);
-	if (!strstr(buff, "Total:")){ color_("error: tomoyo kernel mode is not activated\n", red); exit(1); }
-	else{ color_("tomoyo kernel mode is active\n", clr); }
-	/* create tomoyo dir if it doesn't exist yet */
-	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
+	/* check tomoyo status */
+	check_tomoyo();
 
 	/* check profile.conf and manager.conf files */
 	check_prof();
