@@ -181,28 +181,62 @@ char *home = "/home";
 int count = 10;
 
 /* max entries variable in profile config */
-int maxent = 10000;
+#define maxmem 10000
 
 /* tomoyo kernel parameter */
 char *tkern = "security=tomoyo";
 
 /* tomoyo vars and files */
 char *tdomf	= "";
-char *texcf	= "";
-char *tprof	= ""
-"PROFILE_VERSION=20090903\n"
-"PREFERENCE::enforcing={ verbose=yes }\n"
-"PREFERENCE::learning={ verbose=no max_entry=2048 }\n"
-"PREFERENCE::permissive={ verbose=yes }\n"
-"0-COMMENT=-----Disabled Mode-----\n"
-"0-CONFIG={ mode=disabled }\n"
-"1-COMMENT=-----Learning Mode-----\n"
-"1-CONFIG={ mode=learning }\n"
-"2-COMMENT=-----Permissive Mode-----\n"
-"2-CONFIG={ mode=permissive }\n"
-"3-COMMENT=-----Enforcing Mode-----\n"
-"3-CONFIG={ mode=enforcing }\n";
-char *tmanf	= "";
+char *texcf = "";
+
+char *tprof22 = ""
+	"0-COMMENT=-----Disabled Mode-----\n"
+	"0-MAC_FOR_FILE=disabled\n"
+	"0-MAX_ACCEPT_ENTRY=10000\n"
+	"0-TOMOYO_VERBOSE=disabled\n"
+	"1-COMMENT=-----Learning Mode-----\n"
+	"1-MAC_FOR_FILE=learning\n"
+	"1-MAX_ACCEPT_ENTRY=10000\n"
+	"1-TOMOYO_VERBOSE=disabled\n"
+	"2-COMMENT=-----Permissive Mode-----\n"
+	"2-MAC_FOR_FILE=permissive\n"
+	"2-MAX_ACCEPT_ENTRY=10000\n"
+	"2-TOMOYO_VERBOSE=enabled\n"
+	"3-COMMENT=-----Enforcing Mode-----\n"
+	"3-MAC_FOR_FILE=enforcing\n"
+	"3-MAX_ACCEPT_ENTRY=10000\n"
+	"3-TOMOYO_VERBOSE=enabled\n";
+
+char *tprof23 = ""
+	"PROFILE_VERSION=20090903\n"
+	"PREFERENCE::enforcing={ verbose=yes }\n"
+	"PREFERENCE::learning={ verbose=no max_entry=10000 }\n"
+	"PREFERENCE::permissive={ verbose=yes }\n"
+	"0-COMMENT=-----Disabled Mode-----\n"
+	"0-CONFIG={ mode=disabled }\n"
+	"1-COMMENT=-----Learning Mode-----\n"
+	"1-CONFIG={ mode=learning }\n"
+	"2-COMMENT=-----Permissive Mode-----\n"
+	"2-CONFIG={ mode=permissive }\n"
+	"3-COMMENT=-----Enforcing Mode-----\n"
+	"3-CONFIG={ mode=enforcing }\n";
+
+char *tmanf22 = ""
+	"/usr/sbin/tomoyo-loadpolicy\n"
+	"/usr/sbin/tomoyo-editpolicy\n"
+	"/usr/sbin/tomoyo-setlevel\n"
+	"/usr/sbin/tomoyo-setprofile\n"
+	"/usr/sbin/tomoyo-ld-watch\n";
+
+char *tmanf23 = ""
+	"/usr/sbin/tomoyo-loadpolicy\n"	
+	"/usr/sbin/tomoyo-editpolicy\n"
+	"/usr/sbin/tomoyo-setlevel\n"
+	"/usr/sbin/tomoyo-setprofile\n"
+	"/usr/sbin/tomoyo-ld-watch\n"
+	"/usr/sbin/tomoyo-queryd\n";
+
 char *tdir	= "/etc/tomoyo";
 char *tdom	= "/etc/tomoyo/domain_policy.conf";
 char *texc	= "/etc/tomoyo/exception_policy.conf";
@@ -686,8 +720,28 @@ int which(char *name){
 }
 
 
+/* check profile.conf and manager.conf files */
 void check_prof()
 {
+	char comm[max_char] = "";
+	/* check kernel version, if it's under 2.6.33, then use profile for tomoyo version 2.2.x */
+	if (flag_kernel_version < 263300){
+		/* write profiles to disk */
+		file_write(tpro, tprof22);
+		file_write(tman, tmanf22);
+	}
+	/* use profile for tomoyo version 2.3.x */
+	else{
+		/* write profiles to disk */
+		file_write(tpro, tprof23);
+		file_write(tman, tmanf23);
+	}
+	/* load profile.conf from disk to memory */
+	strcpy(comm, tload); strcat(comm, " p");
+	system(comm);
+	/* load manager.conf from disk to memory */
+	strcpy(comm, tload); strcat(comm, " m");
+	system(comm);
 }
 
 
