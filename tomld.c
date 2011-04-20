@@ -181,7 +181,7 @@ char *home = "/home";
 int count = 10;
 
 /* max entries variable in profile config */
-#define maxmem 10000
+#define maxmem "10000"
 
 /* tomoyo kernel parameter */
 char *tkern = "security=tomoyo";
@@ -193,25 +193,25 @@ char *texcf = "";
 char *tprof22 = ""
 	"0-COMMENT=-----Disabled Mode-----\n"
 	"0-MAC_FOR_FILE=disabled\n"
-	"0-MAX_ACCEPT_ENTRY=10000\n"
+	"0-MAX_ACCEPT_ENTRY="maxmem"\n"
 	"0-TOMOYO_VERBOSE=disabled\n"
 	"1-COMMENT=-----Learning Mode-----\n"
 	"1-MAC_FOR_FILE=learning\n"
-	"1-MAX_ACCEPT_ENTRY=10000\n"
+	"1-MAX_ACCEPT_ENTRY="maxmem"\n"
 	"1-TOMOYO_VERBOSE=disabled\n"
 	"2-COMMENT=-----Permissive Mode-----\n"
 	"2-MAC_FOR_FILE=permissive\n"
-	"2-MAX_ACCEPT_ENTRY=10000\n"
+	"2-MAX_ACCEPT_ENTRY="maxmem"\n"
 	"2-TOMOYO_VERBOSE=enabled\n"
 	"3-COMMENT=-----Enforcing Mode-----\n"
 	"3-MAC_FOR_FILE=enforcing\n"
-	"3-MAX_ACCEPT_ENTRY=10000\n"
+	"3-MAX_ACCEPT_ENTRY="maxmem"\n"
 	"3-TOMOYO_VERBOSE=enabled\n";
 
 char *tprof23 = ""
 	"PROFILE_VERSION=20090903\n"
 	"PREFERENCE::enforcing={ verbose=yes }\n"
-	"PREFERENCE::learning={ verbose=no max_entry=10000 }\n"
+	"PREFERENCE::learning={ verbose=no max_entry="maxmem" }\n"
 	"PREFERENCE::permissive={ verbose=yes }\n"
 	"0-COMMENT=-----Disabled Mode-----\n"
 	"0-CONFIG={ mode=disabled }\n"
