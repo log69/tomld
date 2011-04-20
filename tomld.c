@@ -392,6 +392,7 @@ void help() {
 	printf ("\n");
 	printf ("*executables are additonal programs to create domains for\n");
 	printf ("\n");
+	printf ("requirements: Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)\n");
 	printf ("\n");
 	printf ("REMARKS:\n");
 	printf ("- it is written in python, tested with version 2.6\n");
@@ -905,7 +906,7 @@ int main(int argc, char **argv){
 
 	/* check if i am root */
 	user = getenv("USER");
-	if (!!strcmp(user, "root")) { color_("error: root privileges needed\n", red); exit(1); }
+	if (strcmp(user, "root")) { color_("error: root privileges needed\n", red); exit(1); }
 
 	/* check already running instance of the program */
 	if (!check_instance()) { color_("error: tomld is running already\n", red); exit(1); }
