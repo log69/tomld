@@ -160,6 +160,8 @@ flow chart:
 #include <dirent.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 #define max_char	1024
 #define max_num		32
@@ -190,6 +192,7 @@ char *tkern = "security=tomoyo";
 char *tdomf	= "";
 char *texcf = "";
 
+/* default profile.conf */
 char *tprof22 = ""
 	"0-COMMENT=-----Disabled Mode-----\n"
 	"0-MAC_FOR_FILE=disabled\n"
@@ -222,6 +225,7 @@ char *tprof23 = ""
 	"3-COMMENT=-----Enforcing Mode-----\n"
 	"3-CONFIG={ mode=enforcing }\n";
 
+/* default manager.conf */
 char *tmanf22 = ""
 	"/usr/sbin/tomoyo-loadpolicy\n"
 	"/usr/sbin/tomoyo-editpolicy\n"
@@ -309,7 +313,8 @@ char shell[][max_char] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bi
 "/usr/bin/ksh", "/usr/bin/rc", "/usr/bin/screen"};
 int  shell_counter = 13;
 
-/* default profile.conf */
+/* other vars */
+struct termio terminal_backup;
 
 
 
@@ -486,6 +491,54 @@ void color_(char *text, char *col)
 		fprintf(stderr, "%s", text);
 		fflush(stderr);
 	}
+}
+
+
+/* set terminal input mode for keyboard read */
+void key_set_mode()
+{
+	int fd = fileno(stdin);
+	struct termio term;
+	ioctl(fd, TCGETA, &terminal_backup);
+	term = terminal_backup;
+	term.c_cc[VMIN] = 0;
+	term.c_cc[VTIME] = 0;
+	term.c_lflag = 0;
+	ioctl(fd, TCSETA, &term);
+}
+
+
+/* restore original terminal mode */
+void key_clear_mode()
+{
+	int fd = fileno(stdin);
+	ioctl(fd, TCSETA, &terminal_backup);
+}
+
+
+/* read keyboard without waiting */
+char key_get()
+{
+	int fd, key;
+	char c = '\0';
+	key_set_mode();
+	fd = fileno(stdin);
+	key = read(fd, &c, 1);
+	if (key == 0) c = '\0';
+	key_clear_mode();
+	return c;
+}
+
+
+/* give a choice */
+int choice(char *text)
+{
+	char c = 0;
+	printf(text);
+	printf(" [y/N]");
+	scanf("%c", &c);
+	if (c == 'y') return 1;
+	return 0;
 }
 
 
@@ -892,6 +945,39 @@ void check_tomoyo()
 }
 
 
+/* clear config files */
+void clear()
+{
+	char comm[max_char] = "";
+	/* write config files */
+	file_write(texc, "");
+	file_write(tdom, "<kernel>\nuse_profile 0\n\n");
+	/* load config files from disk to memory */
+	strcpy(comm, tload); strcat(comm, " fa");
+	system(comm);
+}
+
+
+/* info about domains by a pattern */
+void domain_info(char *text)
+{
+	debug(text);
+}
+
+
+/* remove domains by a pattern */
+void domain_remove(char *text)
+{
+	debug(text);
+}
+
+
+/* turn back learning mode for all domains with profile 2-3 */
+void domain_learn_all()
+{
+}
+
+
 /* ----------------------------------- */
 /* ------------ MAIN PART ------------ */
 /* ----------------------------------- */
@@ -930,6 +1016,49 @@ int main(int argc, char **argv){
 
 	/* check profile.conf and manager.conf files */
 	check_prof();
+
+	/* on --reset option, create backup of config files with tomoyo-savepolicy */
+	/* (tomoyo-savepolicy always creates backup files using timestamp) */
+	if (opt_reset){
+		color("* resetting domain configurations on demand\n", red);
+		if (!choice("are you sure?")) exit(0);
+		system(tsave);
+		color("policy file backups created\n", green);
+	}
+
+	/* create new empty policy files if missing or if --reset switch is on */
+	if (!file_exist(tdom) || !file_exist(texc) || opt_reset) clear();
+
+	/* on --clear, empty configuration files */
+	if (!opt_reset && opt_clear){
+		color("* clearing domain configurations on demand\n", red);
+		if (!choice("are you sure?")) exit(0);
+		system(tsave);
+		color("policy file backups created\n", green);
+		clear();
+		color("* configuration cleared\n", red);
+		exit(0);
+	}
+
+	if (opt_info){
+		domain_info(opt_info2);
+		exit(0);
+	}
+
+	if (opt_remove){
+		domain_remove(opt_remove2);
+		exit(0);
+	}
+
+	if (opt_learn){
+		color("* turning all domains into learning mode on demand\n", red);
+		if (!choice("are you sure?")) exit(0);
+		system(tsave);
+		color("policy file backups created\n", green);
+		domain_learn_all();
+		color("all domains turned back to learning mode\n", red);
+		exit(0);
+	}
 
 
 	return 0;
