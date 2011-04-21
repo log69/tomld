@@ -166,7 +166,7 @@ flow chart:
 #define max_char	1024
 #define max_num		32
 #define max_array	1024
-#define max_file	1*1024*1024
+#define max_file	10*1024*1024
 
 
 /* ------------------------------------------ */
@@ -435,12 +435,21 @@ void help() {
 }
 
 
+/* my exit */
+void myexit(int num)
+{
+	free(tdomf);
+	free(texcf);
+	exit(num);
+}
+
+
 /* print debug info about a string */
 void debug(char *text)
 {
-	unsigned long i;
-	unsigned long c = 0;
-	unsigned long l = strlen(text);
+	long i;
+	long c = 0;
+	long l = strlen(text);
 	/* count lines of text */
 	for (i = 0; i < l; i++){ if (text[i] == '\n') c++; }
 	/* print text and info */
@@ -448,14 +457,27 @@ void debug(char *text)
 	printf(text);
 	/* print newline if missing from the end of string */
 	if (text[l-1] != '\n') printf("\n");
-	printf("--\n");
-	printf("len = %ld, ", strlen(text));
-	printf("lines = %ld\n", c);
+	printf("-- debug len %ld, ", strlen(text));
+	printf("lines %ld\n", c);
+}
+
+
+/* print debug info about an integer */
+void debugi(int num)
+{
+	printf("-- debug integer %d\n", num);
+}
+
+
+/* print debug info about a long integer */
+void debugl(long num)
+{
+	printf("-- debug long integer %ld\n", num);
 }
 
 
 /* convert integer to ascii */
-/* custom implementation because itoa function is missing from standard libs */
+/* custom implementation because "itoa" function is missing from standard libs */
 void itoa(int num, char *buf)
 {
 	sprintf(buf, "%d", num);
@@ -490,6 +512,50 @@ void color_(char *text, char *col)
 	else{
 		fprintf(stderr, "%s", text);
 		fflush(stderr);
+	}
+}
+
+
+/* allocate memory and return pointer */
+char *memory_get(long num)
+{
+	char* p = malloc((sizeof (char)) * (num + 1));
+	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	return p;
+}
+
+
+/* returns a new string containing the next line of a string and moves the pointer to the beginning of the next line */
+/* returned value must be freed by caller */
+char *string_get_next_line(char **text)
+{
+	char *res, c;
+	int i = 0;
+	do {
+		c = (*text)[i++];
+	/* exit on end or on a new line */
+	} while(c && c != '\n');
+	/* allocate mem for the new string */
+	--i;
+	res = memory_get(i);
+	/* copy it */
+	strncpy(res, (*text), i);
+	res[i] = 0;
+	/* move pointer to the next line */
+	(*text) += i + 1;
+	return res;
+}
+
+
+/* return the length of the next line in a string */
+int string_next_line_len(char *text)
+{
+	int i = 0;
+	while(1){
+		char c = text[i];
+		/* exit on end or on a new line */
+		if (!c || c == '\n') return i;
+		i++;
 	}
 }
 
@@ -543,32 +609,66 @@ int choice(char *text)
 
 
 /* open pipe and read content */
-void pipe_read(char *comm, char *buff, int len)
+char *pipe_read(char *comm, long length)
 {
+	char *buff;
+	
+	/* open file for reading */
 	FILE *p = popen(comm, "r");
 	if (!p){
-		color_("error: cannot read pipe from ", red);
+		color_("error: cannot read pipe from command: ", red);
 		color_(comm, red);
 		color_("\n", red);
-		exit(1);
+		myexit(1);
 	}
-	fread(buff, len, 1, p);
+	
+	/* alloc mem for it */
+	buff = memory_get(length);
+	
+	fread(buff, length, 1, p);
 	pclose(p);
+	
+	return buff;
 }
 
 
 /* open file and read content */
-void file_read(char *name, char *buff, int len)
+char *file_read(char *name, long *length)
 {
+	char *buff;
+	long len = 0;
+
+	/* open file for reading */
 	FILE *f = fopen(name, "r");
 	if (!f){
 		color_("error: cannot read file ", red);
 		color_(name, red);
 		color_("\n", red);
-		exit(1);
+		myexit(1);
 	}
+	/* check file length */
+	if (!(*length)){
+		/* get file length from file descriptor */
+		fseek(f, 0, SEEK_END);
+		len = ftell(f) + 1;
+		fseek(f, 0, SEEK_SET);
+		/* store file length for caller */
+		*length = len;
+	}
+	/* length is manually set */
+	else{
+		len = *length;
+	}
+
+	/* alloc mem */
+	buff = memory_get(len);
+	/* read in file */
 	fread(buff, len, 1, f);
 	fclose(f);
+	/* write zero to the end of file */
+	buff[len] = 0;
+
+	return buff;
 }
 
 
@@ -580,26 +680,27 @@ void file_write(char *name, char *buff)
 		color_("error: cannot write file ", red);
 		color_(name, red);
 		color_("\n", red);
-		exit(1);
+		myexit(1);
 	}
 	fprintf(f, buff);
 	fclose(f);
 }
 
 
-/* check kernel version, is it 2.6.33 or above? */
+/* get kernel version in a format where 2.6.33 will be 263300 */
 int kernel_version()
 {
 	char v[] = "/proc/sys/kernel/osrelease";
-	char buff[max_char] = "";
+	char *buff;
 	int c, c2;
 	int ver = 0;
 	char n;
+	/* define length for file manually because it's a kernel file from /proc and doesn't have real length */
+	long len = max_char;
 	/* read in kernel version from /proc in a format as 2.6.32-5-amd64 */
-	file_read(v, buff, sizeof buff);
-	
+	buff = file_read(v, &len);
 	c = 0;
-	/* read in version numbers in a format where 2.6.33 will be 263300 */
+	/* create in version numbers */
 	c2 = 100000;
 	while (c2){
 		n = buff[c++];
@@ -614,6 +715,8 @@ int kernel_version()
 			c2 /= 10;
 		}
 	}
+	
+	free(buff);
 
 	return ver;
 }
@@ -646,7 +749,7 @@ void sand_clock(int dot)
 }
 
 
-/* check if process with the given name is running */
+/* check if process with path is running */
 int running(char *name){
 	DIR *mydir;
 	struct dirent *mydir_entry;
@@ -659,23 +762,23 @@ int running(char *name){
 	/* cycle through dirs in /proc */
 	while((mydir_entry = readdir(mydir))) {
 		/* get the dir names inside /proc dir */
-		strcpy(mypid, mydir_entry->d_name);
+		strncpy(mypid, mydir_entry->d_name, max_char);
 		/* does it contain numbers only meaning they are pids? */
 		if (strspn(mypid, "0123456789") == strlen(mypid)) {
 			int res;
 			char buff[max_char] = "";
 			/* create dirname like /proc/pid/exe */
-			strcpy(mydir_name, "/proc/");
-			strcat(mydir_name, mypid);
-			strcat(mydir_name, "/exe");
+			strncpy(mydir_name, "/proc/", max_char);
+			strncat(mydir_name, mypid, max_char);
+			strncat(mydir_name, "/exe", max_char);
 			/* resolv the link pointing from the exe name */
-			res = readlink(mydir_name, buff, (sizeof buff) - 1);
+			res = readlink(mydir_name, buff, max_char - 1);
 			if (res > 0){
 				/* put a zero end mark to the end of the string after string length */
 				buff[res] = 0;
 				/* compare the link to the process name */
 				/* gives back zero on full match */
-				if (strcmp(buff, name) == 0) {
+				if (strncmp(buff, name, max_char) == 0) {
 					closedir(mydir);
 					return 1;
 				}
@@ -707,6 +810,24 @@ int file_exist(char *name){
 }
 
 
+/* load config files from kernel memory to user memory */
+void load()
+{
+	char comm[max_char] = "";
+
+	tdomf = memory_get(max_file);
+	/* string for command */
+	strncpy(comm, tsave, max_char); strncat(comm, " d -", max_char);
+	/* load domain config */
+	tdomf = pipe_read(comm, max_file);
+
+	/* string for command */
+	strncpy(comm, tsave, max_char); strncat(comm, " e -", max_char);
+	/* load exception config */
+	texcf = pipe_read(comm, max_file);
+}
+
+
 /* check if only one instance of the program is running */
 int check_instance(){
 	char mypid[max_num] = "";
@@ -714,15 +835,16 @@ int check_instance(){
 	itoa(getpid(), mypid);
 	/* check if my pid file exists */
 	if (file_exist(pidf)){
-		char pid2[max_num] = "";
+		char *pid2;
+		long len = 0;
 		/* read pid number from pid file */
-		file_read(pidf, pid2, sizeof pid2);
+		pid2 = file_read(pidf, &len);
 		/* is it me? */
-		if (strcmp(mypid, pid2) == 0) return 0;
+		if (strncmp(mypid, pid2, max_char) == 0) return 0;
 		else{
 			/* is the process with the foreign pid still running? */
 			char path[max_char] = "/proc/";
-			strcat(path, pid2);
+			strncat(path, pid2, max_char);
 			/* if running, then return false */
 			if (dir_exist(path)) return 1;
 			/* if not running, then overwrite pid number in pid file */
@@ -730,6 +852,7 @@ int check_instance(){
 				file_write(pidf, mypid);
 			}
 		}
+		free(pid2);
 	}
 	/* create pid file if it doesn't exist */
 	else{
@@ -742,6 +865,7 @@ int check_instance(){
 
 /* get absolute pathname of a file from a name */
 /* first the current directory is checked, then the path list on the path env variable */
+/* return true if success and write back new path to old name */
 int which(char *name){
 	char *res;
 	char *path;
@@ -756,17 +880,17 @@ int which(char *name){
 	}
 
 	/* does the file exist in the current dir? */
-	strcpy(full, "./");
-	strcat(full, name);
-	if (file_exist(full)){ strcpy(name, full); return 1; }
+	strncpy(full, "./", max_char);
+	strncat(full, name, max_char);
+	if (file_exist(full)){ strncpy(name, full, max_char); return 1; }
 
 	/* does the file exist in the paths from path env? */
 	path = getenv("PATH");
 	while((res = strtok(path, ":"))){
-		strcpy(full, res);
-		strcat(full, "/");
-		strcat(full, name);
-		if (file_exist(full)){ strcpy(name, full); return 1; }
+		strncpy(full, res, max_char);
+		strncat(full, "/", max_char);
+		strncat(full, name, max_char);
+		if (file_exist(full)){ strncpy(name, full, max_char); return 1; }
 		path = 0;
 	}
 
@@ -774,8 +898,8 @@ int which(char *name){
 }
 
 
-/* check profile.conf and manager.conf files */
-void check_prof()
+/* create profile.conf and manager.conf files */
+void create_prof()
 {
 	char comm[max_char] = "";
 	/* check kernel version, if it's under 2.6.33, then use profile for tomoyo version 2.2.x */
@@ -791,10 +915,10 @@ void check_prof()
 		file_write(tman, tmanf23);
 	}
 	/* load profile.conf from disk to memory */
-	strcpy(comm, tload); strcat(comm, " p");
+	strncpy(comm, tload, max_char); strncat(comm, " p", max_char);
 	system(comm);
 	/* load manager.conf from disk to memory */
-	strcpy(comm, tload); strcat(comm, " m");
+	strncpy(comm, tload, max_char); strncat(comm, " m", max_char);
 	system(comm);
 }
 
@@ -811,27 +935,30 @@ void check_options(int argc, char **argv){
 		int flag_type = 0;
 		int flag_last = 0;
 		int c = 1;
-		char *myarg;
+		char myarg[max_char] = "";
 		/* cycle through the arguments */
 		while (argc2--){
 			int flag_ok = 0;
-			myarg = argv[c];
+			/* clear argument buffer for security */
+			int i = max_char;
+			while(--i) myarg[i] = 0;
+			strncpy(myarg, argv[c], max_char);
 			
-			if (!strcmp(myarg, "-v") || !strcmp(myarg, "--verson"))	{ opt_version = 1;	flag_ok = 1; }
-			if (!strcmp(myarg, "-h") || !strcmp(myarg, "--help"))	{ opt_help    = 1;	flag_ok = 1; }
+			if (!strncmp(myarg, "-v", max_char) || !strncmp(myarg, "--verson", max_char))	{ opt_version = 1;	flag_ok = 1; }
+			if (!strncmp(myarg, "-h", max_char) || !strncmp(myarg, "--help"  , max_char))	{ opt_help    = 1;	flag_ok = 1; }
 			
-			if (!strcmp(myarg, "-1") || !strcmp(myarg, "--once" ))	{ opt_once   = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color  = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "-k") || !strcmp(myarg, "--keep" ))	{ opt_keep   = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	{ opt_learn  = 1; flag_ok = 1; }
+			if (!strncmp(myarg, "-1", max_char) || !strncmp(myarg, "--once" , max_char))	{ opt_once   = 1; flag_ok = 1; }
+			if (!strncmp(myarg, "-c", max_char) || !strncmp(myarg, "--color", max_char))	{ opt_color  = 1; flag_ok = 1; }
+			if (!strncmp(myarg, "-k", max_char) || !strncmp(myarg, "--keep" , max_char))	{ opt_keep   = 1; flag_ok = 1; }
+			if (!strncmp(myarg, "-l", max_char) || !strncmp(myarg, "--learn", max_char))	{ opt_learn  = 1; flag_ok = 1; }
 
-			if (!strcmp(myarg, "-i") || !strcmp(myarg, "--info"     ))	{ opt_info       = 1; flag_ok = 2; }
-			if (!strcmp(myarg, "-r") || !strcmp(myarg, "--remove"   ))	{ opt_remove     = 1; flag_ok = 3; }
-			if (!strcmp(myarg, "-R") || !strcmp(myarg, "--recursive"))	{ opt_recursive  = 1; flag_ok = 4; }
+			if (!strncmp(myarg, "-i", max_char) || !strncmp(myarg, "--info"     , max_char))	{ opt_info       = 1; flag_ok = 2; }
+			if (!strncmp(myarg, "-r", max_char) || !strncmp(myarg, "--remove"   , max_char))	{ opt_remove     = 1; flag_ok = 3; }
+			if (!strncmp(myarg, "-R", max_char) || !strncmp(myarg, "--recursive", max_char))	{ opt_recursive  = 1; flag_ok = 4; }
 
-			if (!strcmp(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
+			if (!strncmp(myarg, "--yes"  , max_char))	{ opt_yes   = 1; flag_ok = 1; }
+			if (!strncmp(myarg, "--clear", max_char))	{ opt_clear = 1; flag_ok = 1; }
+			if (!strncmp(myarg, "--reset", max_char))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
 
 			/* store option type if it was any of --info, --remove or --recursive */
 			/* so if the next argument is not an option, then i know which former one it belongs to */
@@ -844,7 +971,7 @@ void check_options(int argc, char **argv){
 					/* if former arg was an option, then it belongs to it */
 					if (flag_last){
 						/* store as --info parameter */
-						strcpy(opt_info2, myarg);
+						strncpy(opt_info2, myarg, max_char);
 					}
 					/* it belongs to the extra executables, so store it */
 					else flag_progs = 1;
@@ -854,7 +981,7 @@ void check_options(int argc, char **argv){
 					/* if former arg was an option, then it belongs to it */
 					if (flag_last){
 						/* store as --remove parameter */
-						strcpy(opt_remove2, myarg);
+						strncpy(opt_remove2, myarg, max_char);
 					}
 					/* it belongs to the extra executables, so store it */
 					else flag_progs = 1;
@@ -865,26 +992,26 @@ void check_options(int argc, char **argv){
 					int l;
 					flag_progs = 0;
 					/* root "/" dir not allowed */
-					if (strcmp(myarg, "/") == 0){ color_("error: root directory is not allowed", red); exit(1); }
+					if (strncmp(myarg, "/", max_char) == 0){ color_("error: root directory is not allowed", red); myexit(1); }
 					/* check if dir name exist */
 					if (!dir_exist(myarg)){
-						color_("error: no such directory: ", red); color_(myarg, red); color_("\n", red); exit(1); }
+						color_("error: no such directory: ", red); color_(myarg, red); color_("\n", red); myexit(1); }
 					/* expand recursive dir names with "/" char if missing */
-					strcpy(path, myarg);
+					strncpy(path, myarg, max_char);
 					l = strlen(myarg);
 					if (path[l-1] != '/'){ path[l] = '/'; path[l+1] = 0; }
 					/* if so, store it in recursive dir array */
-					strcpy(opt_recursive2[opt_recursive2_counter++], path);
+					strncpy(opt_recursive2[opt_recursive2_counter++], path, max_char);
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (!flag_type || flag_progs){
 					char path[max_char] = "";
-					strcpy(path, myarg);
+					strncpy(path, myarg, max_char);
 					/* search for name in path env and check if file exist */
 					if(!which(path)){
-						color_("error: no such file: ", red); color_(path, red); color_("\n", red); exit(1); }
+						color_("error: no such file: ", red); color_(path, red); color_("\n", red); myexit(1); }
 					/* if so, store it in extra executables */
-					strcpy(progs[progs_counter++], myarg);
+					strncpy(progs[progs_counter++], myarg, max_char);
 				}
 			}
 
@@ -898,28 +1025,28 @@ void check_options(int argc, char **argv){
 		if (opt_version || opt_help){
 			if (opt_version) version();
 			if (opt_help)    help();
-			exit(0);
+			myexit(0);
 		}
 
 		/* fail if no arguments for --remove option */
-		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); exit(1); }
+		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); myexit(1); }
 		/* tail if no arguments for --recursive option */
-		if (opt_recursive && !opt_recursive2_counter){ color_("error: bad argument\n", red); exit(1); }
+		if (opt_recursive && !opt_recursive2_counter){ color_("error: bad argument\n", red); myexit(1); }
 
 	}
 }
 
 
+/* is output colored? */
 void check_options_colored(int argc, char **argv)
 {
-	/* is output colored? set color option before anything else */
 	int argc2 = argc - 1;
 	int c = 1;
 	if (argc2 > 0) {
 		char *myarg;
 		while (argc2--){
 			myarg = argv[c];
-			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color  = 1; }
+			if (!strncmp(myarg, "-c", max_char) || !strncmp(myarg, "--color", max_char))	{ opt_color  = 1; }
 		}
 	}
 }
@@ -928,17 +1055,17 @@ void check_options_colored(int argc, char **argv)
 /* check status of tomoyo (kernel mode and tools) */
 void check_tomoyo()
 {
+	char *buff;
 	char comm[max_char] = "";
-	char buff[max_char] = "";
 	/* check tomoyo tool files */
-	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); exit(1); }
-	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); exit(1); }
+	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); myexit(1); }
+	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); myexit(1); }
 	/* check status of tomoyo */
-	strcpy(comm, tsave); strcat(comm, " u - 2>/dev/null");
+	strncpy(comm, tsave, max_char); strncat(comm, " u - 2>/dev/null", max_char);
 	/* get the output of command "tomoyo-savepolicy u -" giving back memory stat */
-	pipe_read(comm, buff, sizeof buff);
+	buff = pipe_read(comm, max_char);
 	/* if no "total" part, then tomoyo is not activated */
-	if (!strstr(buff, "Total:")){ color_("error: tomoyo kernel mode is not activated\n", red); exit(1); }
+	if (!strstr(buff, "Total:")){ color_("error: tomoyo kernel mode is not activated\n", red); myexit(1); }
 	else{ color_("tomoyo kernel mode is active\n", clr); }
 	/* create tomoyo dir if it doesn't exist yet */
 	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
@@ -953,7 +1080,7 @@ void clear()
 	file_write(texc, "");
 	file_write(tdom, "<kernel>\nuse_profile 0\n\n");
 	/* load config files from disk to memory */
-	strcpy(comm, tload); strcat(comm, " fa");
+	strncpy(comm, tload, max_char); strncat(comm, " fa", max_char);
 	system(comm);
 }
 
@@ -961,7 +1088,11 @@ void clear()
 /* info about domains by a pattern */
 void domain_info(char *text)
 {
-	debug(text);
+	load();
+	/* is there any pattern? */
+	if (text[0]){
+		debug(text);
+	}
 }
 
 
@@ -987,15 +1118,15 @@ int main(int argc, char **argv){
 	/* vars */
 	char *user;
 
-	/* check if colored output is needed */
+	/* is output colored? set only color option here before anything else */
 	check_options_colored(argc, argv);
 
 	/* check if i am root */
 	user = getenv("USER");
-	if (strcmp(user, "root")) { color_("error: root privileges needed\n", red); exit(1); }
+	if (strncmp(user, "root", 5)) { color_("error: root privileges needed\n", red); myexit(1); }
 
 	/* check already running instance of the program */
-	if (!check_instance()) { color_("error: tomld is running already\n", red); exit(1); }
+	if (!check_instance()) { color_("error: tomld is running already\n", red); myexit(1); }
 
 	/* check command line options */
 	check_options(argc, argv);
@@ -1008,20 +1139,20 @@ int main(int argc, char **argv){
 	/* print version info */
 	printf("tomld (tomoyo learning daemon) "); printf(ver); printf("\n");
 	
-	/* get kernel version in a format where 2.6.32 is 263200 */
+	/* store kernel version */
 	flag_kernel_version = kernel_version();
 
 	/* check tomoyo status */
 	check_tomoyo();
 
-	/* check profile.conf and manager.conf files */
-	check_prof();
+	/* create profile.conf and manager.conf files */
+	create_prof();
 
 	/* on --reset option, create backup of config files with tomoyo-savepolicy */
 	/* (tomoyo-savepolicy always creates backup files using timestamp) */
 	if (opt_reset){
 		color("* resetting domain configurations on demand\n", red);
-		if (!choice("are you sure?")) exit(0);
+		if (!choice("are you sure?")) myexit(0);
 		system(tsave);
 		color("policy file backups created\n", green);
 	}
@@ -1032,32 +1163,35 @@ int main(int argc, char **argv){
 	/* on --clear, empty configuration files */
 	if (!opt_reset && opt_clear){
 		color("* clearing domain configurations on demand\n", red);
-		if (!choice("are you sure?")) exit(0);
+		if (!choice("are you sure?")) myexit(0);
 		system(tsave);
 		color("policy file backups created\n", green);
 		clear();
 		color("* configuration cleared\n", red);
-		exit(0);
+		myexit(0);
 	}
 
+	/* on --info, print domain information */
 	if (opt_info){
 		domain_info(opt_info2);
-		exit(0);
+		myexit(0);
 	}
 
+	/* on --remove, remove domain */
 	if (opt_remove){
 		domain_remove(opt_remove2);
-		exit(0);
+		myexit(0);
 	}
 
+	/* turn all domains into learning mode */
 	if (opt_learn){
 		color("* turning all domains into learning mode on demand\n", red);
-		if (!choice("are you sure?")) exit(0);
+		if (!choice("are you sure?")) myexit(0);
 		system(tsave);
 		color("policy file backups created\n", green);
 		domain_learn_all();
 		color("all domains turned back to learning mode\n", red);
-		exit(0);
+		myexit(0);
 	}
 
 
