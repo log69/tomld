@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-19/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
+21/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
                          - use special recursive wildcard in dir handling that is available since tomoyo version 2.3
@@ -159,9 +159,10 @@ flow chart:
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <time.h>
-#include <termios.h>
 #include <sys/ioctl.h>
+#include <termios.h>
+#include <time.h>
+
 
 #define max_char	1024
 #define max_num		32
@@ -435,7 +436,7 @@ void help() {
 }
 
 
-/* my exit */
+/* my exit point and free mem */
 void myexit(int num)
 {
 	free(tdomf);
@@ -457,7 +458,7 @@ void debug(char *text)
 	printf(text);
 	/* print newline if missing from the end of string */
 	if (text[l-1] != '\n') printf("\n");
-	printf("-- debug len %ld, ", strlen(text));
+	printf("-- debug bytes %ld and ", strlen(text));
 	printf("lines %ld\n", c);
 }
 
@@ -465,14 +466,14 @@ void debug(char *text)
 /* print debug info about an integer */
 void debugi(int num)
 {
-	printf("-- debug integer %d\n", num);
+	printf("-- debug integer is %d\n", num);
 }
 
 
 /* print debug info about a long integer */
 void debugl(long num)
 {
-	printf("-- debug long integer %ld\n", num);
+	printf("-- debug long integer is %ld\n", num);
 }
 
 
@@ -519,13 +520,14 @@ void color_(char *text, char *col)
 /* allocate memory and return pointer */
 char *memory_get(long num)
 {
-	char* p = malloc((sizeof (char)) * (num + 1));
+/*	char* p = malloc((sizeof (char)) * (num + 1)); */
+	char* p = calloc(num + 1, sizeof (char));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
 	return p;
 }
 
 
-/* returns a new string containing the next line of a string and moves the pointer to the beginning of the next line */
+/* return a new string containing the next line of a string and move the pointer to the beginning of the next line */
 /* returned value must be freed by caller */
 char *string_get_next_line(char **text)
 {
@@ -608,7 +610,7 @@ int choice(char *text)
 }
 
 
-/* open pipe and read content */
+/* open pipe and read content with given length */
 char *pipe_read(char *comm, long length)
 {
 	char *buff;
@@ -624,7 +626,7 @@ char *pipe_read(char *comm, long length)
 	
 	/* alloc mem for it */
 	buff = memory_get(length);
-	
+	/* read pipe */
 	fread(buff, length, 1, p);
 	pclose(p);
 	
@@ -632,7 +634,7 @@ char *pipe_read(char *comm, long length)
 }
 
 
-/* open file and read content */
+/* open file and read content with given length, or if length is null, then give back file length to caller */
 char *file_read(char *name, long *length)
 {
 	char *buff;
@@ -662,7 +664,7 @@ char *file_read(char *name, long *length)
 
 	/* alloc mem */
 	buff = memory_get(len);
-	/* read in file */
+	/* read file */
 	fread(buff, len, 1, f);
 	fclose(f);
 	/* write zero to the end of file */
@@ -815,7 +817,6 @@ void load()
 {
 	char comm[max_char] = "";
 
-	tdomf = memory_get(max_file);
 	/* string for command */
 	strncpy(comm, tsave, max_char); strncat(comm, " d -", max_char);
 	/* load domain config */
@@ -825,6 +826,14 @@ void load()
 	strncpy(comm, tsave, max_char); strncat(comm, " e -", max_char);
 	/* load exception config */
 	texcf = pipe_read(comm, max_file);
+	
+	/* remove disabled mode entries so runtime will be faster */
+
+	/* remove deleted entries */
+
+	/* remove quota_exceeded entries too (replace text with spaces) */
+
+	debug(tdomf);
 }
 
 
@@ -1183,7 +1192,7 @@ int main(int argc, char **argv){
 		myexit(0);
 	}
 
-	/* turn all domains into learning mode */
+	/* on --learn, turn all domains into learning mode */
 	if (opt_learn){
 		color("* turning all domains into learning mode on demand\n", red);
 		if (!choice("are you sure?")) myexit(0);
