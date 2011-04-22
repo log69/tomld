@@ -445,6 +445,13 @@ void myexit(int num)
 }
 
 
+/* print a new line */
+void newl()
+{
+	printf("\n");
+}
+
+
 /* print debug info about a string */
 void debug(char *text)
 {
@@ -457,7 +464,7 @@ void debug(char *text)
 	printf("--\n");
 	printf(text);
 	/* print newline if missing from the end of string */
-	if (text[l-1] != '\n') printf("\n");
+	if (text[l-1] != '\n') newl();
 	printf("-- debug bytes %ld and ", strlen(text));
 	printf("lines %ld\n", c);
 }
@@ -479,7 +486,7 @@ void debugl(long num)
 
 /* convert integer to ascii */
 /* custom implementation because "itoa" function is missing from standard libs */
-void itoa(int num, char *buf)
+void itoa(char *buf, int num)
 {
 	sprintf(buf, "%d", num);
 }
@@ -737,8 +744,7 @@ char *pipe_read(char *comm, long length)
 	FILE *p = popen(comm, "r");
 	if (!p){
 		color_("error: cannot read pipe from command: ", red);
-		color_(comm, red);
-		color_("\n", red);
+		color_(comm, red); newl();
 		myexit(1);
 	}
 	
@@ -763,8 +769,7 @@ char *file_read(char *name, long *length)
 	FILE *f = fopen(name, "r");
 	if (!f){
 		color_("error: cannot read file ", red);
-		color_(name, red);
-		color_("\n", red);
+		color_(name, red); newl();
 		myexit(1);
 	}
 	/* check file length */
@@ -800,8 +805,7 @@ void file_write(char *name, char *buff)
 	FILE *f = fopen(name, "w");
 	if (!f){
 		color_("error: cannot write file ", red);
-		color_(name, red);
-		color_("\n", red);
+		color_(name, red); newl();
 		myexit(1);
 	}
 	fprintf(f, buff);
@@ -980,7 +984,7 @@ void load()
 int check_instance(){
 	char mypid[max_num] = "";
 	/* get my pid number and convert it */
-	itoa(getpid(), mypid);
+	itoa(mypid, getpid());
 	/* check if my pid file exists */
 	if (file_exist(pidf)){
 		char *pid2;
@@ -1143,7 +1147,7 @@ void check_options(int argc, char **argv){
 					if (strncmp(myarg, "/", max_char) == 0){ color_("error: root directory is not allowed", red); myexit(1); }
 					/* check if dir name exist */
 					if (!dir_exist(myarg)){
-						color_("error: no such directory: ", red); color_(myarg, red); color_("\n", red); myexit(1); }
+						color_("error: no such directory: ", red); color_(myarg, red); newl(); myexit(1); }
 					/* expand recursive dir names with "/" char if missing */
 					strncpy(path, myarg, max_char);
 					l = strlen(myarg);
@@ -1157,7 +1161,7 @@ void check_options(int argc, char **argv){
 					strncpy(path, myarg, max_char);
 					/* search for name in path env and check if file exist */
 					if(!which(path)){
-						color_("error: no such file: ", red); color_(path, red); color_("\n", red); myexit(1); }
+						color_("error: no such file: ", red); color_(path, red); newl(); myexit(1); }
 					/* if so, store it in extra executables */
 					strncpy(progs[progs_counter++], myarg, max_char);
 				}
@@ -1234,12 +1238,80 @@ void clear()
 
 
 /* info about domains by a pattern */
-void domain_info(char *text)
+void domain_info(char *pattern)
 {
+	/* load config files from kernel memory */
 	load();
+
 	/* is there any pattern? */
-	if (text[0]){
-		debug(text);
+	if (pattern[0]){
+		char *tdomf2, *res, *res2, *res_orig;
+		int i;
+		char counts[max_num] = "";
+		int count = 0;
+		
+		tdomf2 = tdomf;
+		while(1){
+			/* get next domain */
+			res = domain_get_next(&tdomf2);
+			res_orig = res;
+			/* get first line */
+			res2 = string_get_next_line(&res);
+			
+			/* search for a keyword */
+			i = string_search_keyword(res2, pattern);
+			
+			/* print domain if match */
+			if (i > -1){
+				/* increase counter for summary */
+				count++;
+
+				/* print header part in blue */
+				newl(); color(res2, blue); newl();
+				free(res2);
+
+				/* print the rest of the domain part */
+				while(1){
+					res2 = string_get_next_line(&res);
+					/* print non empty lines */
+					if (res2[0]){
+						char h[max_char] = "";
+						strncpy(h, home, strlen(home));
+						strncat(h, "/", 1);
+					
+						/* print rules with reading libs in yellow */
+						if ((string_search_keyword(res2, "allow_read /lib/") > -1) ||
+						    (string_search_keyword(res2, "allow_read /usr/lib/") > -1)){
+							color(res2, yellow); newl();
+						}
+						/* print rules with touching /home in light blue */
+						else if (string_search_keyword(res2, h) > -1){
+							color(res2, cyan); newl();
+						}
+						/* print the rest in red */
+						else{
+							color(res2, red); newl();
+						}
+					}
+					free(res2);
+					/* exit if reaching end of domain block */
+					if (!res[0]) break;
+				}
+			}
+			else free(res2);
+
+			free(res_orig);
+
+			/* exit after last domain */
+			if (!tdomf2[0]) break;
+		}
+		
+		/* print summary */
+		newl();
+		itoa(counts, count);
+		color("(found ", clr); color(counts, clr);
+		if (count == 1) color(" domain)\n", clr);
+		else            color(" domains)\n", clr);
 	}
 }
 
@@ -1285,7 +1357,7 @@ int main(int argc, char **argv){
 	/* ---------------- */
 
 	/* print version info */
-	printf("tomld (tomoyo learning daemon) "); printf(ver); printf("\n");
+	printf("tomld (tomoyo learning daemon) "); printf(ver); newl();
 	
 	/* store kernel version */
 	flag_kernel_version = kernel_version();
