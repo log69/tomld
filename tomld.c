@@ -485,6 +485,15 @@ void itoa(int num, char *buf)
 }
 
 
+/* convert char to integer */
+int ctoi(char c)
+{
+	char s[2];
+	s[0] = c; s[1] = 0;
+	return (atoi(s));
+}
+
+
 /* print colored output to stdout */
 void color(char *text, char *col)
 {
@@ -520,9 +529,10 @@ void color_(char *text, char *col)
 /* allocate memory and return pointer */
 char *memory_get(long num)
 {
-/*	char* p = malloc((sizeof (char)) * (num + 1)); */
-	char* p = calloc(num + 1, sizeof (char));
+	char* p = malloc((sizeof (char)) * (num + 1));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	/* clear first byte */
+	p[0] = 0;
 	return p;
 }
 
@@ -533,18 +543,20 @@ char *string_get_next_line(char **text)
 {
 	char *res, c;
 	int i = 0;
-	do {
+
+	do{
 		c = (*text)[i++];
 	/* exit on end or on a new line */
 	} while(c && c != '\n');
+
 	/* allocate mem for the new string */
-	--i;
 	res = memory_get(i);
 	/* copy it */
-	strncpy(res, (*text), i);
-	res[i] = 0;
+	strncpy(res, (*text), i-1);
+	res[i-1] = 0;
 	/* move pointer to the next line */
-	(*text) += i + 1;
+	(*text) += i;
+
 	return res;
 }
 
@@ -560,6 +572,112 @@ int string_next_line_len(char *text)
 		i++;
 	}
 }
+
+
+/* search for a keyword in a string and return the position where it starts */
+/* return -1 if no keyword found */
+int string_search_keyword(char *text, char *key)
+{
+	char c1, c2;
+	int i, i2, start;
+
+	/* search for the keyword */
+	i = 0;
+	i2 = 0;
+	start = 0;
+	while(1){
+		c1 = text[i];
+		c2 = key[i2];
+		/* stop on reaching end of keyword and success */
+		if (!c2) return start;
+		/* stop on end of text and fail */
+		if (!c1) return -1;
+		/* stop if no match or if end of text */
+		if (c1 != c2){
+			i2 = 0;
+			start = i + 1;
+		}
+		else i2++;
+		i++;
+	}
+	
+	return 0;
+}
+
+
+/* return a new string containing the next domain entry and move the pointer to the beginning of the next domain */
+/* returned value must be freed by caller */
+char *domain_get_next(char **text)
+{
+	char *key = "<kernel>";
+	long keyl = strlen(key);
+	long l;
+	char *text2, *res;
+	int i, start, end;
+
+	/* search for first keyword */
+	text2 = (*text);
+	start = string_search_keyword(text2, key);
+	
+	/* fail if no match */
+	if (start == -1) return 0;
+
+	/* move position to the end of keyword and search for second keyword */
+	text2 += start + keyl;
+	end = string_search_keyword(text2, key);
+	/* if reached the end of text, then use that as the remaining part of domain block */
+	if (end == -1){
+		end = 0;
+		while(text2[end++]);
+	}
+	
+	/* domain block length */
+	l = keyl + end;
+
+	/* allocate mem for the new string */
+	res = memory_get(l);
+	/* copy mem block */
+	i = l - 1;
+	while(i--){
+		res[i] = (*text)[start + i];
+	}
+	res[l-1] = 0;
+	
+	/* move pointer to the next line */
+	(*text) += start + l;
+
+	return res;
+}
+
+
+/* return profile number of domain */
+int domain_get_profile(char *text)
+{
+	int i, p;
+	char *key = "use_profile ";
+	char *res, *orig;
+	
+	while(text[0]){
+		orig = text;
+
+		/* get next line */
+		res = string_get_next_line(&text);
+		/* search for the keyword */
+		i = string_search_keyword(res, key);
+
+		/* if match */
+		if (i > -1){
+			i += strlen(key);
+			p = ctoi(orig[i]);
+			return p;
+		}
+	}
+	
+	return 0;
+}
+
+
+/* ------------------------------------------------------------------------------------- */
 
 
 /* set terminal input mode for keyboard read */
@@ -626,6 +744,7 @@ char *pipe_read(char *comm, long length)
 	
 	/* alloc mem for it */
 	buff = memory_get(length);
+	memset(buff, 0, length);
 	/* read pipe */
 	fread(buff, length, 1, p);
 	pclose(p);
@@ -664,10 +783,11 @@ char *file_read(char *name, long *length)
 
 	/* alloc mem */
 	buff = memory_get(len);
+	memset(buff, 0, len);
 	/* read file */
 	fread(buff, len, 1, f);
 	fclose(f);
-	/* write zero to the end of file */
+	/* write null to the end of file */
 	buff[len] = 0;
 
 	return buff;
@@ -707,13 +827,10 @@ int kernel_version()
 	while (c2){
 		n = buff[c++];
 		if (n != '.'){
-			char conv[2] = "";
 			/* exit if no numbers or end of string */
 			if (!(n >= '0' && n <= '9') || !n) return ver;
-			/* convert char to string */
-			conv[0] = n; conv[1] = 0;
 			/* convert string to integer and add it to result */
-			ver += c2 * atoi(conv);
+			ver += c2 * ctoi(n);
 			c2 /= 10;
 		}
 	}
@@ -776,10 +893,10 @@ int running(char *name){
 			/* resolv the link pointing from the exe name */
 			res = readlink(mydir_name, buff, max_char - 1);
 			if (res > 0){
-				/* put a zero end mark to the end of the string after string length */
+				/* put a null end mark to the end of the string after string length */
 				buff[res] = 0;
 				/* compare the link to the process name */
-				/* gives back zero on full match */
+				/* gives back null on full match */
 				if (strncmp(buff, name, max_char) == 0) {
 					closedir(mydir);
 					return 1;
@@ -816,6 +933,7 @@ int file_exist(char *name){
 void load()
 {
 	char comm[max_char] = "";
+	char *tdomf2, *tdomf_new, *res;
 
 	/* string for command */
 	strncpy(comm, tsave, max_char); strncat(comm, " d -", max_char);
@@ -827,13 +945,34 @@ void load()
 	/* load exception config */
 	texcf = pipe_read(comm, max_file);
 	
+	/* alloc memory for new policy */
+	tdomf_new = memory_get(max_file);
+
 	/* remove disabled mode entries so runtime will be faster */
+	tdomf2 = tdomf;
+	
+	while(1){
+		/* get next domain */
+		res = domain_get_next(&tdomf2);
+		
+		/* check domain profile */
+		if (domain_get_profile(res)){
+			/* if it's not null, then add it to the new policy */
+			strncat(tdomf_new, res, max_file);
+			strncat(tdomf_new, "\n", 1);
+		}
+		free(res);
+		
+		/* exit if reaching end */
+		if (!tdomf2[0]) break;
+	}
 
 	/* remove deleted entries */
 
 	/* remove quota_exceeded entries too (replace text with spaces) */
 
-	debug(tdomf);
+	free(tdomf);
+	tdomf = tdomf_new;
 }
 
 
