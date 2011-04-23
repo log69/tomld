@@ -190,8 +190,8 @@ int count = 10;
 char *tkern = "security=tomoyo";
 
 /* tomoyo vars and files */
-char *tdomf	= "";
-char *texcf = "";
+char *tdomf	= 0;
+char *texcf = 0;
 
 /* default profile.conf */
 char *tprof22 = ""
@@ -439,8 +439,8 @@ void help() {
 /* my exit point and free mem */
 void myexit(int num)
 {
-	free(tdomf);
-	free(texcf);
+	if (tdomf) free(tdomf);
+	if (texcf) free(texcf);
 	exit(num);
 }
 
@@ -1429,6 +1429,7 @@ void check_options(int argc, char **argv){
 			myexit(0);
 		}
 
+	return;
 		/* fail if no arguments for --remove option */
 		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); myexit(1); }
 		/* tail if no arguments for --recursive option */
@@ -1634,7 +1635,7 @@ int main(int argc, char **argv){
 
 	/* vars */
 	char *user;
-
+	
 	/* is output colored? set only color option here before anything else */
 	check_options_colored(argc, argv);
 
