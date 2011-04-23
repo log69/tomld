@@ -452,6 +452,14 @@ void newl()
 }
 
 
+/* print a new line to stderr */
+void newl_()
+{
+	fprintf(stderr, "%s", "\n");
+	fflush(stderr);
+}
+
+
 /* print debug info about a string */
 void debug(char *text)
 {
@@ -536,7 +544,7 @@ void color_(char *text, char *col)
 /* allocate memory and return pointer */
 char *memory_get(long num)
 {
-	char* p = malloc((sizeof (char)) * (num + 1));
+	char* p = malloc((sizeof(char)) * (num + 1));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
 	/* clear first byte */
 	p[0] = 0;
@@ -550,6 +558,8 @@ char *string_get_next_line(char **text)
 {
 	char *res, c;
 	int i = 0;
+
+	if (!(*text)[0]) return 0;
 
 	do{
 		c = (*text)[i++];
@@ -577,6 +587,105 @@ int string_next_line_len(char *text)
 		/* exit on end or on a new line */
 		if (!c || c == '\n') return i;
 		i++;
+	}
+}
+
+
+/* move pointer to the beginning of next line in string skipping empty lines */
+/* return null on fail */
+int string_jump_next_line(char **text)
+{
+	char c;
+	int i = 0;
+
+	/* jump to next line */
+	while(1){
+		c = (*text)[i++];
+		/* exit on end */
+		if (!c) return 0;
+		/* exit on new line */
+		if (c == '\n') break;
+	}
+
+	/* skip new lines */
+	while(1){
+		c = (*text)[i];
+		/* exit on end */
+		if (!c) return 0;
+		/* exit on new line */
+		if (c != '\n') break;
+		i++;
+	}
+
+	/* success, move pointer */
+	(*text) += i;
+	return 1;
+}
+
+
+/* return a new string containing the next word in a string and move the pointer to the beginning of the next word */
+/* check only the current line, not the whole string */
+/* returned value must be freed by caller */
+char *string_get_next_word(char **text)
+{
+	char *res, c;
+	int i = 0;
+	int start, l;
+
+	/* skip white spaces or exit on end of line */
+	while (1){
+		c = (*text)[i];
+		if (!c || c == '\n') return 0;
+		if (c != ' ') break;
+		i++;
+	}
+
+	start = i;
+	while (1){
+		/* get next char */
+		c = (*text)[i];
+		/* exit on new line */
+		if (!c || c == '\n' || c == ' ') break;
+		i++;
+	}
+	
+	l = i - start;
+	/* fail on zero length result */
+	if (!l) return 0;
+
+	/* allocate mem for the new string */
+	res = memory_get(l);
+	/* copy word */
+	i = l;
+	while(i--){
+		res[i] = (*text)[start + i];
+	}
+	res[l] = 0;
+	/* skip more white spaces and move pointer to the next line */
+	i = start + l;
+	while (1){
+		c = (*text)[i];
+		if (c != ' ') break;
+		i++;
+	}
+	(*text) += i;
+
+	return res;
+}
+
+
+/* return n. word from a line of string */
+/* returned value must be freed by caller */
+char *string_get_next_wordn(char **text, int num)
+{
+	char *res;
+	
+	while(1){
+		res = string_get_next_word(text);
+		if (!res) return 0;
+		if (num <= 0) return res;
+		free(res);
+		num--;
 	}
 }
 
@@ -612,6 +721,129 @@ int string_search_keyword(char *text, char *key)
 }
 
 
+/* qsort string comparison function */ 
+int string_cmp(const void *a, const void *b) 
+{ 
+	const char **ia = (const char **)a;
+	const char **ib = (const char **)b;
+	return strcmp(*ia, *ib);
+}
+
+
+/* sort lines of a string and make it uniq */
+/* returned value must be freed by caller */
+char *string_sort_uniq_lines(char *text)
+{
+	char c, *res, *text_orig, **ptr;
+	char *text_new, *text_final, *text_sort;
+	char *res2 = "";
+	int flag_first = 0;
+	int flag_newl = 0;
+	int flag_diff = 0;
+	int i, i2, l1, l2, count;
+	int maxl = strlen(text);
+	
+	/* create a copy of text for sorting */
+	text_sort = memory_get(maxl);
+	strncpy(text_sort, text, maxl);
+
+	/* count lines */
+	i = 0;
+	count = 0;
+	while(1){
+		c = text[i++];
+		/* exit on end */
+		if (!c) break;
+		if (c == '\n') count++;
+	}
+
+	/* create array of char pointers pointing to string lines */
+	ptr = malloc((sizeof(char**)) * (count + 1));
+	if (!ptr){ color_("error: out of memory\n", red); myexit(1); }
+	/* clear first byte */
+	ptr[0] = 0;
+	
+	/* change new line chars to nulls and create pointer list to string lines */
+	i = 0;
+	i2 = 0;
+	flag_newl = 0;
+	while(1){
+		c = text_sort[i];
+		/* exit on end */
+		if (!c) break;
+		/* add pointer at first line or after every new line */
+		if (!flag_newl){
+			ptr[i2++] = text_sort + i;
+			flag_newl = 1;
+		}
+		/* make a mark at new line and change new line to zero */
+		if (c == '\n'){
+			text_sort[i] = 0;
+			flag_newl = 0;
+		}
+		i++;
+	}
+	
+	/* sort it */
+	qsort(ptr, count, sizeof(char *), string_cmp);
+
+	/* create another string holder */
+	text_new = memory_get(maxl);
+
+	/* collect lines back from pointer list */
+	i = 0;
+	i2 = count;
+	while(i2--){
+		char *s = ptr[i++];
+		strncat(text_new, s, strlen(s));
+		strncat(text_new, "\n", 1);
+	}
+	free(text_sort);
+
+	/* create another string holder */
+	text_final = memory_get(maxl);
+
+	/* make it uniq */
+	text_orig = text_new;
+	while(1){
+		/* get next line */
+		res = string_get_next_line(&text_orig);
+		/* exit on end */
+		if (!res){
+			if (flag_first) free(res2);
+			break;
+		}
+
+		/* first run */		
+		if (!flag_first){
+			l1 = strlen(res);
+			strncat(text_final, res, l1);
+			strncat(text_final, "\n", 1);
+		}
+		else{
+			/* compare 2 lines */
+			l1 = strlen(res);
+			l2 = strlen(res2);
+			flag_diff = 0;
+			if (l1 != l2) flag_diff = 1;
+			else if (strncmp(res, res2, l1)) flag_diff = 1;
+			/* store if different */
+			if (flag_diff){
+				strncat(text_final, res, l1);
+				strncat(text_final, "\n", 1);
+			}
+			free(res2);
+		}
+		
+		res2 = res;
+		flag_first = 1;
+	}
+	free(text_new);
+
+	return text_final;
+}
+
+
 /* return a new string containing the next domain entry and move the pointer to the beginning of the next domain */
 /* returned value must be freed by caller */
 char *domain_get_next(char **text)
@@ -621,6 +853,8 @@ char *domain_get_next(char **text)
 	long l;
 	char *text2, *res;
 	int i, start, end;
+
+	if (!(*text)[0]) return 0;
 
 	/* search for first keyword */
 	text2 = (*text);
@@ -639,16 +873,16 @@ char *domain_get_next(char **text)
 	}
 	
 	/* domain block length */
-	l = keyl + end;
+	l = keyl + end - 1;
 
 	/* allocate mem for the new string */
 	res = memory_get(l);
 	/* copy mem block */
-	i = l - 1;
+	i = l;
 	while(i--){
 		res[i] = (*text)[start + i];
 	}
-	res[l-1] = 0;
+	res[l] = 0;
 	
 	/* move pointer to the next line */
 	(*text) += start + l;
@@ -664,13 +898,16 @@ int domain_get_profile(char *text)
 	char *key = "use_profile ";
 	char *res, *orig;
 	
-	while(text[0]){
+	while(1){
 		orig = text;
 
 		/* get next line */
 		res = string_get_next_line(&text);
+		if (!res) break;
+
 		/* search for the keyword */
 		i = string_search_keyword(res, key);
+		free(res);
 
 		/* if match */
 		if (i > -1){
@@ -956,10 +1193,24 @@ void load()
 	tdomf2 = tdomf;
 	
 	while(1){
+/*		int flag_root_domain = 0;
+		char *res2, *res_orig;*/
+		
 		/* get next domain */
 		res = domain_get_next(&tdomf2);
+		/* exit if reaching end */
+		if (!res) break;
 		
-		/* check domain profile */
+		/* root domain <kernel> with profile 0 should stay */
+/*		res_orig = res;
+		res2 = string_get_next_line(&res_orig);
+		if (res2){
+			flag_root_domain = strcmp(res2, "<kernel>");
+		}
+		if (domain_get_profile(res) || !flag_root_domain){*/
+
+
+		/* check domain profile and add only profile with non-zero */
 		if (domain_get_profile(res)){
 			/* if it's not null, then add it to the new policy */
 			strncat(tdomf_new, res, max_file);
@@ -967,8 +1218,6 @@ void load()
 		}
 		free(res);
 		
-		/* exit if reaching end */
-		if (!tdomf2[0]) break;
 	}
 
 	/* remove deleted entries */
@@ -1249,13 +1498,18 @@ void domain_info(char *pattern)
 		int i;
 		char counts[max_num] = "";
 		int count = 0;
+		int flag_first = 0;
 		
 		tdomf2 = tdomf;
 		while(1){
 			/* get next domain */
 			res = domain_get_next(&tdomf2);
+			/* exit on end */
+			if (!res) break;
+
 			res_orig = res;
 			/* get first line */
+			/* here res2 should be something, so i don't check data availability */
 			res2 = string_get_next_line(&res);
 			
 			/* search for a keyword */
@@ -1266,13 +1520,17 @@ void domain_info(char *pattern)
 				/* increase counter for summary */
 				count++;
 
+				/* print new line only once for header */
+				if (!flag_first){ newl_(); flag_first = 1; }
 				/* print header part in blue */
-				newl(); color(res2, blue); newl();
+				color(res2, blue); newl(); newl();
 				free(res2);
 
 				/* print the rest of the domain part */
 				while(1){
 					res2 = string_get_next_line(&res);
+					/* exit if reaching end of domain block */
+					if (!res2) break;
 					/* print non empty lines */
 					if (res2[0]){
 						char h[max_char] = "";
@@ -1294,24 +1552,62 @@ void domain_info(char *pattern)
 						}
 					}
 					free(res2);
-					/* exit if reaching end of domain block */
-					if (!res[0]) break;
 				}
 			}
 			else free(res2);
 
 			free(res_orig);
-
-			/* exit after last domain */
-			if (!tdomf2[0]) break;
 		}
 		
 		/* print summary */
-		newl();
-		itoa(counts, count);
-		color("(found ", clr); color(counts, clr);
-		if (count == 1) color(" domain)\n", clr);
-		else            color(" domains)\n", clr);
+		if (count){
+			newl();
+			itoa(counts, count);
+			color_("(found ", clr); color_(counts, clr);
+			if (count == 1) color_(" domain)\n", clr);
+			else            color_(" domains)\n", clr);
+		}
+		else color_("error: no domains found\n", red);
+	}
+
+	/* list domain names only */	
+	else{
+		char *tdomf2, *res, *res2, *res_orig;
+		char *texcf_new;
+		long maxl;
+		
+		/* get policy size to use it for allocating memory as a maximum value */
+		maxl = strlen(tdomf);
+		texcf_new = memory_get(maxl);
+		
+		tdomf2 = tdomf;
+		while(1){
+			/* get next domain */
+			res = domain_get_next(&tdomf2);
+			/* exit on end */
+			if (!res) break;
+
+			res_orig = res;
+			/* get first line */
+			/* here res2 should be something, so i don't check data availability */
+
+			res2 = string_get_next_wordn(&res, 1);
+			if (res2){
+				strncat(texcf_new, res2, strlen(res2));
+				strncat(texcf_new, "\n", 1);
+				free(res2);
+			}
+		}
+		
+		res = string_sort_uniq_lines(texcf_new);
+		if (res){
+			free(texcf_new);
+			texcf_new = res;
+		}
+		
+		newl_();
+		color(texcf_new, blue); newl();
+		free(texcf_new);
 	}
 }
 
@@ -1357,7 +1653,7 @@ int main(int argc, char **argv){
 	/* ---------------- */
 
 	/* print version info */
-	printf("tomld (tomoyo learning daemon) "); printf(ver); newl();
+	color_("tomld (tomoyo learning daemon) ", clr); color_(ver, clr); newl_();
 	
 	/* store kernel version */
 	flag_kernel_version = kernel_version();
