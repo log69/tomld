@@ -1429,7 +1429,6 @@ void check_options(int argc, char **argv){
 			myexit(0);
 		}
 
-	return;
 		/* fail if no arguments for --remove option */
 		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); myexit(1); }
 		/* tail if no arguments for --recursive option */
