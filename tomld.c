@@ -1517,7 +1517,7 @@ void domain_info(char *pattern)
 			
 			/* print domain if match */
 			if (i > -1){
-				char *text_sort, *text_new;
+				char *text_new;
 			
 				/* increase counter for summary */
 				count++;
@@ -1528,30 +1528,13 @@ void domain_info(char *pattern)
 				/* print header part in blue */
 				color(res2, blue); newl();
 				free(res2);
-
-				/* print use_profile here */
+				/* print use_profile here too */
 				res2 = string_get_next_line(&res);
 				color(res2, green); newl();
 				free(res2);
 				
-				/* allocate mem for sorting lines and copy rule lines */
-				text_sort = memory_get(strlen(res));
-				
-				while(1){
-					res2 = string_get_next_line(&res);
-					/* exit if reaching end of domain block */
-					if (!res2) break;
-					/* print non empty lines */
-					if (res2[0]){
-						strncat(text_sort, res2, strlen(res2));
-						strncat(text_sort, "\n", 1);
-					}
-					free(res2);
-				}
-
-				/* allocate mem for sort result */
-				text_new = string_sort_uniq_lines(text_sort);
-				free(text_sort);
+				/* allocate mem for sorting */
+				text_new = string_sort_uniq_lines(res);
 
 				/* print the rest of the domain part */
 				while(1){
