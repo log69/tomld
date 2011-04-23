@@ -1520,10 +1520,11 @@ void domain_info(char *pattern)
 				/* increase counter for summary */
 				count++;
 
-				/* print new line only once for header */
+				/* print new line to stderr only once for header */
 				if (!flag_first){ newl_(); flag_first = 1; }
+				else newl();
 				/* print header part in blue */
-				color(res2, blue); newl(); newl();
+				color(res2, blue); newl();
 				free(res2);
 
 				/* print the rest of the domain part */
