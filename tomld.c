@@ -158,10 +158,11 @@ flow chart:
 #include <unistd.h>
 #include <string.h>
 #include <dirent.h>
+#include <termios.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
-#include <termios.h>
 #include <sys/time.h>
+#include <sys/mount.h>
 
 
 #define max_char	1024
@@ -243,11 +244,16 @@ char *tmanf23 = ""
 	"/usr/sbin/tomoyo-queryd\n";
 
 char *tdir	= "/etc/tomoyo";
+char *tverk = "/sys/kernel/security/tomoyo/version";
 char *tdom	= "/etc/tomoyo/domain_policy.conf";
 char *texc	= "/etc/tomoyo/exception_policy.conf";
+char *tdomk = "/sys/kernel/security/tomoyo/domain_policy";
+char *texck = "/sys/kernel/security/tomoyo/exception_policy";
 char *tpro	= "/etc/tomoyo/profile.conf";
 char *tman	= "/etc/tomoyo/manager.conf";
-char *tinit	= "/usr/lib/tomoyo/tomoyo_init_policy";
+char *tprok	= "/sys/kernel/security/tomoyo/profile";
+char *tmank	= "/sys/kernel/security/tomoyo/manager";
+char *tinit	= "/sbin/tomoyo-init";
 char *tload	= "/usr/sbin/tomoyo-loadpolicy";
 char *tsave	= "/usr/sbin/tomoyo-savepolicy";
 
@@ -495,23 +501,6 @@ void debugl(long num)
 }
 
 
-/* convert integer to ascii */
-/* custom implementation because "itoa" function is missing from standard libs */
-void itoa(char *buf, int num)
-{
-	sprintf(buf, "%d", num);
-}
-
-
-/* convert char to integer */
-int ctoi(char c)
-{
-	char s[2];
-	s[0] = c; s[1] = 0;
-	return (atoi(s));
-}
-
-
 /* print colored output to stdout */
 void color(char *text, char *col)
 {
@@ -571,6 +560,44 @@ char *strncpy2(char *s1, char *s2)
 */
 	char *res = strncpy(s1, s2, strlen(s2)+1);
 	return res;
+}
+
+
+/* convert integer to ascii */
+/* custom implementation because "itoa" function is missing from standard libs */
+void string_itoa(char *buf, int num)
+{
+	sprintf(buf, "%d", num);
+}
+
+
+/* convert char to integer */
+int string_ctoi(char c)
+{
+	char s[2];
+	s[0] = c; s[1] = 0;
+	return (atoi(s));
+}
+
+
+/* convert long integer to string */
+char *string_ltos(unsigned long num)
+{
+	char *res;
+	int i, c, n;
+	
+	res = memory_get(32);
+	
+	i = 0;
+	c = 12;
+	res[c] = 0;
+	while(c--){
+		n = num % 10;
+		num /= 10;
+		res[c] = n + 48;
+	}
+
+	return res;	
 }
 
 
@@ -934,7 +961,7 @@ int domain_get_profile(char *text)
 		/* if match */
 		if (i > -1){
 			i += strlen(key);
-			p = ctoi(orig[i]);
+			p = string_ctoi(orig[i]);
 			return p;
 		}
 	}
@@ -956,11 +983,11 @@ void mytime()
 
 	/* first run? */
 	if (!flag_time){
-		gettimeofday(&start, NULL);
+		gettimeofday(&start, 0);
 		flag_time = 1;
 	}
 	else{
-		gettimeofday(&end, NULL);
+		gettimeofday(&end, 0);
 
 		seconds  = end.tv_sec  - start.tv_sec;
 		useconds = end.tv_usec - start.tv_usec;
@@ -1042,8 +1069,8 @@ char *pipe_read(char *comm, long length)
 }
 
 
-/* open file and read content with given length, or if length is null, then give back file length to caller */
-char *file_read(char *name, long *length)
+/* open file and read content with given length, or if length is null, then check length from file descriptor */
+char *file_read(char *name, long length)
 {
 	char *buff;
 	long len = 0;
@@ -1056,17 +1083,15 @@ char *file_read(char *name, long *length)
 		myexit(1);
 	}
 	/* check file length */
-	if (!(*length)){
+	if (!length){
 		/* get file length from file descriptor */
 		fseek(f, 0, SEEK_END);
 		len = ftell(f) + 1;
 		fseek(f, 0, SEEK_SET);
-		/* store file length for caller */
-		*length = len;
 	}
 	/* length is manually set */
 	else{
-		len = *length;
+		len = length;
 	}
 
 	/* alloc mem */
@@ -1104,10 +1129,8 @@ int kernel_version()
 	int c, c2;
 	int ver = 0;
 	char n;
-	/* define length for file manually because it's a kernel file from /proc and doesn't have real length */
-	long len = max_char;
 	/* read in kernel version from /proc in a format as 2.6.32-5-amd64 */
-	buff = file_read(v, &len);
+	buff = file_read(v, max_char);
 	c = 0;
 	/* create in version numbers */
 	c2 = 100000;
@@ -1117,13 +1140,46 @@ int kernel_version()
 			/* exit if no numbers or end of string */
 			if (!(n >= '0' && n <= '9') || !n) return ver;
 			/* convert string to integer and add it to result */
-			ver += c2 * ctoi(n);
+			ver += c2 * string_ctoi(n);
 			c2 /= 10;
 		}
 	}
 	
 	free(buff);
 
+	return ver;
+}
+
+
+/* get tomoyo version */
+int tomoyo_version()
+{
+	char *buff;
+	int c, c2;
+	int ver = 0;
+	char n;
+
+	/* read in version string */
+	buff = file_read(tverk, max_char);
+
+	c = 0;
+	/* create in version numbers */
+	c2 = 1000;
+	while (c2){
+		n = buff[c++];
+		if (n != '.'){
+			/* exit if no numbers or end of string */
+			if (!(n >= '0' && n <= '9') || !n) return ver;
+			/* convert string to integer and add it to result */
+			ver += c2 * string_ctoi(n);
+			c2 /= 10;
+		}
+	}
+
+	debugi(ver); myexit(1);
+
+	free(buff);
+	
 	return ver;
 }
 
@@ -1219,18 +1275,13 @@ int file_exist(char *name){
 /* load config files from kernel memory to user memory */
 void load()
 {
-	char comm[max_char] = "";
 	char *tdomf2, *tdomf_new, *orig, *res, *res2;
-
-	/* string for command */
-	strncpy2(comm, tsave); strncat2(comm, " d -");
+	
 	/* load domain config */
-	tdomf = pipe_read(comm, max_file);
+	tdomf = file_read(tdomk, max_file);
 
-	/* string for command */
-	strncpy2(comm, tsave); strncat2(comm, " e -");
 	/* load exception config */
-	texcf = pipe_read(comm, max_file);
+	texcf = file_read(texck, max_file);
 	
 	/* alloc memory for new policy */
 	tdomf_new = memory_get(max_file);
@@ -1240,8 +1291,6 @@ void load()
 	
 	while(1){
 		int flag_deleted = 0;
-/*		int flag_root_domain = 0;
-		char *res2, *res_orig;*/
 		
 		/* get next domain */
 		res = domain_get_next(&tdomf2);
@@ -1252,12 +1301,15 @@ void load()
 		orig = res;
 		res2 = string_get_next_line(&orig);
 		if (res2){
+			/* don't add domain marked as (deleted) */
 			if (string_search_keyword(res2, "(deleted)") > -1) flag_deleted = 1;
 			free(res2);
 		}
 		
 		/* root domain <kernel> with profile 0 should stay */
-/*		res_orig = res;
+/*		int flag_root_domain = 0;
+		char *res2, *res_orig;
+		res_orig = res;
 		res2 = string_get_next_line(&res_orig);
 		if (res2){
 			flag_root_domain = strcmp(res2, "<kernel>");
@@ -1291,17 +1343,48 @@ void load()
 }
 
 
+/* reload config files from variables to kernel memory */
+void reload()
+{
+	file_write(tdom, tdomk);
+	file_write(texc, texck);
+}
+
+
 /* save config files: variables --> disk --> kernel memory */
 void save()
 {
-	char comm[max_char] = "";
-
-	file_write(texc, texcf);
+	/* save configs to disk */
 	file_write(tdom, tdomf);
+	file_write(texc, texcf);
+}
 
-	/* string for command */
-	strncpy2(comm, tsave); strncat2(comm, " fa");
-	system(comm);
+
+/* create backup of config files from memory to disk */
+void backup()
+{
+	char tdom2[max_char] = "";
+	char texc2[max_char] = "";
+	char *num;
+	struct timeval t;
+
+	/* get elapsed seconds since 1970 */
+	gettimeofday(&t, 0);
+	/* convert long integer to string */
+	num = string_ltos(t.tv_sec);
+
+	/* create new uniqe names to config files */
+	strncpy2(tdom2, tdom);
+	strncat2(tdom2, ".backup.");
+	strncat2(tdom2, num);
+	strncpy2(texc2, texc);
+	strncat2(texc2, ".backup.");
+	strncat2(texc2, num);
+	free(num);
+
+	/* save configs to backup files too on disk */
+	file_write(tdom2, tdomf);
+	file_write(texc2, texcf);
 }
 
 
@@ -1309,13 +1392,12 @@ void save()
 int check_instance(){
 	char mypid[max_num] = "";
 	/* get my pid number and convert it */
-	itoa(mypid, getpid());
+	string_itoa(mypid, getpid());
 	/* check if my pid file exists */
 	if (file_exist(pidf)){
 		char *pid2;
-		long len = 0;
 		/* read pid number from pid file */
-		pid2 = file_read(pidf, &len);
+		pid2 = file_read(pidf, 0);
 		/* is it me? */
 		if (strcmp(mypid, pid2) == 0) return 0;
 		else{
@@ -1379,25 +1461,28 @@ int which(char *name){
 /* create profile.conf and manager.conf files */
 void create_prof()
 {
-	char comm[max_char] = "";
-	/* check kernel version, if it's under 2.6.33, then use profile for tomoyo version 2.2.x */
-	if (flag_kernel_version < 263300){
+	/* check tomoyo version */
+	if (tomoyo_version() <= 2299){
 		/* write profiles to disk */
 		file_write(tpro, tprof22);
 		file_write(tman, tmanf22);
+		/* load profiles to kernel memory */
+		file_write(tprok, tprof22);
+		file_write(tmank, tmanf22);
 	}
 	/* use profile for tomoyo version 2.3.x */
-	else{
+	else if (tomoyo_version() >= 2300){
 		/* write profiles to disk */
 		file_write(tpro, tprof23);
 		file_write(tman, tmanf23);
+		/* load profiles to kernel memory */
+		file_write(tprok, tprof23);
+		file_write(tmank, tmanf23);
 	}
-	/* load profile.conf from disk to memory */
-	strncpy2(comm, tload); strncat2(comm, " p");
-	system(comm);
-	/* load manager.conf from disk to memory */
-	strncpy2(comm, tload); strncat2(comm, " m");
-	system(comm);
+	else{
+		color_("error: tomoyo version is not compatible\n", red);
+		myexit(1);
+	}
 }
 
 
@@ -1533,18 +1618,47 @@ void check_options_colored(int argc, char **argv)
 /* check status of tomoyo (kernel mode and tools) */
 void check_tomoyo()
 {
-	char *buff;
-	char comm[max_char] = "";
+	char *cmd;
+	int tver;
+
+	/* check kernel command line */
+	cmd = file_read("/proc/cmdline", max_char);
+	if (string_search_keyword(cmd, " security=tomoyo") == -1){
+		free(cmd);
+		color_("error: tomoyo kernel mode is not activated\n", red);
+		myexit(1);
+	}
+	free(cmd);
+
+	/* check mount state of securityfs */
+	cmd = file_read("/proc/mounts", max_file);
+	if (string_search_keyword(cmd, "none /sys/kernel/security securityfs") == -1){
+		int flag_mount = 0;
+		/* mount tomoyo securityfs if not mounted */
+		/* shell command: mount -t securityfs none /sys/kernel/security */
+		flag_mount = mount("none", "/sys/kernel/security", "securityfs", MS_NOATIME, 0);
+		if (flag_mount == -1){
+			free(cmd);
+			color_("error: tomoyo securityfs cannot be mounted\n", red);
+			myexit(1);
+		}
+	}
+	free(cmd);
+
+	color_("tomoyo kernel mode is active\n", clr);
+	
+	/* check tomoyo version */
+	tver = tomoyo_version();
+	if (tver < 2200 || tver > 2399){
+		color_("error: tomoyo version is not compatible\n", red);
+		myexit(1);
+	}
+
 	/* check tomoyo tool files */
-	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); myexit(1); }
-	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); myexit(1); }
-	/* check status of tomoyo */
-	strncpy2(comm, tsave); strncat2(comm, " u - 2>/dev/null");
-	/* get the output of command "tomoyo-savepolicy u -" giving back memory stat */
-	buff = pipe_read(comm, max_char);
-	/* if no "total" part, then tomoyo is not activated */
-	if (!strstr(buff, "Total:")){ color_("error: tomoyo kernel mode is not activated\n", red); myexit(1); }
-	else{ color_("tomoyo kernel mode is active\n", clr); }
+	if (!file_exist(tinit)){ color_("error: ", red); color_(tinit, red); color_(" executable binary missing\n", red); myexit(1); }
+/*	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); myexit(1); }*/
+/*	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); myexit(1); }*/
+
 	/* create tomoyo dir if it doesn't exist yet */
 	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
 }
@@ -1553,13 +1667,21 @@ void check_tomoyo()
 /* clear config files */
 void clear()
 {
-	char comm[max_char] = "";
+	/* create backup of fromber config files */
+	backup();
+	/* free up memory of configs */
+	if (tdomf) free(tdomf);
+	if (texcf) free(texcf);
+	/* create new configs */
+	tdomf = memory_get(max_char);
+	texcf = memory_get(2);
+	strncpy2(tdomf, "<kernel>\nuse_profile 0\n\n");
+	texcf[0] = 0;
 	/* write config files */
-	file_write(texc, "");
-	file_write(tdom, "<kernel>\nuse_profile 0\n\n");
+	file_write(texc, texcf);
+	file_write(tdom, tdomf);
 	/* load config files from disk to memory */
-	strncpy2(comm, tload); strncat2(comm, " fa");
-	system(comm);
+	reload();
 }
 
 
@@ -1649,7 +1771,7 @@ void domain_info(char *pattern)
 		/* print summary */
 		if (count){
 			newl();
-			itoa(counts, count);
+			string_itoa(counts, count);
 			color_("(found ", clr); color_(counts, clr);
 			if (count == 1) color_(" domain)\n", clr);
 			else            color_(" domains)\n", clr);
@@ -1756,7 +1878,7 @@ int main(int argc, char **argv){
 	if (opt_reset){
 		color("* resetting domain configurations on demand\n", red);
 		if (!choice("are you sure?")) myexit(0);
-		system(tsave);
+		backup();
 		color("policy file backups created\n", green);
 	}
 
@@ -1767,7 +1889,7 @@ int main(int argc, char **argv){
 	if (!opt_reset && opt_clear){
 		color("* clearing domain configurations on demand\n", red);
 		if (!choice("are you sure?")) myexit(0);
-		system(tsave);
+		backup();
 		color("policy file backups created\n", green);
 		clear();
 		color("* configuration cleared\n", red);
@@ -1790,7 +1912,7 @@ int main(int argc, char **argv){
 	if (opt_learn){
 		color("* turning all domains into learning mode on demand\n", red);
 		if (!choice("are you sure?")) myexit(0);
-		system(tsave);
+		backup();
 		color("policy file backups created\n", green);
 		domain_learn_all();
 		color("all domains turned back to learning mode\n", red);
