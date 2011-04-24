@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-21/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
+24/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
                          - use special recursive wildcard in dir handling that is available since tomoyo version 2.3
@@ -161,7 +161,7 @@ flow chart:
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <termios.h>
-#include <time.h>
+#include <sys/time.h>
 
 
 #define max_char	1024
@@ -946,6 +946,30 @@ int domain_get_profile(char *text)
 /* ------------------------------------------------------------------------------------- */
 
 
+/* print time elapsed since program start */
+void mytime()
+{
+	static int flag_time = 0;
+	static struct timeval start, end;
+	static long seconds, useconds;
+	static float t;
+
+	/* first run? */
+	if (!flag_time){
+		gettimeofday(&start, NULL);
+		flag_time = 1;
+	}
+	else{
+		gettimeofday(&end, NULL);
+
+		seconds  = end.tv_sec  - start.tv_sec;
+		useconds = end.tv_usec - start.tv_usec;
+		t = (((seconds) * 1000 + useconds/1000.0) + 0.5) / 1000;
+		printf("-- time %.3fs\n", t);
+	}
+}
+
+
 /* set terminal input mode for keyboard read */
 void key_set_mode()
 {
@@ -1196,7 +1220,7 @@ int file_exist(char *name){
 void load()
 {
 	char comm[max_char] = "";
-	char *tdomf2, *tdomf_new, *res;
+	char *tdomf2, *tdomf_new, *orig, *res, *res2;
 
 	/* string for command */
 	strncpy2(comm, tsave); strncat2(comm, " d -");
@@ -1215,6 +1239,7 @@ void load()
 	tdomf2 = tdomf;
 	
 	while(1){
+		int flag_deleted = 0;
 /*		int flag_root_domain = 0;
 		char *res2, *res_orig;*/
 		
@@ -1222,6 +1247,14 @@ void load()
 		res = domain_get_next(&tdomf2);
 		/* exit if reaching end */
 		if (!res) break;
+
+		/* check if domain is marked as deleted */
+		orig = res;
+		res2 = string_get_next_line(&orig);
+		if (res2){
+			if (string_search_keyword(res2, "(deleted)") > -1) flag_deleted = 1;
+			free(res2);
+		}
 		
 		/* root domain <kernel> with profile 0 should stay */
 /*		res_orig = res;
@@ -1232,22 +1265,43 @@ void load()
 		if (domain_get_profile(res) || !flag_root_domain){*/
 
 
-		/* check domain profile and add only profile with non-zero */
-		if (domain_get_profile(res)){
+		/* check domain profile and add only profile with non-zero but only if not marked as deleted */
+		if (domain_get_profile(res) && !flag_deleted){
 			/* if it's not null, then add it to the new policy */
-			strncat2(tdomf_new, res);
-			strncat2(tdomf_new, "\n");
+			orig = res;
+			while(1){
+				/* read domain line by line */
+				res2 = string_get_next_line(&orig);
+				if (!res2) break;
+				
+				/* remove (deleted) and quota_exceeded entries */
+				if((string_search_keyword(res2, "(deleted)") == -1) && (string_search_keyword(res2, "(deleted)") == -1)){
+					/* add entry if ok */
+					strncat2(tdomf_new, res2);
+					strncat2(tdomf_new, "\n");
+				}
+			}
 		}
 		free(res);
 		
 	}
 
-	/* remove deleted entries */
-
-	/* remove quota_exceeded entries too (replace text with spaces) */
-
 	free(tdomf);
 	tdomf = tdomf_new;
+}
+
+
+/* save config files: variables --> disk --> kernel memory */
+void save()
+{
+	char comm[max_char] = "";
+
+	file_write(texc, texcf);
+	file_write(tdom, tdomf);
+
+	/* string for command */
+	strncpy2(comm, tsave); strncat2(comm, " fa");
+	system(comm);
 }
 
 
@@ -1665,7 +1719,8 @@ void domain_learn_all()
 
 int main(int argc, char **argv){
 
-	/* vars */
+	/* store start of my process time for later to check speed */
+	mytime();
 
 	/* is output colored? set only color option here before anything else */
 	check_options_colored(argc, argv);
