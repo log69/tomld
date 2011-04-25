@@ -1468,7 +1468,7 @@ int check_instance(){
 }
 
 
-/* search file name in current dir first, then in bin locations and give back full name on success */
+/* search file name in current dir first, then in bin locations and give back full path on success */
 /* returned value must be freed by caller */
 char *which(char *name){
 	char *res;
@@ -1488,7 +1488,8 @@ char *which(char *name){
 	}
 
 	/* fle exists in the current dir? */
-	strncpy2(full, "./");
+	getcwd(full, max_char);
+	strncat2(full, "/");
 	strncat2(full, name);
 	if (file_exist(full)){
 		res = memory_get(strlen(full));
@@ -1627,16 +1628,15 @@ void check_options(int argc, char **argv){
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (!flag_type || flag_progs){
-					char *res;
 					/* search for name in paths and check if file exists */
-					res = which(myarg);
+					char *res = which(myarg);
 					if(!res){
 						color_("error: no such file: ", red); color_(myarg, red); newl(); myexit(1); }
 					/* alloc mem for tprogs */
 					if (!tprogs) tprogs = memory_get(max_file);
-					/* if so, store it in extra executables */
-					strncpy2(tprogs, res);
-					strncpy2(tprogs, "\n");
+					/* if so, store it as extra executables */
+					strncat2(tprogs, res);
+					strncat2(tprogs, "\n");
 					free(res);
 				}
 			}
@@ -1780,8 +1780,11 @@ void check_exceptions()
 		if (!res) break;
 		/* if line doesn't start with "#" char meaning a remark */
 		if (res[0] != '#'){
-			strncat2(tprogs_exc, res);
-			strncat2(tprogs_exc, "\n");
+			/* add it only if it exists */
+			if (file_exist(res)){
+				strncat2(tprogs_exc, res);
+				strncat2(tprogs_exc, "\n");
+			}
 		}
 	}
 
@@ -1799,6 +1802,13 @@ void check_exceptions()
 	if (res){
 		free(tprogs_exc);
 		tprogs_exc = res;
+	}
+
+	/* sort program list */
+	res = string_sort_uniq_lines(tprogs);
+	if (res){
+		free(tprogs);
+		tprogs = res;
 	}
 
 	/* initialize recursive dirs' depth values */
@@ -1966,6 +1976,48 @@ void domain_learn_all()
 }
 
 
+/* ************************************ */
+/* ******* PROCESS SEARCH LOOP ******** */
+/* ************************************ */
+/* print process names using tcp or udp packets */
+void check_processes()
+{
+	/* vars */
+	int mypid;
+
+	/* get my pid */
+	mypid = getpid();
+
+	/* print exceptions */
+	if (tprogs_exc){
+		char *temp = tprogs_exc;
+		color("* exception domains\n", green);
+		while(1){
+			char *res = string_get_next_line(&temp);
+			if (!res) break;
+			color(res, purple);
+			color(" ", purple);
+			free(res);
+		}
+		newl();
+	}
+	
+	/* print on demand programs */
+	if (tprogs){
+		char *temp = tprogs;
+		color("* additional programs on demand\n", green);
+		while(1){
+			char *res = string_get_next_line(&temp);
+			if (!res) break;
+			color(res, blue); newl();
+			free(res);
+		}
+	}
+	
+	
+}
+
+
 /* ----------------------------------- */
 /* ------------ MAIN PART ------------ */
 /* ----------------------------------- */
@@ -2049,8 +2101,12 @@ int main(int argc, char **argv){
 		color("all domains turned back to learning mode\n", red);
 		myexit(0);
 	}
-	
+
+	/* create excaption list from program names and available shells */
 	check_exceptions();
+
+	/* check running processes */
+	check_processes();
 
 
 	/* free all my pointers */
