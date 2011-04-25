@@ -22,8 +22,9 @@
 
 changelog:
 -----------
-24/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
+25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
+                         - improve checking of tomoyo status and availability
 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
                          - use special recursive wildcard in dir handling that is available since tomoyo version 2.3
 14/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
@@ -181,10 +182,10 @@ char *ver = "0.31";
 /* home dir */
 char *home = "/home";
 
-/* policy check interval in seconds */
+/* interval of policy check in seconds */
 int count = 10;
 
-/* max entries variable in profile config */
+/* number of max entries in profile config */
 #define maxmem "10000"
 
 /* tomoyo kernel parameter */
@@ -263,8 +264,8 @@ char *tlog	= "/var/log/syslog";
 /* backup conf for checking change of rules */
 char *tdomf_bak = "";
 
-/* this stores the kernel time of last line of the system log */
-/* to identify it and make sure not to read it twice */
+/* this stores the kernel time of the last line of system log */
+/* to identify the end of tomoyo logs and make sure not to read it twice */
 char *tmark	= "/var/local/tomld.logmark";
 /* tomld pid file */
 char *pidf	= "/var/run/tomld.pid";
@@ -285,8 +286,7 @@ int opt_once		= 0;
 
 char opt_info2     [max_char]  = "";
 char opt_remove2   [max_char]  = "";
-char opt_recursive2[max_array][max_char];
-int  opt_recursive2_counter = 0;
+char *opt_recursive2 = 0;
 
 int flag_reset		= 0;
 int flag_check		= 0;
@@ -309,19 +309,18 @@ char *bold		= "\033[1m";
 char *clr		= "\033[0m";
 
 /* arrays */
-char progs[max_array][max_char];
-int  progs_counter = 0;
+char *tprogs = 0;
 
-char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6"};
+char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6", 0};
 int  netf_counter = 4;
 
-char *shell[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbash",
-"/bin/sh", "/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish",
-"/usr/bin/ksh", "/usr/bin/rc", "/usr/bin/screen"};
-int  shell_counter = 13;
+char tshell[] = "/etc/shells";
+char *tshellf = 0;
+char *tshellf2[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbash", "/bin/sh",
+"/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish", "/usr/bin/ksh", "/usr/bin/rc",
+"/usr/bin/screen", 0};
 
-char *search_path[] = {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin"};
-int search_path_counter = 6;
+char *path_bin[] = {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin", 0};
 
 /* other vars */
 struct termio terminal_backup;
@@ -445,11 +444,22 @@ void help() {
 }
 
 
-/* my exit point and free mem */
+/* free my pointers */
+void myfree()
+{
+	if (tdomf)   free(tdomf);
+	if (texcf)   free(texcf);
+	if (tshellf) free(tshellf);
+	if (tprogs)  free(tprogs);
+	if (opt_recursive2) free(opt_recursive2);
+}
+
+
+/* my exit point */
 void myexit(int num)
 {
-	if (tdomf) free(tdomf);
-	if (texcf) free(texcf);
+	/* free my pointers */
+	myfree();
 	exit(num);
 }
 
@@ -534,6 +544,7 @@ void color_(char *text, char *col)
 
 
 /* allocate memory and return pointer */
+/* returned value must be freed by caller */
 char *memory_get(long num)
 {
 	char* p = malloc((sizeof(char)) * (num + 1));
@@ -563,14 +574,6 @@ char *strncpy2(char *s1, char *s2)
 }
 
 
-/* convert integer to ascii */
-/* custom implementation because "itoa" function is missing from standard libs */
-void string_itoa(char *buf, int num)
-{
-	sprintf(buf, "%d", num);
-}
-
-
 /* convert char to integer */
 int string_ctoi(char c)
 {
@@ -580,24 +583,23 @@ int string_ctoi(char c)
 }
 
 
+/* convert integer to string */
+/* returned value must be freed by caller */
+char *string_itos(int num)
+{
+	char *res = memory_get(max_num);
+	sprintf(res, "%d", num);
+	return res;
+}
+
+
 /* convert long integer to string */
+/* returned value must be freed by caller */
 char *string_ltos(unsigned long num)
 {
-	char *res;
-	int i, c, n;
-	
-	res = memory_get(32);
-	
-	i = 0;
-	c = 12;
-	res[c] = 0;
-	while(c--){
-		n = num % 10;
-		num /= 10;
-		res[c] = n + 48;
-	}
-
-	return res;	
+	char *res = memory_get(max_num);
+	sprintf(res, "%ld", num);
+	return res;
 }
 
 
@@ -640,7 +642,7 @@ int string_next_line_len(char *text)
 }
 
 
-/* move pointer to the beginning of next line in string skipping empty lines */
+/* move pointer to the beginning of next line in a string skipping empty lines */
 /* return null on fail */
 int string_jump_next_line(char **text)
 {
@@ -740,7 +742,7 @@ char *string_get_next_wordn(char **text, int num)
 
 
 /* search for a keyword in a string and return the position where it starts */
-/* return -1 if no keyword found */
+/* return -1 on fail */
 int string_search_keyword(char *text, char *key)
 {
 	char c1, c2;
@@ -770,7 +772,7 @@ int string_search_keyword(char *text, char *key)
 }
 
 
-/* qsort string comparison function */ 
+/* compare strings for qsort */ 
 int string_cmp(const void *a, const void *b) 
 { 
 	const char **ia = (const char **)a;
@@ -940,7 +942,7 @@ char *domain_get_next(char **text)
 }
 
 
-/* return profile number of domain */
+/* return profile number of domain (0-3) */
 int domain_get_profile(char *text)
 {
 	int i, p;
@@ -988,10 +990,11 @@ void mytime()
 	}
 	else{
 		gettimeofday(&end, 0);
-
 		seconds  = end.tv_sec  - start.tv_sec;
 		useconds = end.tv_usec - start.tv_usec;
+
 		t = (((seconds) * 1000 + useconds/1000.0) + 0.5) / 1000;
+
 		printf("-- time %.3fs\n", t);
 	}
 }
@@ -1046,6 +1049,7 @@ int choice(char *text)
 
 
 /* open pipe and read content with given length */
+/* returned value must be freed by caller */
 char *pipe_read(char *comm, long length)
 {
 	char *buff;
@@ -1070,6 +1074,7 @@ char *pipe_read(char *comm, long length)
 
 
 /* open file and read content with given length, or if length is null, then check length from file descriptor */
+/* returned value must be freed by caller */
 char *file_read(char *name, long length)
 {
 	char *buff;
@@ -1132,12 +1137,12 @@ int kernel_version()
 	/* read in kernel version from /proc in a format as 2.6.32-5-amd64 */
 	buff = file_read(v, max_char);
 	c = 0;
-	/* create in version numbers */
+	/* create version numbers */
 	c2 = 100000;
 	while (c2){
 		n = buff[c++];
 		if (n != '.'){
-			/* exit if no numbers or end of string */
+			/* exit if no numbers or at end of string */
 			if (!(n >= '0' && n <= '9') || !n) return ver;
 			/* convert string to integer and add it to result */
 			ver += c2 * string_ctoi(n);
@@ -1163,12 +1168,12 @@ int tomoyo_version()
 	buff = file_read(tverk, max_char);
 
 	c = 0;
-	/* create in version numbers */
+	/* create version numbers */
 	c2 = 1000;
 	while (c2){
 		n = buff[c++];
 		if (n != '.'){
-			/* exit if no numbers or end of string */
+			/* exit if no numbers or at end of string */
 			if (!(n >= '0' && n <= '9') || !n) return ver;
 			/* convert string to integer and add it to result */
 			ver += c2 * string_ctoi(n);
@@ -1211,7 +1216,8 @@ void sand_clock(int dot)
 }
 
 
-/* check if process with path is running */
+/* check if process is running currently */
+/* full path name required */
 int running(char *name){
 	DIR *mydir;
 	struct dirent *mydir_entry;
@@ -1239,7 +1245,6 @@ int running(char *name){
 				/* put a null end mark to the end of the string after string length */
 				buff[res] = 0;
 				/* compare the link to the process name */
-				/* gives back null on full match */
 				if (strcmp(buff, name) == 0) {
 					closedir(mydir);
 					return 1;
@@ -1294,10 +1299,10 @@ void load()
 		
 		/* get next domain */
 		res = domain_get_next(&tdomf2);
-		/* exit if reaching end */
+		/* exit on end */
 		if (!res) break;
 
-		/* check if domain is marked as deleted */
+		/* check if domain is marked as (deleted) */
 		orig = res;
 		res2 = string_get_next_line(&orig);
 		if (res2){
@@ -1335,7 +1340,6 @@ void load()
 			}
 		}
 		free(res);
-		
 	}
 
 	free(tdomf);
@@ -1351,7 +1355,7 @@ void reload()
 }
 
 
-/* save config files: variables --> disk --> kernel memory */
+/* save config files from variables to disk */
 void save()
 {
 	/* save configs to disk */
@@ -1360,7 +1364,7 @@ void save()
 }
 
 
-/* create backup of config files from memory to disk */
+/* create backup and save config files from variables to disk with new names */
 void backup()
 {
 	char tdom2[max_char] = "";
@@ -1382,7 +1386,7 @@ void backup()
 	strncat2(texc2, num);
 	free(num);
 
-	/* save configs to backup files too on disk */
+	/* save configs to backup files on disk */
 	file_write(tdom2, tdomf);
 	file_write(texc2, texcf);
 }
@@ -1390,22 +1394,22 @@ void backup()
 
 /* check if only one instance of the program is running */
 int check_instance(){
-	char mypid[max_num] = "";
-	/* get my pid number and convert it */
-	string_itoa(mypid, getpid());
+	char *mypid;
+	/* get my pid number and convert it to string */
+	mypid = string_itos(getpid());
 	/* check if my pid file exists */
 	if (file_exist(pidf)){
 		char *pid2;
 		/* read pid number from pid file */
 		pid2 = file_read(pidf, 0);
 		/* is it me? */
-		if (strcmp(mypid, pid2) == 0) return 0;
+		if (strcmp(mypid, pid2) == 0){ free(mypid); free(pid2); return 0; }
 		else{
 			/* is the process with the foreign pid still running? */
 			char path[max_char] = "/proc/";
 			strncat2(path, pid2);
 			/* if running, then return false */
-			if (dir_exist(path)) return 1;
+			if (dir_exist(path)){ free(mypid); free(pid2); return 1; }
 			/* if not running, then overwrite pid number in pid file */
 			else{
 				file_write(pidf, mypid);
@@ -1418,43 +1422,54 @@ int check_instance(){
 		file_write(pidf, mypid);
 	}
 
+	free(mypid);
+
 	return 1;
 }
 
 
-/* get absolute pathname of a file from a name */
-/* first the current directory is checked, then the path list on the path env variable */
-/* return true if success and write back new path to old name */
-int which(char *name){
+/* search file name in current dir first, then in bin locations and give back full name on success */
+/* returned value must be freed by caller */
+char *which(char *name){
 	char *res;
 	char full[max_char] = "";
 	int i;
 
-	/* does the name contain any "/" char? */
-	/* if so, then it's whether a relative or a full path, so i don't check it any further */
+	/* name contains any "/" char? */
+	/* if so, then it's whether a relative or a full path, so don't check it any further */
 	if (strpbrk(name, "/")){
-		/* is the file exist? if not, then fail */
-		if (file_exist(name)) return 1;
+		/* file exists? if not, then fail */
+		if (file_exist(name)){
+			res = memory_get(strlen(name));
+			strncpy2(res, name);
+			return res;
+		}
 		return 0;
 	}
 
-	/* does the file exist in the current dir? */
+	/* fle exists in the current dir? */
 	strncpy2(full, "./");
 	strncat2(full, name);
-	if (file_exist(full)){ strncpy2(name, full); return 1; }
+	if (file_exist(full)){
+		res = memory_get(strlen(full));
+		strncpy2(res, full);
+		return res;
+	}
 
-	/* does the file exist in the paths from path env? */
+	/* file exists in the search paths? */
 	i = 0;
-	while(i < search_path_counter){
-		res = search_path[i++];
+	while(1){
+		res = path_bin[i++];
+		if (!res) return 0;
 		strncpy2(full, res);
 		strncat2(full, "/");
 		strncat2(full, name);
-		if (file_exist(full)){ strncpy2(name, full); return 1; }
+		debug(full);
+		if (file_exist(full)){
+			res = memory_get(strlen(full));
+			strncpy2(res, full); return res; }
 		full[0] = 0;
 	}
-
-	return 0;
 }
 
 
@@ -1563,18 +1578,25 @@ void check_options(int argc, char **argv){
 					strncpy2(path, myarg);
 					l = strlen(myarg);
 					if (path[l-1] != '/'){ path[l] = '/'; path[l+1] = 0; }
+					/* alloc mem for opt_recursive2 */
+					if (!opt_recursive2) opt_recursive2 = memory_get(max_file);
 					/* if so, store it in recursive dir array */
-					strncpy2(opt_recursive2[opt_recursive2_counter++], path);
+					strncpy2(opt_recursive2, path);
+					strncpy2(opt_recursive2, "\n");
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (!flag_type || flag_progs){
-					char path[max_char] = "";
-					strncpy2(path, myarg);
-					/* search for name in path env and check if file exist */
-					if(!which(path)){
-						color_("error: no such file: ", red); color_(path, red); newl(); myexit(1); }
+					char *res;
+					/* search for name in paths and check if file exists */
+					res = which(myarg);
+					if(!res){
+						color_("error: no such file: ", red); color_(myarg, red); newl(); myexit(1); }
+					/* alloc mem for tprogs */
+					if (!tprogs) tprogs = memory_get(max_file);
 					/* if so, store it in extra executables */
-					strncpy2(progs[progs_counter++], myarg);
+					strncpy2(tprogs, res);
+					strncpy2(tprogs, "\n");
+					free(res);
 				}
 			}
 
@@ -1594,7 +1616,7 @@ void check_options(int argc, char **argv){
 		/* fail if no arguments for --remove option */
 		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); myexit(1); }
 		/* tail if no arguments for --recursive option */
-		if (opt_recursive && !opt_recursive2_counter){ color_("error: bad argument\n", red); myexit(1); }
+		if (opt_recursive && !opt_recursive2){ color_("error: bad argument\n", red); myexit(1); }
 
 	}
 }
@@ -1685,6 +1707,28 @@ void clear()
 }
 
 
+/* get shell names for exception */
+void check_shells()
+{
+	/* load /etc/shells if exists */
+	if (file_exist(tshell)){
+		tshellf = file_read(tshell, 0);
+	}
+	/* if not, get shell names from defined list */
+	else{
+		int i = 0;
+		tshellf = memory_get(max_file);
+		while(1){
+			char *res = tshellf2[i++];
+			if (!res) break;
+			strncpy2(tshellf, res);
+			strncpy2(tshellf, "\n");
+		}
+	}
+	
+}
+
+
 /* info about domains by a pattern */
 void domain_info(char *pattern)
 {
@@ -1695,7 +1739,6 @@ void domain_info(char *pattern)
 	if (pattern[0]){
 		char *tdomf2, *res, *res2, *res_orig;
 		int i;
-		char counts[max_num] = "";
 		int count = 0;
 		int flag_first = 0;
 		
@@ -1738,7 +1781,7 @@ void domain_info(char *pattern)
 				/* print the rest of the domain part */
 				while(1){
 					res2 = string_get_next_line(&text_new);
-					/* exit if reaching end of domain block */
+					/* exit on end of domain block */
 					if (!res2) break;
 					/* print non empty lines */
 					if (res2[0]){
@@ -1770,11 +1813,13 @@ void domain_info(char *pattern)
 		
 		/* print summary */
 		if (count){
+			char *res;
 			newl();
-			string_itoa(counts, count);
-			color_("(found ", clr); color_(counts, clr);
+			res = string_itos(count);
+			color_("(found ", clr); color_(res, clr);
 			if (count == 1) color_(" domain)\n", clr);
 			else            color_(" domains)\n", clr);
+			free(res);
 		}
 		else color_("error: no domains found\n", red);
 	}
@@ -1918,7 +1963,12 @@ int main(int argc, char **argv){
 		color("all domains turned back to learning mode\n", red);
 		myexit(0);
 	}
+	
+	check_shells();
 
+
+	/* free all my pointers */
+	myfree();
 
 	return 0;
 }
