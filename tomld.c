@@ -1143,13 +1143,12 @@ int kernel_version()
 		n = buff[c++];
 		if (n != '.'){
 			/* exit if no numbers or at end of string */
-			if (!(n >= '0' && n <= '9') || !n) return ver;
+			if (!(n >= '0' && n <= '9') || !n){ free(buff); return ver; }
 			/* convert string to integer and add it to result */
 			ver += c2 * string_ctoi(n);
 			c2 /= 10;
 		}
 	}
-	
 	free(buff);
 
 	return ver;
@@ -1174,15 +1173,12 @@ int tomoyo_version()
 		n = buff[c++];
 		if (n != '.'){
 			/* exit if no numbers or at end of string */
-			if (!(n >= '0' && n <= '9') || !n) return ver;
+			if (!(n >= '0' && n <= '9') || !n){ free(buff); return ver; }
 			/* convert string to integer and add it to result */
 			ver += c2 * string_ctoi(n);
 			c2 /= 10;
 		}
 	}
-
-	debugi(ver); myexit(1);
-
 	free(buff);
 	
 	return ver;
@@ -1464,10 +1460,11 @@ char *which(char *name){
 		strncpy2(full, res);
 		strncat2(full, "/");
 		strncat2(full, name);
-		debug(full);
 		if (file_exist(full)){
 			res = memory_get(strlen(full));
-			strncpy2(res, full); return res; }
+			strncpy2(res, full);
+			return res;
+		}
 		full[0] = 0;
 	}
 }
@@ -1695,8 +1692,8 @@ void clear()
 	if (tdomf) free(tdomf);
 	if (texcf) free(texcf);
 	/* create new configs */
-	tdomf = memory_get(max_char);
-	texcf = memory_get(2);
+	tdomf = memory_get(max_file);
+	texcf = memory_get(max_file);
 	strncpy2(tdomf, "<kernel>\nuse_profile 0\n\n");
 	texcf[0] = 0;
 	/* write config files */
