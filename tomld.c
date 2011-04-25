@@ -785,7 +785,7 @@ int string_cmp(const void *a, const void *b)
 /* returned value must be freed by caller */
 char *string_sort_uniq_lines(char *text)
 {
-	char c, *res, *text_orig, **ptr;
+	char c, *res, *text_temp, **ptr;
 	char *text_new, *text_final, *text_sort;
 	char *res2 = "";
 	int flag_first = 0;
@@ -850,15 +850,16 @@ char *string_sort_uniq_lines(char *text)
 		strncat2(text_new, "\n");
 	}
 	free(text_sort);
+	free(ptr);
 
 	/* create another string holder */
 	text_final = memory_get(maxl);
 
 	/* make it uniq */
-	text_orig = text_new;
+	text_temp = text_new;
 	while(1){
 		/* get next line */
-		res = string_get_next_line(&text_orig);
+		res = string_get_next_line(&text_temp);
 		/* exit on end */
 		if (!res){
 			if (flag_first) free(res2);
@@ -1276,7 +1277,7 @@ int file_exist(char *name){
 /* load config files from kernel memory to user memory */
 void load()
 {
-	char *tdomf2, *tdomf_new, *orig, *res, *res2;
+	char *tdomf2, *tdomf_new, *res, *res2, *res_temp;
 	
 	/* load domain config */
 	tdomf = file_read(tdomk, max_file);
@@ -1297,10 +1298,10 @@ void load()
 		res = domain_get_next(&tdomf2);
 		/* exit on end */
 		if (!res) break;
+		res_temp = res;
 
 		/* check if domain is marked as (deleted) */
-		orig = res;
-		res2 = string_get_next_line(&orig);
+		res2 = string_get_next_line(&res_temp);
 		if (res2){
 			/* don't add domain marked as (deleted) */
 			if (string_search_keyword(res2, "(deleted)") > -1) flag_deleted = 1;
@@ -1309,9 +1310,9 @@ void load()
 		
 		/* root domain <kernel> with profile 0 should stay */
 /*		int flag_root_domain = 0;
-		char *res2, *res_orig;
-		res_orig = res;
-		res2 = string_get_next_line(&res_orig);
+		char *res2, *res_temp;
+		res_temp = res;
+		res2 = string_get_next_line(&res_temp);
 		if (res2){
 			flag_root_domain = strcmp(res2, "<kernel>");
 		}
@@ -1321,10 +1322,10 @@ void load()
 		/* check domain profile and add only profile with non-zero but only if not marked as deleted */
 		if (domain_get_profile(res) && !flag_deleted){
 			/* if it's not null, then add it to the new policy */
-			orig = res;
+			res_temp = res;
 			while(1){
 				/* read domain line by line */
-				res2 = string_get_next_line(&orig);
+				res2 = string_get_next_line(&res_temp);
 				if (!res2) break;
 				
 				/* remove (deleted) and quota_exceeded entries */
@@ -1333,6 +1334,7 @@ void load()
 					strncat2(tdomf_new, res2);
 					strncat2(tdomf_new, "\n");
 				}
+				free(res2);
 			}
 		}
 		free(res);
@@ -1734,7 +1736,7 @@ void domain_info(char *pattern)
 
 	/* is there any pattern? */
 	if (pattern[0]){
-		char *tdomf2, *res, *res2, *res_orig;
+		char *tdomf2, *res, *res2, *res_temp;
 		int i;
 		int count = 0;
 		int flag_first = 0;
@@ -1745,18 +1747,19 @@ void domain_info(char *pattern)
 			res = domain_get_next(&tdomf2);
 			/* exit on end */
 			if (!res) break;
+			res_temp = res;
 
-			res_orig = res;
 			/* get first line */
 			/* here res2 should be something, so i don't check data availability */
-			res2 = string_get_next_line(&res);
+			res2 = string_get_next_line(&res_temp);
 			
 			/* search for a keyword */
 			i = string_search_keyword(res2, pattern);
 			
 			/* print domain if match */
-			if (i > -1){
-				char *text_new;
+			if (i == -1) free(res2);
+			else{
+				char *text_new, *text_temp;
 			
 				/* increase counter for summary */
 				count++;
@@ -1768,16 +1771,17 @@ void domain_info(char *pattern)
 				color(res2, blue); newl();
 				free(res2);
 				/* print use_profile here too */
-				res2 = string_get_next_line(&res);
+				res2 = string_get_next_line(&res_temp);
 				color(res2, green); newl();
 				free(res2);
 				
 				/* sort the rest of the policy text */
-				text_new = string_sort_uniq_lines(res);
+				text_new = string_sort_uniq_lines(res_temp);
+				text_temp = text_new;
 
 				/* print the rest of the domain part */
 				while(1){
-					res2 = string_get_next_line(&text_new);
+					res2 = string_get_next_line(&text_temp);
 					/* exit on end of domain block */
 					if (!res2) break;
 					/* print non empty lines */
@@ -1802,17 +1806,15 @@ void domain_info(char *pattern)
 					}
 					free(res2);
 				}
+				free(text_new);
 			}
-			else free(res2);
-
-			free(res_orig);
+			free(res);
 		}
 		
 		/* print summary */
 		if (count){
-			char *res;
+			char *res = string_itos(count);
 			newl();
-			res = string_itos(count);
 			color_("(found ", clr); color_(res, clr);
 			if (count == 1) color_(" domain)\n", clr);
 			else            color_(" domains)\n", clr);
@@ -1823,7 +1825,7 @@ void domain_info(char *pattern)
 
 	/* list domain names only */	
 	else{
-		char *tdomf2, *res, *res2, *res_orig;
+		char *tdomf2, *res, *res2, *res_temp;
 		char *texcf_new;
 		long maxl;
 		
@@ -1839,26 +1841,27 @@ void domain_info(char *pattern)
 			/* exit on end */
 			if (!res) break;
 
-			res_orig = res;
+			res_temp = res;
 			/* get first line */
 			/* here res2 should be something, so i don't check data availability */
 
-			res2 = string_get_next_wordn(&res, 1);
+			res2 = string_get_next_wordn(&res_temp, 1);
 			if (res2){
 				strncat2(texcf_new, res2);
 				strncat2(texcf_new, "\n");
 				free(res2);
 			}
+			free(res);
 		}
 		
 		res = string_sort_uniq_lines(texcf_new);
 		if (res){
-			free(texcf_new);
-			texcf_new = res;
+			newl_(); color(res, blue); newl();
+			free(res);
 		}
-		
-		newl_();
-		color(texcf_new, blue); newl();
+		else{
+			newl_(); color(texcf_new, blue); newl();
+		}		
 		free(texcf_new);
 	}
 }
