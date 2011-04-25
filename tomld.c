@@ -25,6 +25,7 @@ changelog:
 25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
                          - improve checking of tomoyo status and availability
+                         - some memory leaks fixed
 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
                          - use special recursive wildcard in dir handling that is available since tomoyo version 2.3
 14/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
@@ -152,6 +153,8 @@ flow chart:
 	12) on exit, turn all old domains with profile 1-2 into enforcing mode
 
 */
+
+/* tab = 4 chars */
 
 
 #include <stdio.h>
@@ -286,7 +289,8 @@ int opt_once		= 0;
 
 char opt_info2     [max_char]  = "";
 char opt_remove2   [max_char]  = "";
-char *opt_recursive2 = 0;
+char *dirs_recursive = 0;
+long *dirs_recursive_depth = 0;
 
 int flag_reset		= 0;
 int flag_check		= 0;
@@ -310,6 +314,9 @@ char *clr		= "\033[0m";
 
 /* arrays */
 char *tprogs = 0;
+
+char *tprogs_exc = 0;
+char *tprogs_exc_manual[] = {"/usr/sbin/sshd", 0};
 
 char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6", 0};
 int  netf_counter = 4;
@@ -447,11 +454,13 @@ void help() {
 /* free my pointers */
 void myfree()
 {
-	if (tdomf)   free(tdomf);
-	if (texcf)   free(texcf);
-	if (tshellf) free(tshellf);
-	if (tprogs)  free(tprogs);
-	if (opt_recursive2) free(opt_recursive2);
+	if (tdomf)					free(tdomf);
+	if (texcf)					free(texcf);
+	if (tshellf)				free(tshellf);
+	if (tprogs)					free(tprogs);
+	if (tprogs_exc)				free(tprogs_exc);
+	if (dirs_recursive)			free(dirs_recursive);
+	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 }
 
 
@@ -461,6 +470,19 @@ void myexit(int num)
 	/* free my pointers */
 	myfree();
 	exit(num);
+}
+
+
+/* count lines of string */
+int string_count_lines(char *text)
+{
+	int i = 0;
+	int c = 0;
+	while(1){
+		if (!text[i]) return c;
+		if (text[i] == '\n') c++;
+		i++;
+	}
 }
 
 
@@ -482,11 +504,10 @@ void newl_()
 /* print debug info about a string */
 void debug(char *text)
 {
-	long i;
-	long c = 0;
+	long c;
 	long l = strlen(text);
 	/* count lines of text */
-	for (i = 0; i < l; i++){ if (text[i] == '\n') c++; }
+	c = string_count_lines(text);
 	/* print text and info */
 	printf("--\n");
 	printf(text);
@@ -543,11 +564,35 @@ void color_(char *text, char *col)
 }
 
 
-/* allocate memory and return pointer */
+/* allocate memory for char and return pointer */
 /* returned value must be freed by caller */
 char *memory_get(long num)
 {
 	char* p = malloc((sizeof(char)) * (num + 1));
+	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	/* clear first byte */
+	p[0] = 0;
+	return p;
+}
+
+
+/* allocate memory for char pointer list and return pointer */
+/* returned value must be freed by caller */
+char **memory_get_ptr(long num)
+{
+	char** p = malloc((sizeof(char**)) * (num + 1));
+	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	/* clear first byte */
+	p[0] = 0;
+	return p;
+}
+
+
+/* allocate memory for long and return pointer */
+/* returned value must be freed by caller */
+long *memory_get_long(long num)
+{
+	long *p = malloc((sizeof(long)) * (num + 1));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
 	/* clear first byte */
 	p[0] = 0;
@@ -808,11 +853,8 @@ char *string_sort_uniq_lines(char *text)
 		if (c == '\n') count++;
 	}
 
-	/* create array of char pointers pointing to string lines */
-	ptr = malloc((sizeof(char**)) * (count + 1));
-	if (!ptr){ color_("error: out of memory\n", red); myexit(1); }
-	/* clear first byte */
-	ptr[0] = 0;
+	/* alloc mem for char pointers pointing to string lines */
+	ptr = memory_get_ptr(count);
 	
 	/* change new line chars to nulls and create pointer list to string lines */
 	i = 0;
@@ -1577,11 +1619,11 @@ void check_options(int argc, char **argv){
 					strncpy2(path, myarg);
 					l = strlen(myarg);
 					if (path[l-1] != '/'){ path[l] = '/'; path[l+1] = 0; }
-					/* alloc mem for opt_recursive2 */
-					if (!opt_recursive2) opt_recursive2 = memory_get(max_file);
+					/* alloc mem for dirs_recursive */
+					if (!dirs_recursive) dirs_recursive = memory_get(max_file);
 					/* if so, store it in recursive dir array */
-					strncpy2(opt_recursive2, path);
-					strncpy2(opt_recursive2, "\n");
+					strncpy2(dirs_recursive, path);
+					strncpy2(dirs_recursive, "\n");
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (!flag_type || flag_progs){
@@ -1615,7 +1657,7 @@ void check_options(int argc, char **argv){
 		/* fail if no arguments for --remove option */
 		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); myexit(1); }
 		/* tail if no arguments for --recursive option */
-		if (opt_recursive && !opt_recursive2){ color_("error: bad argument\n", red); myexit(1); }
+		if (opt_recursive && !dirs_recursive){ color_("error: bad argument\n", red); myexit(1); }
 
 	}
 }
@@ -1707,8 +1749,11 @@ void clear()
 
 
 /* get shell names for exception */
-void check_shells()
+void check_exceptions()
 {
+	char *res, *temp;
+	int i;
+
 	/* load /etc/shells if exists */
 	if (file_exist(tshell)){
 		tshellf = file_read(tshell, 0);
@@ -1725,6 +1770,47 @@ void check_shells()
 		}
 	}
 	
+	/* alloc mem for program exceptions */
+	if (!tprogs_exc) tprogs_exc = memory_get(max_file);
+	
+	/* add shells to exceptions */
+	temp = tshellf;
+	while(1){
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		/* if line doesn't start with "#" char meaning a remark */
+		if (res[0] != '#'){
+			strncat2(tprogs_exc, res);
+			strncat2(tprogs_exc, "\n");
+		}
+	}
+
+	/* add manual programs to exceptions */
+	i = 0;
+	while(1){
+		res = tprogs_exc_manual[i++];
+		if (!res) break;
+		strncat2(tprogs_exc, res);
+		strncat2(tprogs_exc, "\n");
+	}
+	
+	/* sort exception list */
+	res = string_sort_uniq_lines(tprogs_exc);
+	if (res){
+		free(tprogs_exc);
+		tprogs_exc = res;
+	}
+
+	/* initialize recursive dirs' depth values */
+	if (dirs_recursive){
+		i = string_count_lines(dirs_recursive);
+		if (i > 0){
+			if (!dirs_recursive_depth) dirs_recursive_depth = memory_get_long(i+1);
+			while(i--){
+				dirs_recursive_depth[i] = -1;
+			}
+		}
+	}
 }
 
 
@@ -1964,7 +2050,7 @@ int main(int argc, char **argv){
 		myexit(0);
 	}
 	
-	check_shells();
+	check_exceptions();
 
 
 	/* free all my pointers */
