@@ -1989,14 +1989,15 @@ void domain_learn_all()
 }
 
 
-/* ************************************ */
-/* ******* PROCESS SEARCH LOOP ******** */
-/* ************************************ */
+/* ------------------------------------ */
+/* ------- PROCESS SEARCH LOOP -------- */
+/* ------------------------------------ */
 /* print process names using tcp or udp packets */
 void check_processes()
 {
 	/* vars */
 	int mypid;
+	int count2;
 
 	/* get my pid */
 	mypid = getpid();
@@ -2029,6 +2030,14 @@ void check_processes()
 	
 	/* check processes using network */
 	color("* processes using network", green); newl();	
+
+	/* store start of my process time for later to check speed */
+	mytime();
+
+	count2 = 0;
+	while(1){
+		break;
+	}
 }
 
 
@@ -2037,9 +2046,6 @@ void check_processes()
 /* ----------------------------------- */
 
 int main(int argc, char **argv){
-
-	/* store start of my process time for later to check speed */
-	mytime();
 
 	/* is output colored? set only color option here before anything else */
 	check_options_colored(argc, argv);
