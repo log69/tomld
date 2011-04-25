@@ -1473,15 +1473,18 @@ int check_instance(){
 char *which(char *name){
 	char *res;
 	char full[max_char] = "";
+	char buff[max_char] = "";
 	int i;
 
-	/* name contains any "/" char? */
-	/* if so, then it's whether a relative or a full path, so don't check it any further */
-	if (strpbrk(name, "/")){
+	/* name starts with "/" char? */
+	if (name[0] == '/'){
 		/* file exists? if not, then fail */
-		if (file_exist(name)){
-			res = memory_get(strlen(name));
-			strncpy2(res, name);
+		if (file_exist(full)){
+			/* read link path */
+			i = readlink(name, buff, max_char);
+			if (i > -1){ strncpy2(full, buff); }
+			res = memory_get(strlen(full));
+			strncpy2(res, full);
 			return res;
 		}
 		return 0;
@@ -1492,6 +1495,9 @@ char *which(char *name){
 	strncat2(full, "/");
 	strncat2(full, name);
 	if (file_exist(full)){
+		/* read link path */
+		i = readlink(full, buff, max_char);
+		if (i > -1){ strncpy2(full, buff); }
 		res = memory_get(strlen(full));
 		strncpy2(res, full);
 		return res;
@@ -1506,6 +1512,9 @@ char *which(char *name){
 		strncat2(full, "/");
 		strncat2(full, name);
 		if (file_exist(full)){
+			/* read link path */
+			i = readlink(full, buff, max_char);
+			if (i > -1){ strncpy2(full, buff); }
 			res = memory_get(strlen(full));
 			strncpy2(res, full);
 			return res;
@@ -1798,17 +1807,21 @@ void check_exceptions()
 	}
 	
 	/* sort exception list */
-	res = string_sort_uniq_lines(tprogs_exc);
-	if (res){
-		free(tprogs_exc);
-		tprogs_exc = res;
+	if (tprogs_exc){
+		res = string_sort_uniq_lines(tprogs_exc);
+		if (res){
+			free(tprogs_exc);
+			tprogs_exc = res;
+		}
 	}
 
 	/* sort program list */
-	res = string_sort_uniq_lines(tprogs);
-	if (res){
-		free(tprogs);
-		tprogs = res;
+	if (tprogs){
+		res = string_sort_uniq_lines(tprogs);
+		if (res){
+			free(tprogs);
+			tprogs = res;
+		}
 	}
 
 	/* initialize recursive dirs' depth values */
@@ -2014,7 +2027,8 @@ void check_processes()
 		}
 	}
 	
-	
+	/* check processes using network */
+	color("* processes using network", green); newl();	
 }
 
 
