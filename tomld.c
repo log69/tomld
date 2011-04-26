@@ -169,9 +169,8 @@ flow chart:
 #include <sys/mount.h>
 
 
-#define max_char	1024
+#define max_char	4096
 #define max_num		32
-#define max_array	1024
 #define max_file	10*1024*1024
 
 
@@ -319,7 +318,6 @@ char *tprogs_exc = 0;
 char *tprogs_exc_manual[] = {"/usr/sbin/sshd", 0};
 
 char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6", 0};
-int  netf_counter = 4;
 
 char tshell[] = "/etc/shells";
 char *tshellf = 0;
@@ -747,7 +745,7 @@ char *string_get_next_word(char **text)
 	
 	l = i - start;
 	/* fail on zero length result */
-	if (!l) return 0;
+	if (l < 1) return 0;
 
 	/* allocate mem for the new string */
 	res = memory_get(l);
@@ -774,7 +772,63 @@ char *string_get_next_word(char **text)
 /* returned value must be freed by caller */
 char *string_get_next_wordn(char **text, int num)
 {
-	char *res;
+	char *res, c;
+	int i = 0;
+	int start = 0;
+	int l;
+
+	/* count num pieces of words */
+	if (num < 0) num = 0;
+	num++;
+	while (num--){
+
+		/* skip white spaces or exit on end of line */
+		while (1){
+			c = (*text)[i];
+			/* exit on end */
+			if (!c || c == '\n') return 0;
+			if (c != ' ') break;
+			i++;
+		}
+
+		start = i;
+		while (1){
+			/* get next char */
+			c = (*text)[i];
+			/* exit on end if not the last word yet */
+			if (!c || c == '\n'){
+				if (num > 0) return 0;
+				else break;
+			}
+			if (c == ' ') break;
+			i++;
+		}
+	}
+	
+	l = i - start;
+	/* fail on zero length result */
+	if (l < 1) return 0;
+
+	/* allocate mem for the new string */
+	res = memory_get(l);
+	/* copy word */
+	i = l;
+	while(i--){
+		res[i] = (*text)[start + i];
+	}
+	res[l] = 0;
+	/* skip more white spaces and move pointer to the next line */
+	i = start + l;
+	while (1){
+		c = (*text)[i];
+		if (c != ' ') break;
+		i++;
+	}
+	(*text) += i;
+
+	return res;
+
+/*	char *res;
 	
 	while(1){
 		res = string_get_next_word(text);
@@ -782,7 +836,8 @@ char *string_get_next_wordn(char **text, int num)
 		if (num <= 0) return res;
 		free(res);
 		num--;
-	}
+	}*/
+
 }
 
 
@@ -1177,7 +1232,7 @@ int kernel_version()
 	int c, c2;
 	int ver = 0;
 	char n;
-	/* read in kernel version from /proc in a format as 2.6.32-5-amd64 */
+	/* read kernel version from /proc in a format as 2.6.32-5-amd64 */
 	buff = file_read(v, max_char);
 	c = 0;
 	/* create version numbers */
@@ -1206,7 +1261,7 @@ int tomoyo_version()
 	int ver = 0;
 	char n;
 
-	/* read in version string */
+	/* read version string */
 	buff = file_read(tverk, max_char);
 
 	c = 0;
@@ -2036,8 +2091,51 @@ void check_processes()
 
 	count2 = 0;
 	while(1){
+		char *netf2, *netf3;
+		int i;
+		
+		/* read up all net stat files and create a list of pids of all processes using network */
+		netf2 = memory_get(max_char);
+		i = 0;
+		while (1){
+			char *res, *res2, *res3, *temp, *temp2;
+			if (!netf[i]) break;
+			/* read file */
+			res = file_read(netf[i++], max_char);
+			temp = res;
+			/* skip one line */
+			res2 = string_get_next_line(&temp);
+			free(res2);
+			/* get all column 9 (uid) */
+			while(1){
+				/* get next line */
+				res2 = string_get_next_line(&temp);
+				if (!res2) break;
+				temp2 = res2;
+				res3 = string_get_next_wordn(&temp2, 9);
+				strncat2(netf2, res3);
+				strncat2(netf2, "\n");
+				free(res3);
+				free(res2);
+			}
+			free(res);
+		}
+
+		/* sort pid list */
+		netf3 = string_sort_uniq_lines(netf2);
+		free(netf2);
+
+		debug(netf3);
+		
+
+
+		free(netf3);
 		break;
 	}
+
+	/* print running time */
+/*	mytime();*/
+
 }
 
 
