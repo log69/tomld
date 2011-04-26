@@ -2094,7 +2094,7 @@ void check_processes()
 		char *netf2, *netf3;
 		int i;
 		
-		/* read up all net stat files and create a list of pids of all processes using network */
+		/* read up all net stat files and create a list of inode numbers of all processes using network */
 		netf2 = memory_get(max_char);
 		i = 0;
 		while (1){
