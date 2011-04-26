@@ -646,6 +646,47 @@ char *string_ltos(unsigned long num)
 }
 
 
+/* return the first occurence of string containing only numbers */
+/* returned value must be freed by caller */
+char *string_get_number(char *text)
+{
+	char *res;
+	char c;
+	int i = 0;
+	int start = 0;
+	int l;
+	
+	while(1){
+		c = text[i];
+		if (!c || c == '\n') return 0;
+		if (c >= '0' && c <= '9') break;
+		i++;
+	}
+
+	start = i;
+	while(1){
+		c = text[i];
+		if (c < '0' || c > '9') break;
+		i++;
+	}
+	
+	l = i - start;
+	/* fail on zero length result */
+	if (l < 1) return 0;
+
+	/* allocate mem for the new string */
+	res = memory_get(l);
+	/* copy word */
+	i = l;
+	while(i--){
+		res[i] = text[start + i];
+	}
+	res[l] = 0;
+
+	return res;
+}
+
+
 /* return a new string containing the next line of a string and move the pointer to the beginning of the next line */
 /* returned value must be freed by caller */
 char *string_get_next_line(char **text)
@@ -1334,10 +1375,8 @@ int running(char *name){
 			strncat2(mydir_name, mypid);
 			strncat2(mydir_name, "/exe");
 			/* resolv the link pointing from the exe name */
-			res = readlink(mydir_name, buff, max_char - 1);
+			res = readlink(mydir_name, buff, max_char);
 			if (res > 0){
-				/* put a null end mark to the end of the string after string length */
-				buff[res] = 0;
 				/* compare the link to the process name */
 				if (strcmp(buff, name) == 0) {
 					closedir(mydir);
@@ -2093,8 +2132,12 @@ void check_processes()
 	while(1){
 		char *netf2, *netf3;
 		int i;
+
+		DIR *mydir;
+		struct dirent *mydir_entry;
 		
-		/* read up all net stat files and create a list of inode numbers of all processes using network */
+		/* read up all net stat files and create a list of inode numbers (column 10)
+		   of all processes using network */
 		netf2 = memory_get(max_char);
 		i = 0;
 		while (1){
@@ -2106,7 +2149,7 @@ void check_processes()
 			/* skip one line */
 			res2 = string_get_next_line(&temp);
 			free(res2);
-			/* get all column 9 (uid) */
+			/* get all column 10 (uid) */
 			while(1){
 				/* get next line */
 				res2 = string_get_next_line(&temp);
@@ -2125,8 +2168,72 @@ void check_processes()
 		netf3 = string_sort_uniq_lines(netf2);
 		free(netf2);
 
-		debug(netf3);
-		
+
+		/* find all processes with the matching inode numbers in netf3's list */	
+		/* open /proc dir */
+		mydir = opendir("/proc/");
+		if (!mydir){
+			color_("error: cannot open /proc/ directory\n", red);
+			free(netf3);
+			myexit(1);
+		}
+		/* cycle through dirs in /proc */
+		while((mydir_entry = readdir(mydir))) {
+			char mypid[max_num] = "";
+			/* get my pid number from dir name in /proc */
+			strncpy2(mypid, mydir_entry->d_name);
+			/* does it contain numbers only meaning they are pids? */
+			if (strspn(mypid, "0123456789") == strlen(mypid)) {
+				int res;
+				char mydir_name[max_char] = "";
+				char myprog[max_char] = "";
+				/* create dirname like /proc/pid/exe */
+				strncpy2(mydir_name, "/proc/");
+				strncat2(mydir_name, mypid);
+				strncat2(mydir_name, "/exe");
+				/* resolv the link pointing from the exe name */
+				res = readlink(mydir_name, myprog, max_char);
+				if (res > 0){
+					DIR *mydir2;
+					struct dirent *mydir_entry2;
+					char myfd[max_char] = "";
+					/* create dir name like /proc/pid/fd/ */
+					strncpy2(myfd, "/proc/");
+					strncat2(myfd, mypid);
+					strncat2(myfd, "/fd/");
+					mydir2 = opendir(myfd);
+					
+					if (mydir2){
+						/* cycle through files in /proc/pid/fd/ */
+						while((mydir_entry2 = readdir(mydir2))) {
+							char mydir_name2[max_char] = "";
+							char mysock[max_char] = "";
+							int resfd;
+							/* create dirname like /proc/pid/fd/4 */
+							strncpy2(mydir_name2, myfd);
+							strncat2(mydir_name2, mydir_entry2->d_name);
+							/* resolv the links from the /proc/pid/fd/ dir */
+							resfd = readlink(mydir_name2, mysock, max_char);
+							if (resfd > 0){
+								/* does it contain a name like "socket:"? */
+								if (string_search_keyword(mysock, "socket:") > -1){
+									/* get inode number out of file name */
+									char *myinode = string_get_number(mysock);
+									/* is the inode number in netf3's list? */
+									if (string_search_keyword(netf3, myinode) > -1){
+										color(myprog, blue); newl();
+									}
+									free(myinode);
+								}
+							}
+						}
+						closedir(mydir2);
+					}
+				}
+			}
+		}
+		closedir(mydir);
+
 
 
 		free(netf3);
