@@ -2151,7 +2151,7 @@ void check_processes()
 		}
 		newl();
 	}
-	
+
 	/* print on demand programs */
 	if (tprogs){
 		color("* additional programs on demand\n", green);
@@ -2174,7 +2174,7 @@ void check_processes()
 		
 		/* read up all net stat files and create a list of inode numbers (column 10)
 		   of all processes using network */
-		netf2 = memory_get(max_char);
+		netf2 = memory_get(max_file);
 		i = 0;
 		while (1){
 			char *res, *res2, *res3, *temp, *temp2;
@@ -2192,10 +2192,12 @@ void check_processes()
 				if (!res2) break;
 				temp2 = res2;
 				res3 = string_get_next_wordn(&temp2, 9);
-				strncat2(netf2, "socket:[");
-				strncat2(netf2, res3);
-				strncat2(netf2, "]\n");
-				free(res3);
+				if(res3){
+					strncat2(netf2, "socket:[");
+					strncat2(netf2, res3);
+					strncat2(netf2, "]\n");
+					free(res3);
+				}
 				free(res2);
 			}
 			free(res);
