@@ -25,8 +25,9 @@
 #
 # changelog:
 # -----------
-# 17/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
+# 27/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
 #                          - drop platform check
+#                          - bugfix: recursive wildcard didn't work after last changes
 # 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
 #                          - use special recursive wildcard in dir handling that is available since tomoyo version 2.3
 # 14/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
