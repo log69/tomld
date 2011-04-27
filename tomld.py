@@ -2000,7 +2000,7 @@ def check():
 							# append "/" char if path was a dir
 							if r[1][-1] == "/": dr += "/"
 							# store new rule
-							s = r[0] + " " + dr + "\n"
+							s += r[0] + " " + dr + "\n"
 						else:
 							c = specr2_count[ind1]
 							# c being -1 means the depth hasn't been calculated yet
@@ -2030,7 +2030,7 @@ def check():
 										for i5 in range(c-i4, c):
 											dr += "/\*"
 							
-									s = r[0] + " " + dr + "\n"
+									s += r[0] + " " + dr + "\n"
 
 				# 2 parameters in the rule
 				elif l2 == 3:
@@ -2057,7 +2057,7 @@ def check():
 							# append "/" char if path was a dir
 							if r[1][-1] == "/": dr += "/"
 							# store new rule
-							s = r[0] + " " + dr + " " + r[2] + "\n"
+							s += r[0] + " " + dr + " " + r[2] + "\n"
 
 						if (not dir1) and dir2 and flag_kernel_version_2633:
 							# add special recursive wildcard to path
@@ -2065,7 +2065,7 @@ def check():
 							# append "/" char if path was a dir
 							if r[2][-1] == "/": dr += "/"
 							# store new rule
-							s = r[0] + " " + r[1] + " " + dr + "\n"
+							s += r[0] + " " + r[1] + " " + dr + "\n"
 
 						if (dir1 and dir2) and (ind1 == ind2):
 							# on tomoyo version 2.3 or above, there is a special recursive wildcard to use
@@ -2075,7 +2075,7 @@ def check():
 								# append "/" char if path was a dir
 								if r[1][-1] == "/": dr += "/"
 								# store new rule
-								s = r[0] + " " + dr + " " + dr + "\n"
+								s += r[0] + " " + dr + " " + dr + "\n"
 							else:
 								c = specr2_count[ind1]
 								# c being -1 means the depth hasn't been calculated yet
@@ -2105,7 +2105,7 @@ def check():
 											for i5 in range(c-i4, c):
 												dr += "/\*"
 
-										s = r[0] + " " + dr + " " + dr + "\n"
+										s += r[0] + " " + dr + " " + dr + "\n"
 
 
 						if (dir1 and dir2) and (not ind1 == ind2) and flag_kernel_version_2633:
@@ -2116,7 +2116,7 @@ def check():
 							if r[1][-1] == "/": dr1 += "/"
 							if r[2][-1] == "/": dr2 += "/"
 							# store new rule
-							s = r[0] + " " + dr1 + " " + dr2 + "\n"
+							s += r[0] + " " + dr1 + " " + dr2 + "\n"
 	
 
 				# insert rule only if the former rule was not the same
