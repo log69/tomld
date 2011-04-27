@@ -909,7 +909,45 @@ int string_search_keyword(char *text, char *key)
 		i++;
 	}
 	
-	return 0;
+	return -1;
+}
+
+
+/* search for a line in a string and return the position where it starts */
+/* return -1 on fail */
+int string_search_line(char *text, char *key)
+{
+	char c1, c2;
+	int i, i2, start;
+
+	/* search for the keyword */
+	i = 0;
+	i2 = 0;
+	start = 0;
+	while(1){
+		c1 = text[i];
+		c2 = key[i2];
+		/* stop on reaching end of keyword and end of line together and success */
+		if (!c2 && (c1 == '\n' || !c1)) return start;
+		/* stop on end of text and fail */
+		if (!c1) return -1;
+		/* jump to next line if no match */
+		if (c1 != c2){
+			while(1){
+				c1 = text[i];
+				/* fail if no more lines */
+				if (!c1) return -1;
+				if (c1 == '\n') break;
+				i++;
+			}
+			i2 = 0;
+			start = i + 1;
+		}
+		else i2++;
+		i++;
+	}
+	
+	return -1;
 }
 
 
@@ -1914,7 +1952,10 @@ void check_exceptions()
 		res = string_sort_uniq_lines(tprogs);
 		if (res){
 			free(tprogs);
-			tprogs = res;
+			/* realloc more mem above the sorted list to expand it later */
+			tprogs = memory_get(max_file);
+			strncpy2(tprogs, res);
+			free(res);
 		}
 	}
 
@@ -2156,8 +2197,9 @@ void check_processes()
 				if (!res2) break;
 				temp2 = res2;
 				res3 = string_get_next_wordn(&temp2, 9);
+				strncat2(netf2, "socket:[");
 				strncat2(netf2, res3);
-				strncat2(netf2, "\n");
+				strncat2(netf2, "]\n");
 				free(res3);
 				free(res2);
 			}
@@ -2167,7 +2209,7 @@ void check_processes()
 		/* sort pid list */
 		netf3 = string_sort_uniq_lines(netf2);
 		free(netf2);
-
+		
 
 		/* find all processes with the matching inode numbers in netf3's list */	
 		/* open /proc dir */
@@ -2217,13 +2259,15 @@ void check_processes()
 							if (resfd > 0){
 								/* does it contain a name like "socket:"? */
 								if (string_search_keyword(mysock, "socket:") > -1){
-									/* get inode number out of file name */
-									char *myinode = string_get_number(mysock);
 									/* is the inode number in netf3's list? */
-									if (string_search_keyword(netf3, myinode) > -1){
-										color(myprog, blue); newl();
+									if (string_search_line(netf3, mysock) > -1){
+										/* is it in my progs list yet? */
+										if (string_search_line(tprogs, myprog) == -1){
+											strncat2(tprogs, myprog);
+											strncat2(tprogs, "\n");
+											color(myprog, blue); newl();
+										}
 									}
-									free(myinode);
 								}
 							}
 						}
