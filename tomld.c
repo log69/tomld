@@ -188,7 +188,7 @@ char *home = "/home";
 int count = 10;
 
 /* number of max entries in profile config */
-#define maxmem "10000"
+#define max_mem "10000"
 
 /* tomoyo kernel parameter */
 char *tkern = "security=tomoyo";
@@ -201,25 +201,25 @@ char *texcf = 0;
 char *tprof22 = ""
 	"0-COMMENT=-----Disabled Mode-----\n"
 	"0-MAC_FOR_FILE=disabled\n"
-	"0-MAX_ACCEPT_ENTRY="maxmem"\n"
+	"0-MAX_ACCEPT_ENTRY="max_mem"\n"
 	"0-TOMOYO_VERBOSE=disabled\n"
 	"1-COMMENT=-----Learning Mode-----\n"
 	"1-MAC_FOR_FILE=learning\n"
-	"1-MAX_ACCEPT_ENTRY="maxmem"\n"
+	"1-MAX_ACCEPT_ENTRY="max_mem"\n"
 	"1-TOMOYO_VERBOSE=disabled\n"
 	"2-COMMENT=-----Permissive Mode-----\n"
 	"2-MAC_FOR_FILE=permissive\n"
-	"2-MAX_ACCEPT_ENTRY="maxmem"\n"
+	"2-MAX_ACCEPT_ENTRY="max_mem"\n"
 	"2-TOMOYO_VERBOSE=enabled\n"
 	"3-COMMENT=-----Enforcing Mode-----\n"
 	"3-MAC_FOR_FILE=enforcing\n"
-	"3-MAX_ACCEPT_ENTRY="maxmem"\n"
+	"3-MAX_ACCEPT_ENTRY="max_mem"\n"
 	"3-TOMOYO_VERBOSE=enabled\n";
 
 char *tprof23 = ""
 	"PROFILE_VERSION=20090903\n"
 	"PREFERENCE::enforcing={ verbose=yes }\n"
-	"PREFERENCE::learning={ verbose=no max_entry="maxmem" }\n"
+	"PREFERENCE::learning={ verbose=no max_entry="max_mem" }\n"
 	"PREFERENCE::permissive={ verbose=yes }\n"
 	"0-COMMENT=-----Disabled Mode-----\n"
 	"0-CONFIG={ mode=disabled }\n"
@@ -915,19 +915,19 @@ int string_search_keyword(char *text, char *key)
 
 /* search for a line in a string and return the position where it starts */
 /* return -1 on fail */
-int string_search_line(char *text, char *key)
+int string_search_line(char *text, char *line)
 {
 	char c1, c2;
 	int i, i2, start;
 
-	/* search for the keyword */
+	/* search for the line */
 	i = 0;
 	i2 = 0;
 	start = 0;
 	while(1){
 		c1 = text[i];
-		c2 = key[i2];
-		/* stop on reaching end of keyword and end of line together and success */
+		c2 = line[i2];
+		/* stop on reaching end of line and end of string together and success */
 		if (!c2 && (c1 == '\n' || !c1)) return start;
 		/* stop on end of text and fail */
 		if (!c1) return -1;
@@ -1797,7 +1797,7 @@ void check_options(int argc, char **argv){
 
 		/* fail if no arguments for --remove option */
 		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); myexit(1); }
-		/* tail if no arguments for --recursive option */
+		/* fail if no arguments for --recursive option */
 		if (opt_recursive && !dirs_recursive){ color_("error: bad argument\n", red); myexit(1); }
 
 	}
@@ -1886,89 +1886,6 @@ void clear()
 	file_write(tdom, tdomf);
 	/* load config files from disk to memory */
 	reload();
-}
-
-
-/* get shell names for exception */
-void check_exceptions()
-{
-	char *res, *temp;
-	int i;
-
-	/* load /etc/shells if exists */
-	if (file_exist(tshell)){
-		tshellf = file_read(tshell, 0);
-	}
-	/* if not, get shell names from defined list */
-	else{
-		int i = 0;
-		tshellf = memory_get(max_file);
-		while(1){
-			char *res = tshellf2[i++];
-			if (!res) break;
-			strncpy2(tshellf, res);
-			strncpy2(tshellf, "\n");
-		}
-	}
-	
-	/* alloc mem for program exceptions */
-	if (!tprogs_exc) tprogs_exc = memory_get(max_file);
-	
-	/* add shells to exceptions */
-	temp = tshellf;
-	while(1){
-		res = string_get_next_line(&temp);
-		if (!res) break;
-		/* if line doesn't start with "#" char meaning a remark */
-		if (res[0] != '#'){
-			/* add it only if it exists */
-			if (file_exist(res)){
-				strncat2(tprogs_exc, res);
-				strncat2(tprogs_exc, "\n");
-			}
-		}
-	}
-
-	/* add manual programs to exceptions */
-	i = 0;
-	while(1){
-		res = tprogs_exc_manual[i++];
-		if (!res) break;
-		strncat2(tprogs_exc, res);
-		strncat2(tprogs_exc, "\n");
-	}
-	
-	/* sort exception list */
-	if (tprogs_exc){
-		res = string_sort_uniq_lines(tprogs_exc);
-		if (res){
-			free(tprogs_exc);
-			tprogs_exc = res;
-		}
-	}
-
-	/* sort program list */
-	if (tprogs){
-		res = string_sort_uniq_lines(tprogs);
-		if (res){
-			free(tprogs);
-			/* realloc more mem above the sorted list to expand it later */
-			tprogs = memory_get(max_file);
-			strncpy2(tprogs, res);
-			free(res);
-		}
-	}
-
-	/* initialize recursive dirs' depth values */
-	if (dirs_recursive){
-		i = string_count_lines(dirs_recursive);
-		if (i > 0){
-			if (!dirs_recursive_depth) dirs_recursive_depth = memory_get_long(i+1);
-			while(i--){
-				dirs_recursive_depth[i] = -1;
-			}
-		}
-	}
 }
 
 
@@ -2124,6 +2041,90 @@ void domain_learn_all()
 }
 
 
+/* get shell and program exceptions */
+void check_exceptions()
+{
+	char *res, *temp;
+	int i;
+
+	/* load /etc/shells if exists */
+	if (file_exist(tshell)){
+		tshellf = file_read(tshell, 0);
+	}
+	/* if not, get shell names from defined list */
+	else{
+		int i = 0;
+		tshellf = memory_get(max_file);
+		while(1){
+			char *res = tshellf2[i++];
+			if (!res) break;
+			strncpy2(tshellf, res);
+			strncpy2(tshellf, "\n");
+		}
+	}
+	
+	/* alloc mem for program exceptions */
+	if (!tprogs_exc) tprogs_exc = memory_get(max_file);
+	
+	/* add shells to exceptions */
+	temp = tshellf;
+	while(1){
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		/* if line doesn't start with "#" char meaning a remark */
+		if (res[0] != '#'){
+			/* add it only if it exists */
+			if (file_exist(res)){
+				strncat2(tprogs_exc, res);
+				strncat2(tprogs_exc, "\n");
+			}
+		}
+		free(res);
+	}
+
+	/* add manual programs to exceptions */
+	i = 0;
+	while(1){
+		res = tprogs_exc_manual[i++];
+		if (!res) break;
+		strncat2(tprogs_exc, res);
+		strncat2(tprogs_exc, "\n");
+	}
+	
+	/* sort exception list */
+	if (tprogs_exc){
+		res = string_sort_uniq_lines(tprogs_exc);
+		if (res){
+			free(tprogs_exc);
+			tprogs_exc = res;
+		}
+	}
+
+	/* sort program list */
+	if (tprogs){
+		res = string_sort_uniq_lines(tprogs);
+		if (res){
+			free(tprogs);
+			/* realloc more mem above the sorted list to expand it later */
+			tprogs = memory_get(max_file);
+			strncpy2(tprogs, res);
+			free(res);
+		}
+	}
+
+	/* initialize recursive dirs' depth values */
+	if (dirs_recursive){
+		i = string_count_lines(dirs_recursive);
+		if (i > 0){
+			if (!dirs_recursive_depth) dirs_recursive_depth = memory_get_long(i+1);
+			while(i--){
+				dirs_recursive_depth[i] = -1;
+			}
+		}
+	}
+}
+
+
 /* ------------------------------------ */
 /* ------- PROCESS SEARCH LOOP -------- */
 /* ------------------------------------ */
@@ -2153,14 +2154,8 @@ void check_processes()
 	
 	/* print on demand programs */
 	if (tprogs){
-		char *temp = tprogs;
 		color("* additional programs on demand\n", green);
-		while(1){
-			char *res = string_get_next_line(&temp);
-			if (!res) break;
-			color(res, blue); newl();
-			free(res);
-		}
+		color(tprogs, blue);
 	}
 	
 	/* check processes using network */
@@ -2261,6 +2256,8 @@ void check_processes()
 								if (string_search_keyword(mysock, "socket:") > -1){
 									/* is the inode number in netf3's list? */
 									if (string_search_line(netf3, mysock) > -1){
+										/* alloc mem for list if not created yet */
+										if (!tprogs) tprogs = memory_get(max_file);
 										/* is it in my progs list yet? */
 										if (string_search_line(tprogs, myprog) == -1){
 											strncat2(tprogs, myprog);
@@ -2285,7 +2282,7 @@ void check_processes()
 	}
 
 	/* print running time */
-/*	mytime();*/
+	mytime();
 
 }
 
