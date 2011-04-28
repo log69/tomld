@@ -1249,12 +1249,13 @@ void mytime()
 	static int flag_time = 0;
 	static struct timeval start, end;
 	static long seconds, useconds;
-	static float t;
+	static float t, t_old;
 
 	/* first run? */
 	if (!flag_time){
 		gettimeofday(&start, 0);
 		flag_time = 1;
+		t_old = 0;
 	}
 	else{
 		gettimeofday(&end, 0);
@@ -1263,7 +1264,8 @@ void mytime()
 
 		t = (((seconds) * 1000 + useconds/1000.0) + 0.5) / 1000;
 
-		printf("-- time %.3fs\n", t);
+		printf("-- time %.3fs (+%.3f)\n", t, t - t_old);
+		t_old = t;
 	}
 }
 
@@ -2342,11 +2344,11 @@ void check_processes()
 		color(tprogs, blue);
 	}
 	
-	/* check processes using network */
-	color("* processes using network", green); newl();	
-
 	/* store start of my process time for later to check speed */
 	mytime();
+
+	/* check processes using network */
+	color("* processes using network", green); newl();	
 
 	count2 = 0;
 	while(1){
@@ -2484,6 +2486,9 @@ void check_processes()
 /* ----------------------------------- */
 
 int main(int argc, char **argv){
+
+	/* store start time */
+	mytime();
 
 	/* is output colored? set only color option here before anything else */
 	check_options_colored(argc, argv);
