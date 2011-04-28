@@ -646,6 +646,41 @@ char *string_ltos(unsigned long num)
 }
 
 
+/* return the filename part of a path string */
+/* returned value must be freed by caller */
+char *string_get_filename(char *text)
+{
+	char *res;
+	char c;
+	int i, i2, l;
+	
+	/* alloc mem for result */
+	res = memory_get(max_char);
+
+	/* search for filename part */
+	l = strlen(text);
+	if (l > 0){
+		i = l;
+		/* search for "/" char backwords and stop at it */
+		while (i--){
+			c = text[i];
+			if (c == '/') { i++; break; }
+		}
+		/* rightmost string is not null? */
+		if (i < l){
+			/* copy string after "/" char */
+			i2 = 0;
+			while(i <= l){
+				res[i2++] = text[i++];
+			}
+			return res;
+		}
+	}
+	
+	return 0;
+}
+
+
 /* return the first occurence of string containing only numbers */
 /* returned value must be freed by caller */
 char *string_get_number(char *text)
@@ -1135,6 +1170,43 @@ char *domain_get_name(char *text)
 	free(res);
 	if (!res2) return 0;
 	return res2;
+}
+
+
+/* return a new string containing a list of all domain names */
+/* returned value must be freed by caller */
+char *domain_get_list()
+{
+	char *tdomf2, *res, *res2, *list, *list2;
+	
+	/* alloc mem for new list */
+	list = memory_get(max_file);
+
+	/* collect domain names */
+	tdomf2 = tdomf;
+	while(1){
+		/* get next domain */
+		res = domain_get_next(&tdomf2);
+		/* exit on end */
+		if (!res) break;
+		/* get domain name */
+		res2 = domain_get_name(res);
+		if (res2){
+			strncat2(list, res2);
+			strncat2(list, "\n");
+			free(res2);
+		}
+		free(res);
+	}
+	
+	/* sort and uniq list because there many same entries because of subdomains */
+	if (list[0]){
+		list2 = string_sort_uniq_lines(list);
+		free(list);
+		list = list2;
+	}
+
+	return list;
 }
 
 
@@ -2065,43 +2137,71 @@ void domain_learn_all()
 void domain_print_list_not_progs()
 {
 	/* vars */
-	char *tdomf2, *res, *res2, *list, *list2, *temp;
+	char *res, *res2, *list, *list2, *list3, *temp;
+	
+	/* get list of all domain names */
+	list = domain_get_list();
 	
 	/* alloc mem for new list */
-	list = memory_get(max_file);
-	
-	tdomf2 = tdomf;
-	while(1){
-		/* get next domain */
-		res = domain_get_next(&tdomf2);
-		/* exit on end */
-		if (!res) break;
-		/* get domain name */
-		res2 = domain_get_name(res);
-		if (res2){
-			if (string_search_line(tprogs, res2) == -1){
-				strncat2(list, res2);
-				strncat2(list, "\n");
-			}
-			free(res2);
-		}
-		free(res);
-	}
-	
-	/* sort list */
-	list2 = string_sort_uniq_lines(list);
-	if (list2){
-		free(list);
-		list = list2;
-	}
-	
-	/* print list */
+	list2 = memory_get(max_file);
+
+	/* remove entries from the list that are in tprogs too */
 	temp = list;
 	while(1){
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		color(res, blue); newl();
+		if (string_search_line(tprogs, res) == -1){
+			strncat2(list2, res);
+			strncat2(list2, "\n");
+		}
 		free(res);
+	}
+	
+	free(list);
+	list = list2;
+	
+	/* is any element in the list? */
+	if (list[0]){
+		/* sort list */
+		list2 = string_sort_uniq_lines(list);
+		free(list);
+		list = list2;
+		
+		color("* already existing main domains", green); newl();
+
+		/* alloc mem for new sorted list with filenames only */
+		list2 = memory_get(max_file);
+
+		/* get list of filenames only */
+		temp = list;
+		while(1){
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			res2 = string_get_filename(res);
+			if (res2){
+				strncat2(list2, res2);
+				strncat2(list2, "\n");
+			}
+			free(res);
+		}
+		
+		/* sort filename list */
+		list3 = string_sort_uniq_lines(list2);
+		free(list2);
+		list2 = list3;
+		
+		/* print list */
+		temp = list2;
+		while(1){
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			color(res, blue);
+			color(" ", blue);
+			free(res);
+		}
+		newl();
+		
+		free(list2);
 	}
 	
 	free(list);
