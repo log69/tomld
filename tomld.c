@@ -2152,9 +2152,15 @@ void domain_print_list_not_progs()
 	while(1){
 		res = string_get_next_line(&temp);
 		if (!res) break;
+		/* does tprogs contain any of the domain names? */
 		if (string_search_line(tprogs, res) == -1){
 			strncat2(list2, res);
 			strncat2(list2, "\n");
+			/* add domain to tprogs if no in exceptions */
+			if (string_search_line(tprogs_exc, res) == -1){
+				strncat2(tprogs, res);
+				strncat2(tprogs, "\n");
+			}
 		}
 		free(res);
 	}
@@ -2183,6 +2189,7 @@ void domain_print_list_not_progs()
 			if (res2){
 				strncat2(list2, res2);
 				strncat2(list2, "\n");
+				free(res2);
 			}
 			free(res);
 		}
@@ -2210,6 +2217,54 @@ void domain_print_list_not_progs()
 }
 
 
+/* check if domain exist and wich mode it's in, and print info about it */
+void domain_print_mode()
+{
+	/*vars */
+	char *prog, *temp;
+	
+	if (flag_firstrun) color("* checking policy and rules\n", yellow);
+	
+	/* cycle thorugh progs */
+	temp = tprogs;
+	while(1){
+		char s[max_char] = "";
+		
+		prog = string_get_next_line(&temp);
+		if(!prog) break;
+		
+		/* does the domain exist for the program? */
+		strncpy2(s, "initialize_domain ");
+		strncat2(s, prog);
+		if (string_search_line(texcf, s) > -1){
+			if (flag_firstrun){
+				color(prog, blue);
+				color(", domain exists", clr);
+				flag_check3 = 1;
+			}
+		}
+		/* if not, then add program entry to exception policy */
+		else{
+			color(prog, blue);
+			color(", no domain, ", clr);
+			flag_check3 = 1;
+			/* create a domain for the program */
+			color("create domain", green);
+			/* if the program is running already, then restart is needed for the rules to take effect */
+			if (running(prog)) color(" (restart needed)", red);
+			strncat2(texcf, "initialize_domain ");
+			strncat2(texcf, prog);
+			strncat2(texcf, "\n");
+		}
+		
+		/* does the rule exist for it? */
+		
+		
+		free(prog);
+	}
+}
+
+
 /* manage policy and rules */
 void check()
 {
@@ -2223,6 +2278,9 @@ void check()
 	
 	/* print programs already in domain but not in progs list */
 	domain_print_list_not_progs();
+	
+	/* check if domain exist and wich mode it's in */
+	domain_print_mode();
 
 }
 
