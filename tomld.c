@@ -1119,6 +1119,25 @@ char *domain_get_next(char **text)
 }
 
 
+/* return a new string containing the name of the domain from the domain policy */
+/* returned value must be freed by caller */
+char *domain_get_name(char *text)
+{
+	char *res, *res2, *temp, *temp2;
+	
+	/* get first line containing the name of the domain */
+	temp = text;
+	res = string_get_next_line(&temp);
+	if (!res) return 0;
+	/* get second word for domain name */
+	temp2 = res;
+	res2 = string_get_next_wordn(&temp2, 1);
+	free(res);
+	if (!res2) return 0;
+	return res2;
+}
+
+
 /* return profile number of domain (0-3) */
 int domain_get_profile(char *text)
 {
@@ -1451,7 +1470,8 @@ int file_exist(char *name){
 /* load config files from kernel memory to user memory */
 void load()
 {
-	char *tdomf2, *tdomf_new, *res, *res2, *res_temp;
+	/* vars */
+	char *tdomf2, *tdomf_new, *res, *res2, *temp;
 	
 	/* load domain config */
 	tdomf = file_read(tdomk, max_file);
@@ -1472,10 +1492,10 @@ void load()
 		res = domain_get_next(&tdomf2);
 		/* exit on end */
 		if (!res) break;
-		res_temp = res;
+		temp = res;
 
 		/* check if domain is marked as (deleted) */
-		res2 = string_get_next_line(&res_temp);
+		res2 = string_get_next_line(&temp);
 		if (res2){
 			/* don't add domain marked as (deleted) */
 			if (string_search_keyword(res2, "(deleted)") > -1) flag_deleted = 1;
@@ -1484,9 +1504,9 @@ void load()
 		
 		/* root domain <kernel> with profile 0 should stay */
 /*		int flag_root_domain = 0;
-		char *res2, *res_temp;
-		res_temp = res;
-		res2 = string_get_next_line(&res_temp);
+		char *res2, *temp;
+		temp = res;
+		res2 = string_get_next_line(&temp);
 		if (res2){
 			flag_root_domain = strcmp(res2, "<kernel>");
 		}
@@ -1496,10 +1516,10 @@ void load()
 		/* check domain profile and add only profile with non-zero but only if not marked as deleted */
 		if (domain_get_profile(res) && !flag_deleted){
 			/* if it's not null, then add it to the new policy */
-			res_temp = res;
+			temp = res;
 			while(1){
 				/* read domain line by line */
-				res2 = string_get_next_line(&res_temp);
+				res2 = string_get_next_line(&temp);
 				if (!res2) break;
 				
 				/* remove (deleted) and quota_exceeded entries */
@@ -2041,6 +2061,70 @@ void domain_learn_all()
 }
 
 
+/* print programs already in domain but not in progs list */
+void domain_print_list_not_progs()
+{
+	/* vars */
+	char *tdomf2, *res, *res2, *list, *list2, *temp;
+	
+	/* alloc mem for new list */
+	list = memory_get(max_file);
+	
+	tdomf2 = tdomf;
+	while(1){
+		/* get next domain */
+		res = domain_get_next(&tdomf2);
+		/* exit on end */
+		if (!res) break;
+		/* get domain name */
+		res2 = domain_get_name(res);
+		if (res2){
+			if (string_search_line(tprogs, res2) == -1){
+				strncat2(list, res2);
+				strncat2(list, "\n");
+			}
+			free(res2);
+		}
+		free(res);
+	}
+	
+	/* sort list */
+	list2 = string_sort_uniq_lines(list);
+	if (list2){
+		free(list);
+		list = list2;
+	}
+	
+	/* print list */
+	temp = list;
+	while(1){
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		color(res, blue); newl();
+		free(res);
+	}
+	
+	free(list);
+}
+
+
+/* manage policy and rules */
+void check()
+{
+	/* vars */
+/*	char *res;*/
+	
+	/* load config files */
+	load();
+	
+	mytime();
+	
+	/* print programs already in domain but not in progs list */
+	domain_print_list_not_progs();
+
+}
+
+
 /* get shell and program exceptions */
 void check_exceptions()
 {
@@ -2285,7 +2369,13 @@ void check_processes()
 
 	/* print running time */
 	mytime();
+	
+	/* manage policy and rules */
+	check();
 
+	/* print running time */
+	mytime();
+	
 }
 
 
