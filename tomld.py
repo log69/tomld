@@ -27,6 +27,7 @@
 # -----------
 # 28/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
 #                          - bugfix: recursive wildcard didn't work after last changes
+#                          - more bugfixes
 # 16/04/2011 - tomld v0.30 - bugfix in recursive dir handling
 #                          - use special recursive wildcard in dir handling that is available since tomoyo version 2.3
 # 14/04/2011 - tomld v0.29 - print error messages and extra info to stderr instead of stdout
@@ -491,9 +492,11 @@ def compare_dirs(d1, d2):
 	e2 = d2.split("/")
 	l1 = len(e1)
 	l2 = len(e2)
-#	if (not flag_kernel_version_2633) and (not l1 == l2): return 0
-	if not l1 == l2: return 0
-	for i in range(0, l1):
+	l = l1;
+	if not l1 == l2:
+		if not flag_kernel_version_2633: return 0
+		if l2 < l1: l = l2;
+	for i in range(0, l):
 		c1 = e1[i]
 		c2 = e2[i]
 		# if the dirname contains special recursive wildcard, then fail
@@ -502,6 +505,7 @@ def compare_dirs(d1, d2):
 				return 1
 		if (not c1 == "\*") and (not c2 == "\*") and (not c1 == c2):
 			return 0
+	if not l1 == l2: return 0
 	return 1
 
 
