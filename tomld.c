@@ -313,9 +313,9 @@ char *clr		= "\033[0m";
 
 /* arrays */
 char *tprogs = 0;
-
 char *tprogs_exc = 0;
 char *tprogs_exc_manual[] = {"/usr/sbin/sshd", 0};
+char *tprogs_learn = 0;
 
 char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6", 0};
 
@@ -457,6 +457,7 @@ void myfree()
 	if (tshellf)				free(tshellf);
 	if (tprogs)					free(tprogs);
 	if (tprogs_exc)				free(tprogs_exc);
+	if (tprogs_learn)			free(tprogs_learn);
 	if (dirs_recursive)			free(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 }
@@ -623,6 +624,14 @@ int string_ctoi(char c)
 	char s[2];
 	s[0] = c; s[1] = 0;
 	return (atoi(s));
+}
+
+
+/* convert integer to char */
+/* return modulus of dividing by 10 */
+char string_itoc(int i)
+{
+	return ('0' + (i % 10));
 }
 
 
@@ -1154,7 +1163,7 @@ char *domain_get_next(char **text)
 }
 
 
-/* return a new string containing the name of the domain from the domain policy */
+/* return a new string containing the name of the main domain from the domain policy */
 /* returned value must be freed by caller */
 char *domain_get_name(char *text)
 {
@@ -1210,7 +1219,19 @@ char *domain_get_list()
 }
 
 
-/* return profile number of domain (0-3) */
+/* return the index position in domain policy where domain starts */
+/* return -1 if domain does not exist */
+int domain_exist(char *text)
+{
+	char temp[max_char] = "<kernel> ";
+	
+	strncat2(temp, text);
+
+	return string_search_line(tdomf, temp);
+}
+
+
+/* return profile number of domain (0-3) from text position */
 int domain_get_profile(char *text)
 {
 	int i, p;
@@ -1237,6 +1258,59 @@ int domain_get_profile(char *text)
 	}
 	
 	return 0;
+}
+
+
+/* set profile number (0-3) of domain at text position */
+void domain_set_profile(char *text, int profile)
+{
+	int i, p;
+	char *key = "use_profile ";
+	char *res, *orig;
+	
+	while(1){
+		orig = text;
+
+		/* get next line */
+		res = string_get_next_line(&text);
+		if (!res) break;
+
+		/* search for the keyword */
+		i = string_search_keyword(res, key);
+		free(res);
+
+		/* if match */
+		if (i > -1){
+			i += strlen(key);
+			p = string_itoc(profile);
+			orig[i] = p;
+			break;
+		}
+	}
+}
+
+
+/* set profile number (0-3) of domain and all its subdomains in domain policy */
+void domain_set_profile_all(char *prog, int profile)
+{
+	char *res, *res2, *orig, *temp;
+	
+	temp = tdomf;
+	while(1){
+		orig = temp;
+
+		/* check next domain */
+		res = domain_get_next(&temp);
+		if (!res) break;
+		/* check if domain is a main or subdomain of what i'm looking for */
+		res2 = domain_get_name(res);
+
+		/* if so, then set its profile mode */
+		if (!strcmp(prog, res2)) domain_set_profile(orig, profile);
+
+		free(res2);
+		free(res);
+	}
 }
 
 
@@ -2222,6 +2296,7 @@ void domain_print_mode()
 {
 	/*vars */
 	char *prog, *temp;
+	int pos;
 	
 	if (flag_firstrun) color("* checking policy and rules\n", yellow);
 	
@@ -2252,13 +2327,66 @@ void domain_print_mode()
 			color("create domain", green);
 			/* if the program is running already, then restart is needed for the rules to take effect */
 			if (running(prog)) color(" (restart needed)", red);
-			strncat2(texcf, "initialize_domain ");
-			strncat2(texcf, prog);
+			strncat2(texcf, s);
 			strncat2(texcf, "\n");
 		}
 		
 		/* does the rule exist for it? */
+		pos = domain_exist(prog);
+		if (pos == -1){
+			color(", no rule, ", clr);
+			color("create rule with learning mode on", green);
+			if (!flag_firstrun) newl();
+			/* create a rule for it */
+			strncat2(tdomf, "\n<kernel> ");
+			strncat2(tdomf, prog);
+			strncat2(tdomf, "\nuse_profile 1\n");
+			/* alloc mem for tprogs_learn */
+			if (!tprogs_learn) tprogs_learn = memory_get(max_file);
+			/* store prog name to know not to turn on enforcing mode for these ones on exit */
+			if(string_search_line(tprogs_learn, prog) == -1){
+				strncat2(tprogs_learn, prog);
+				strncat2(tprogs_learn, "\n");
+			}
+		}
+		else{
+			int profile;
+			if (flag_firstrun) color(", rule exists", clr);
+			/* get profile mode for domain */
+			profile = domain_get_profile(tdomf + pos);
+			/* check which mode is on */
+			
+			/* disabled mode */
+			if (profile == 0){
+				if (!flag_check3){
+					color(prog, blue);
+					flag_check3 = 1;
+				}
+				color(", disabled mode, ", clr);
+				color("turn on learning mode", green);
+				if (!flag_firstrun) newl();
+				/* turn on learning mode for the domain and all its subdomains */
+				domain_set_profile_all(prog, 1);
+			}
+
+			/* learning mode */
+			if (profile == 1){
+				if (flag_firstrun) color(", learning mode on", clr);
+			}
+
+			/* permissive mode */
+			if (profile == 2){
+				if (flag_firstrun) color(", permissive mode on", clr);
+			}
+
+			/* enforcing mode */
+			if (profile == 3){
+				if (flag_firstrun) color(", enforcing mode on", purple);
+			}
+
+		}
 		
+		if (flag_firstrun) newl();
 		
 		free(prog);
 	}
@@ -2282,6 +2410,7 @@ void check()
 	/* check if domain exist and wich mode it's in */
 	domain_print_mode();
 
+	
 }
 
 
