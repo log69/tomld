@@ -1232,6 +1232,7 @@ int domain_exist(char *text)
 
 
 /* return profile number of domain (0-3) from text position */
+/* return -1 on fail */
 int domain_get_profile(char *text)
 {
 	int i, p;
@@ -1257,7 +1258,7 @@ int domain_get_profile(char *text)
 		}
 	}
 	
-	return 0;
+	return -1;
 }
 
 
@@ -1558,7 +1559,7 @@ void sand_clock(int dot)
 
 /* check if process is running currently */
 /* full path name required */
-int running(char *name){
+int process_running(char *name){
 	DIR *mydir;
 	struct dirent *mydir_entry;
 	char mydir_name[max_char] = "";
@@ -1594,6 +1595,27 @@ int running(char *name){
 
 	return 0;
 	
+}
+
+
+/* return a string containing the full path of the executable that belongs to the pid */
+/* returned value must be freed by caller */
+char *process_get_path(int pid)
+{
+	char path[max_char] = "/proc/";
+	char *buff;
+
+	/* create path */	
+	strncat2(path, string_itos(pid));
+	strncat2(path, "/exe");
+
+	/* alloc mem for result */
+	buff = memory_get(max_char);
+
+	/* resolv the link pointing from the exe name */
+	if (readlink(path, buff, max_char) > 0) return buff;
+
+	return 0;
 }
 
 
@@ -1658,7 +1680,7 @@ void load()
 		if (res2){
 			flag_root_domain = strcmp(res2, "<kernel>");
 		}
-		if (domain_get_profile(res) || !flag_root_domain){*/
+		if (domain_get_profile(res) != -1 || !flag_root_domain){*/
 
 
 		/* check domain profile and add only profile with non-zero but only if not marked as deleted */
@@ -1865,6 +1887,7 @@ void check_options(int argc, char **argv){
 		int flag_last = 0;
 		int c = 1;
 		char myarg[max_char] = "";
+		
 		/* cycle through the arguments */
 		while (argc2--){
 			int flag_ok = 0;
@@ -2326,7 +2349,7 @@ void domain_print_mode()
 			/* create a domain for the program */
 			color("create domain", green);
 			/* if the program is running already, then restart is needed for the rules to take effect */
-			if (running(prog)) color(" (restart needed)", red);
+			if (process_running(prog)) color(" (restart needed)", red);
 			strncat2(texcf, s);
 			strncat2(texcf, "\n");
 		}
@@ -2354,6 +2377,7 @@ void domain_print_mode()
 			if (flag_firstrun) color(", rule exists", clr);
 			/* get profile mode for domain */
 			profile = domain_get_profile(tdomf + pos);
+			if (profile == -1){ color_("error: domain policy is corrupt\n", red); free(prog); myexit(1); }
 			/* check which mode is on */
 			
 			/* disabled mode */
@@ -2463,7 +2487,15 @@ void check_exceptions()
 		strncat2(tprogs_exc, res);
 		strncat2(tprogs_exc, "\n");
 	}
-	
+
+	/* add my executable too to the list */
+	res = process_get_path(getpid());
+	if (res){
+		strncat2(tprogs_exc, res);
+		strncat2(tprogs_exc, "\n");
+		free(res);
+	}
+		
 	/* sort exception list */
 	if (tprogs_exc){
 		res = string_sort_uniq_lines(tprogs_exc);
