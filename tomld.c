@@ -473,7 +473,7 @@ void myexit(int num)
 
 
 /* count lines of string */
-int string_count_lines(char *text)
+int string_count_lines(const char *text)
 {
 	int i = 0;
 	int c = 0;
@@ -501,7 +501,7 @@ void newl_()
 
 
 /* print debug info about a string */
-void debug(char *text)
+void debug(const char *text)
 {
 	long c;
 	long l = strlen(text);
@@ -532,7 +532,7 @@ void debugl(long num)
 
 
 /* print colored output to stdout */
-void color(char *text, char *col)
+void color(const char *text, const char *col)
 {
 	if (opt_color){
 		fprintf(stdout, "%s", col);
@@ -548,7 +548,7 @@ void color(char *text, char *col)
 
 
 /* print colored output to stderr */
-void color_(char *text, char *col)
+void color_(const char *text, const char *col)
 {
 	if (opt_color){
 		fprintf(stderr, "%s", col);
@@ -600,7 +600,7 @@ long *memory_get_long(long num)
 
 
 /* my strncat */
-char *strncat2(char *s1, char *s2)
+char *strncat2(char *s1, const char *s2)
 {
 /*	return (strncat(s1, s2, sizeof(s1) - strlen(s1) - 1));*/
 	return (strncat(s1, s2, strlen(s2)+1));
@@ -608,9 +608,10 @@ char *strncat2(char *s1, char *s2)
 
 
 /* my strncpy */
-char *strncpy2(char *s1, char *s2)
+char *strncpy2(char *s1, const char *s2)
 {
-/*	char *res = strncpy(s1, s2, sizeof(s1)/sizeof(s1[0]));
+/*
+	char *res = strncpy(s1, s2, sizeof(s1)/sizeof(s1[0]));
 	s1[sizeof(s1)-1] = 0;
 */
 	char *res = strncpy(s1, s2, strlen(s2)+1);
@@ -657,7 +658,7 @@ char *string_ltos(unsigned long num)
 
 /* return the filename part of a path string */
 /* returned value must be freed by caller */
-char *string_get_filename(char *text)
+char *string_get_filename(const char *text)
 {
 	char *res;
 	char c;
@@ -692,7 +693,7 @@ char *string_get_filename(char *text)
 
 /* return the first occurence of string containing only numbers */
 /* returned value must be freed by caller */
-char *string_get_number(char *text)
+char *string_get_number(const char *text)
 {
 	char *res;
 	char c;
@@ -700,6 +701,7 @@ char *string_get_number(char *text)
 	int start = 0;
 	int l;
 	
+	/* go to the first number char */
 	while(1){
 		c = text[i];
 		if (!c || c == '\n') return 0;
@@ -707,6 +709,7 @@ char *string_get_number(char *text)
 		i++;
 	}
 
+	/* read only number chars and stop */
 	start = i;
 	while(1){
 		c = text[i];
@@ -758,7 +761,7 @@ char *string_get_next_line(char **text)
 
 
 /* return the length of the next line in a string */
-int string_next_line_len(char *text)
+int string_next_line_len(const char *text)
 {
 	int i = 0;
 	while(1){
@@ -928,7 +931,7 @@ char *string_get_next_wordn(char **text, int num)
 
 /* search for a keyword in a string and return the position where it starts */
 /* return -1 on fail */
-int string_search_keyword(char *text, char *key)
+int string_search_keyword(const char *text, const char *key)
 {
 	char c1, c2;
 	int i, i2, start;
@@ -959,7 +962,7 @@ int string_search_keyword(char *text, char *key)
 
 /* search for a line in a string and return the position where it starts */
 /* return -1 on fail */
-int string_search_line(char *text, char *line)
+int string_search_line(const char *text, const char *line)
 {
 	char c1, c2;
 	int i, i2, start;
@@ -1006,7 +1009,7 @@ int string_cmp(const void *a, const void *b)
 
 /* sort lines of a string and make it uniq */
 /* returned value must be freed by caller */
-char *string_sort_uniq_lines(char *text)
+char *string_sort_uniq_lines(const char *text)
 {
 	char c, *res, *text_temp, **ptr;
 	char *text_new, *text_final, *text_sort;
@@ -1221,7 +1224,7 @@ char *domain_get_list()
 
 /* return the index position in domain policy where domain starts */
 /* return -1 if domain does not exist */
-int domain_exist(char *text)
+int domain_exist(const char *text)
 {
 	char temp[max_char] = "<kernel> ";
 	
@@ -1292,7 +1295,7 @@ void domain_set_profile(char *text, int profile)
 
 
 /* set profile number (0-3) of domain and all its subdomains in domain policy */
-void domain_set_profile_all(char *prog, int profile)
+void domain_set_profile_all(const char *prog, int profile)
 {
 	char *res, *res2, *orig, *temp;
 	
@@ -1382,12 +1385,12 @@ char key_get()
 
 
 /* give a choice */
-int choice(char *text)
+int choice(const char *text)
 {
 	char c = 0;
 	printf(text);
 	printf(" [y/N]");
-	scanf("%c", &c);
+	c = getchar();
 	if (c == 'y') return 1;
 	return 0;
 }
@@ -1395,7 +1398,7 @@ int choice(char *text)
 
 /* open pipe and read content with given length */
 /* returned value must be freed by caller */
-char *pipe_read(char *comm, long length)
+char *pipe_read(const char *comm, long length)
 {
 	char *buff;
 	
@@ -1420,7 +1423,7 @@ char *pipe_read(char *comm, long length)
 
 /* open file and read content with given length, or if length is null, then check length from file descriptor */
 /* returned value must be freed by caller */
-char *file_read(char *name, long length)
+char *file_read(const char *name, long length)
 {
 	char *buff;
 	long len = 0;
@@ -1458,7 +1461,7 @@ char *file_read(char *name, long length)
 
 
 /* open file and write content */
-void file_write(char *name, char *buff)
+void file_write(const char *name, const char *buff)
 {
 	FILE *f = fopen(name, "w");
 	if (!f){
@@ -1559,7 +1562,7 @@ void sand_clock(int dot)
 
 /* check if process is running currently */
 /* full path name required */
-int process_running(char *name){
+int process_running(const char *name){
 	DIR *mydir;
 	struct dirent *mydir_entry;
 	char mydir_name[max_char] = "";
@@ -1620,7 +1623,7 @@ char *process_get_path(int pid)
 
 
 /* check if dir exists */
-int dir_exist(char *name){
+int dir_exist(const char *name){
 	DIR *d;
 	d = opendir(name);
 	if (d) { closedir(d); return 1; }
@@ -1629,7 +1632,7 @@ int dir_exist(char *name){
 
 
 /* check if file exists */
-int file_exist(char *name){
+int file_exist(const char *name){
 	FILE *f = fopen(name, "r+");
 	if (!f) return 0;
 	fclose(f);
@@ -1792,7 +1795,7 @@ int check_instance(){
 
 /* search file name in current dir first, then in bin locations and give back full path on success */
 /* returned value must be freed by caller */
-char *which(char *name){
+char *which(const char *name){
 	char *res;
 	char full[max_char] = "";
 	char buff[max_char] = "";
@@ -2081,7 +2084,7 @@ void clear()
 
 
 /* info about domains by a pattern */
-void domain_info(char *pattern)
+void domain_info(const char *pattern)
 {
 	/* load config files from kernel memory */
 	load();
@@ -2220,7 +2223,7 @@ void domain_info(char *pattern)
 
 
 /* remove domains by a pattern */
-void domain_remove(char *text)
+void domain_remove(const char *text)
 {
 	debug(text);
 }
