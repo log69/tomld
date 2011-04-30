@@ -260,17 +260,19 @@ char *tinit	= "/sbin/tomoyo-init";
 char *tload	= "/usr/sbin/tomoyo-loadpolicy";
 char *tsave	= "/usr/sbin/tomoyo-savepolicy";
 
-/* system log */
-char *tlog	= "/var/log/syslog";
-
 /* backup conf for checking change of rules */
 char *tdomf_bak = "";
+
+/* system log */
+char *tlog	= "/var/log/syslog";
+char *tlogf = 0;
 
 /* this stores the kernel time of the last line of system log */
 /* to identify the end of tomoyo logs and make sure not to read it twice */
 char *tmark	= "/var/local/tomld.logmark";
+char *tmarkf = 0;
 /* tomld pid file */
-char *pidf	= "/var/run/tomld.pid";
+char *tpid	= "/var/run/tomld.pid";
 
 /* options */
 int opt_version		= 0;
@@ -431,7 +433,7 @@ void help() {
 	printf ("- the program can be stopped any time by pressing q whereafter all old domains (learning and permissive) ");
 	printf ("are turned into enforcing mode\n");
 	printf ("- tomld files: "); printf (tmark); printf (" (this contains a mark to identify the end of the recently read message logs), ");
-	printf (pidf); printf(" (pid file to avoid multpiple instances of the program to be running at the same time)\n");
+	printf (tpid); printf(" (pid file to avoid multpiple instances of the program to be running at the same time)\n");
 	printf ("- in case a software or its settings change with a new version, the rules can be regenerated easily\n");
 	printf ("- the running processes need to be restarted on newly created domains\n");
 	printf ("\n");
@@ -460,6 +462,8 @@ void myfree()
 	if (tprogs_learn)			free(tprogs_learn);
 	if (dirs_recursive)			free(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
+	if (tmarkf)					free(tmarkf);
+	if (tlogf)					free(tlogf);
 }
 
 
@@ -730,7 +734,7 @@ char *string_get_number(const char *text)
 }
 
 
-/* return a new string containing the next line of a string and move the pointer to the beginning of the next line */
+/* return a new string containing the next line of a string and move the pointer to the beginning of the this line */
 /* returned value must be freed by caller */
 char *string_get_next_line(char **text)
 {
@@ -751,6 +755,45 @@ char *string_get_next_line(char **text)
 	res[i-1] = 0;
 	/* move pointer to the next line */
 	(*text) += i;
+
+	return res;
+}
+
+
+/* return a new string containing the last line of a string and move the pointer to the beginning of the this line */
+/* returned value must be freed by caller */
+char *string_get_last_line(char **text)
+{
+	char *res, c;
+	int i, l;
+
+	/* get string length */	
+	l = strlen((*text));
+	/* return null if input string is null too */
+	if (l < 1){
+		res = memory_get(1);
+		return res;
+	}
+	
+	/* go backwards till i find a new line */
+	i = l - 1;
+	while(1){
+		/* last char may be new line, that still counts for the last line */
+		i--;
+		if (i < 0) break;
+		c = (*text)[i];
+		if (c == '\n'){ i++; break; }
+	}
+	if (i < 0) i = 0;
+	l = l - i + 1;
+
+	/* allocate mem for the new string */
+	res = memory_get(l);
+	/* move pointer to the next line */
+	(*text) += i;
+	/* copy it */
+	strncpy2(res, (*text), l);
+	res[l - 1] = 0;
 
 	return res;
 }
@@ -1459,13 +1502,17 @@ char *file_read(const char *name, long length)
 /* open file and write content */
 void file_write(const char *name, const char *buff)
 {
+	char zero[] = "";
 	FILE *f = fopen(name, "w");
 	if (!f){
 		color_("error: cannot write file ", red);
 		color_(name, red); newl();
 		myexit(1);
 	}
-	fprintf(f, buff);
+	/* write contents if not null */
+	if (buff) fprintf(f, buff);
+	/* write null */
+	else      fprintf(f, zero);
 	fclose(f);
 }
 
@@ -1503,9 +1550,11 @@ int kernel_version()
 int tomoyo_version()
 {
 	char *buff;
-	int c, c2;
-	int ver = 0;
 	char n;
+	int c, c2;
+	static int ver = 0;
+	
+	if (ver) return ver;
 
 	/* read version string */
 	buff = file_read(tverk, max_char);
@@ -1725,6 +1774,8 @@ void save()
 	/* save configs to disk */
 	file_write(tdom, tdomf);
 	file_write(texc, texcf);
+	/* save log mark to disk */
+	file_write(tmark, tmarkf);
 }
 
 
@@ -1762,10 +1813,10 @@ int check_instance(){
 	/* get my pid number and convert it to string */
 	mypid = string_itos(getpid());
 	/* check if my pid file exists */
-	if (file_exist(pidf)){
+	if (file_exist(tpid)){
 		char *pid2;
 		/* read pid number from pid file */
-		pid2 = file_read(pidf, 0);
+		pid2 = file_read(tpid, 0);
 		/* is it me? */
 		if (strcmp(mypid, pid2) == 0){ free(mypid); free(pid2); return 0; }
 		else{
@@ -1776,14 +1827,14 @@ int check_instance(){
 			if (dir_exist(path)){ free(mypid); free(pid2); return 1; }
 			/* if not running, then overwrite pid number in pid file */
 			else{
-				file_write(pidf, mypid);
+				file_write(tpid, mypid);
 			}
 		}
 		free(pid2);
 	}
 	/* create pid file if it doesn't exist */
 	else{
-		file_write(pidf, mypid);
+		file_write(tpid, mypid);
 	}
 
 	free(mypid);
@@ -2239,6 +2290,105 @@ void domain_learn_all()
 {
 }
 
+/* -------------------------------------------------------------------------------------- */
+
+/* get recent access deny logs */
+void domain_get_log()
+{
+	/* vars */
+	char *res, *temp, *start, *tlogf2;
+	char key[max_char] = "";
+	int i, i2, l;
+	
+	/* load log mark from file if not loaded yet */
+	if (!tmarkf){
+		if (file_exist(tmark)){
+			tmarkf = file_read(tmark, 0);
+		}
+	}
+	/* delete former log */
+	if (tlogf) free(tlogf);
+	/* read in new log */
+	tlogf = file_read(tlog, 0);
+	
+	/* get messages only from mark, so jump to mark if it exists */
+	start = tlogf;
+	if (tmarkf){
+		i = string_search_keyword(start, tmarkf);
+		if (i > -1) start += i;
+	}
+	
+	/* alloc mem for collected log */
+	tlogf2 = memory_get(max_file);
+	/* search for tomoyo error messages from mark */
+	/* collect access deny messages */
+	if (tomoyo_version() <= 2299) strncpy2(key, " TOMOYO-ERROR: Access ", max_char);
+	else strncpy2(key, " ERROR: Access ", max_char);
+	temp = start;
+	while(1){
+		/* jump to the beginning of the next tomoyo error message */
+		i = string_search_keyword(temp, key);
+		/* exit on fail meaning no more messages */
+		if (i == -1) break;
+		temp += i;
+		/* get the whole line of the message */
+		res = string_get_next_line(&temp);
+		if (res){
+			/* store it */
+			strncat2(tlogf2, res, max_file);
+			strncat2(tlogf2, "\n", max_file);
+			free(res);
+		}
+	}
+	/* collect domain deny messages */
+	if (tomoyo_version() <= 2299) strncpy2(key, " TOMOYO-ERROR: Domain ", max_char);
+	else strncpy2(key, " ERROR: Domain ", max_char);
+	temp = start;
+	while(1){
+		/* jump to the beginning of the next tomoyo error message */
+		i = string_search_keyword(temp, key);
+		/* exit on fail meaning no more messages */
+		if (i == -1) break;
+		temp += i;
+		/* get the whole line of the message */
+		res = string_get_next_line(&temp);
+		if (res){
+			/* store it */
+			strncat2(tlogf2, res, max_file);
+			strncat2(tlogf2, "\n", max_file);
+			free(res);
+		}
+	}
+
+	/* set mark to the last log line */
+	temp = tlogf;
+	res = string_get_last_line(&temp);
+	i = string_search_keyword(res, "kernel: [");
+	if (i == -1){
+		color_("error: unexpected error, log message format is not correct\n", red);
+		free(res);
+		free(tlogf2);
+		myexit(1);
+	}
+	i2 = string_search_keyword(res + i, "]");
+	if (i2 == -1){
+		color_("error: unexpected error, log message format is not correct\n", red);
+		free(res);
+		free(tlogf2);
+		myexit(1);
+	}
+	l = i2 + 2;
+	tmarkf = memory_get(l);
+	strncpy2(tmarkf, res + i, l);
+	free(res);
+
+	debug(tlogf2);
+	debug(tmarkf);
+
+	
+	free(tlogf2);
+}
+
 
 /* print programs already in domain but not in progs list */
 void domain_print_list_not_progs()
@@ -2439,10 +2589,11 @@ void check()
 	/* print programs already in domain but not in progs list */
 	domain_print_list_not_progs();
 	
-	/* check if domain exist and wich mode it's in */
+	/* check if domain exist and which mode it's in */
 	domain_print_mode();
 
-	
+	/* get recent access deny logs */
+	domain_get_log();
 }
 
 
