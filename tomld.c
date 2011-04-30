@@ -600,21 +600,17 @@ long *memory_get_long(long num)
 
 
 /* my strncat */
-char *strncat2(char *s1, const char *s2)
+char *strncat2(char *s1, const char *s2, unsigned long size)
 {
-/*	return (strncat(s1, s2, sizeof(s1) - strlen(s1) - 1));*/
-	return (strncat(s1, s2, strlen(s2)+1));
+	return (strncat(s1, s2, size - strlen(s1) - 1));
 }
 
 
 /* my strncpy */
-char *strncpy2(char *s1, const char *s2)
+char *strncpy2(char *s1, const char *s2, unsigned long size)
 {
-/*
-	char *res = strncpy(s1, s2, sizeof(s1)/sizeof(s1[0]));
-	s1[sizeof(s1)-1] = 0;
-*/
-	char *res = strncpy(s1, s2, strlen(s2)+1);
+	char *res = strncpy(s1, s2, size);
+	s1[size - 1] = 0;
 	return res;
 }
 
@@ -751,7 +747,7 @@ char *string_get_next_line(char **text)
 	/* allocate mem for the new string */
 	res = memory_get(i);
 	/* copy it */
-	strncpy(res, (*text), i-1);
+	strncpy2(res, (*text), i);
 	res[i-1] = 0;
 	/* move pointer to the next line */
 	(*text) += i;
@@ -1018,11 +1014,11 @@ char *string_sort_uniq_lines(const char *text)
 	int flag_newl = 0;
 	int flag_diff = 0;
 	int i, i2, l1, l2, count;
-	int maxl = strlen(text);
+	int maxl = strlen(text) + 1;
 	
 	/* create a copy of text for sorting */
 	text_sort = memory_get(maxl);
-	strncpy2(text_sort, text);
+	strncpy2(text_sort, text, maxl);
 
 	/* count lines */
 	i = 0;
@@ -1069,8 +1065,8 @@ char *string_sort_uniq_lines(const char *text)
 	i2 = count;
 	while(i2--){
 		char *s = ptr[i++];
-		strncat2(text_new, s);
-		strncat2(text_new, "\n");
+		strncat2(text_new, s, maxl);
+		strncat2(text_new, "\n", maxl);
 	}
 	free(text_sort);
 	free(ptr);
@@ -1092,8 +1088,8 @@ char *string_sort_uniq_lines(const char *text)
 		/* first run */		
 		if (!flag_first){
 			l1 = strlen(res);
-			strncat2(text_final, res);
-			strncat2(text_final, "\n");
+			strncat2(text_final, res, maxl);
+			strncat2(text_final, "\n", maxl);
 		}
 		else{
 			/* compare 2 lines */
@@ -1104,8 +1100,8 @@ char *string_sort_uniq_lines(const char *text)
 			else if (strcmp(res, res2)) flag_diff = 1;
 			/* store if different */
 			if (flag_diff){
-				strncat2(text_final, res);
-				strncat2(text_final, "\n");
+				strncat2(text_final, res, maxl);
+				strncat2(text_final, "\n", maxl);
 			}
 			free(res2);
 		}
@@ -1204,8 +1200,8 @@ char *domain_get_list()
 		/* get domain name */
 		res2 = domain_get_name(res);
 		if (res2){
-			strncat2(list, res2);
-			strncat2(list, "\n");
+			strncat2(list, res2, max_file);
+			strncat2(list, "\n", max_file);
 			free(res2);
 		}
 		free(res);
@@ -1228,7 +1224,7 @@ int domain_exist(const char *text)
 {
 	char temp[max_char] = "<kernel> ";
 	
-	strncat2(temp, text);
+	strncat2(temp, text, max_char);
 
 	return string_search_line(tdomf, temp);
 }
@@ -1574,15 +1570,15 @@ int process_running(const char *name){
 	/* cycle through dirs in /proc */
 	while((mydir_entry = readdir(mydir))) {
 		/* get the dir names inside /proc dir */
-		strncpy2(mypid, mydir_entry->d_name);
+		strncpy2(mypid, mydir_entry->d_name, max_num);
 		/* does it contain numbers only meaning they are pids? */
 		if (strspn(mypid, "0123456789") == strlen(mypid)) {
 			int res;
 			char buff[max_char] = "";
 			/* create dirname like /proc/pid/exe */
-			strncpy2(mydir_name, "/proc/");
-			strncat2(mydir_name, mypid);
-			strncat2(mydir_name, "/exe");
+			strncpy2(mydir_name, "/proc/", max_char);
+			strncat2(mydir_name, mypid, max_char);
+			strncat2(mydir_name, "/exe", max_char);
 			/* resolv the link pointing from the exe name */
 			res = readlink(mydir_name, buff, max_char);
 			if (res > 0){
@@ -1609,8 +1605,8 @@ char *process_get_path(int pid)
 	char *buff;
 
 	/* create path */	
-	strncat2(path, string_itos(pid));
-	strncat2(path, "/exe");
+	strncat2(path, string_itos(pid), max_char);
+	strncat2(path, "/exe", max_char);
 
 	/* alloc mem for result */
 	buff = memory_get(max_char);
@@ -1698,8 +1694,8 @@ void load()
 				/* remove (deleted) and quota_exceeded entries */
 				if((string_search_keyword(res2, "(deleted)") == -1) && (string_search_keyword(res2, "(deleted)") == -1)){
 					/* add entry if ok */
-					strncat2(tdomf_new, res2);
-					strncat2(tdomf_new, "\n");
+					strncat2(tdomf_new, res2, max_file);
+					strncat2(tdomf_new, "\n", max_file);
 				}
 				free(res2);
 			}
@@ -1743,12 +1739,12 @@ void backup()
 	num = string_ltos(t.tv_sec);
 
 	/* create new uniqe names to config files */
-	strncpy2(tdom2, tdom);
-	strncat2(tdom2, ".backup.");
-	strncat2(tdom2, num);
-	strncpy2(texc2, texc);
-	strncat2(texc2, ".backup.");
-	strncat2(texc2, num);
+	strncpy2(tdom2, tdom, max_char);
+	strncat2(tdom2, ".backup.", max_char);
+	strncat2(tdom2, num, max_char);
+	strncpy2(texc2, texc, max_char);
+	strncat2(texc2, ".backup.", max_char);
+	strncat2(texc2, num, max_char);
 	free(num);
 
 	/* save configs to backup files on disk */
@@ -1772,7 +1768,7 @@ int check_instance(){
 		else{
 			/* is the process with the foreign pid still running? */
 			char path[max_char] = "/proc/";
-			strncat2(path, pid2);
+			strncat2(path, pid2, max_char);
 			/* if running, then return false */
 			if (dir_exist(path)){ free(mypid); free(pid2); return 1; }
 			/* if not running, then overwrite pid number in pid file */
@@ -1805,11 +1801,13 @@ char *which(const char *name){
 	if (name[0] == '/'){
 		/* file exists? if not, then fail */
 		if (file_exist(full)){
+			int maxl;
 			/* read link path */
 			i = readlink(name, buff, max_char);
-			if (i > -1){ strncpy2(full, buff); }
-			res = memory_get(strlen(full));
-			strncpy2(res, full);
+			if (i > -1){ strncpy2(full, buff, max_char); }
+			maxl = strlen(full) + 1;
+			res = memory_get(maxl);
+			strncpy2(res, full, maxl);
 			return res;
 		}
 		return 0;
@@ -1817,14 +1815,16 @@ char *which(const char *name){
 
 	/* fle exists in the current dir? */
 	getcwd(full, max_char);
-	strncat2(full, "/");
-	strncat2(full, name);
+	strncat2(full, "/", max_char);
+	strncat2(full, name, max_char);
 	if (file_exist(full)){
+		int maxl;
 		/* read link path */
 		i = readlink(full, buff, max_char);
-		if (i > -1){ strncpy2(full, buff); }
-		res = memory_get(strlen(full));
-		strncpy2(res, full);
+		if (i > -1){ strncpy2(full, buff, max_char); }
+		maxl = strlen(full) + 1;
+		res = memory_get(maxl);
+		strncpy2(res, full, maxl);
 		return res;
 	}
 
@@ -1833,15 +1833,17 @@ char *which(const char *name){
 	while(1){
 		res = path_bin[i++];
 		if (!res) return 0;
-		strncpy2(full, res);
-		strncat2(full, "/");
-		strncat2(full, name);
+		strncpy2(full, res, max_char);
+		strncat2(full, "/", max_char);
+		strncat2(full, name, max_char);
 		if (file_exist(full)){
+			int maxl;
 			/* read link path */
 			i = readlink(full, buff, max_char);
-			if (i > -1){ strncpy2(full, buff); }
-			res = memory_get(strlen(full));
-			strncpy2(res, full);
+			if (i > -1){ strncpy2(full, buff, max_char); }
+			maxl = strlen(full) + 1;
+			res = memory_get(maxl);
+			strncpy2(res, full, maxl);
 			return res;
 		}
 		full[0] = 0;
@@ -1897,7 +1899,7 @@ void check_options(int argc, char **argv){
 			/* clear argument buffer for security */
 			int i = max_char;
 			while(--i) myarg[i] = 0;
-			strncpy2(myarg, argv[c]);
+			strncpy2(myarg, argv[c], max_char);
 			
 			if (!strcmp(myarg, "-v") || !strcmp(myarg, "--verson"))	{ opt_version = 1;	flag_ok = 1; }
 			if (!strcmp(myarg, "-h") || !strcmp(myarg, "--help"  ))	{ opt_help    = 1;	flag_ok = 1; }
@@ -1926,7 +1928,7 @@ void check_options(int argc, char **argv){
 					/* if former arg was an option, then it belongs to it */
 					if (flag_last){
 						/* store as --info parameter */
-						strncpy2(opt_info2, myarg);
+						strncpy2(opt_info2, myarg, max_char);
 					}
 					/* it belongs to the extra executables, so store it */
 					else flag_progs = 1;
@@ -1936,7 +1938,7 @@ void check_options(int argc, char **argv){
 					/* if former arg was an option, then it belongs to it */
 					if (flag_last){
 						/* store as --remove parameter */
-						strncpy2(opt_remove2, myarg);
+						strncpy2(opt_remove2, myarg, max_char);
 					}
 					/* it belongs to the extra executables, so store it */
 					else flag_progs = 1;
@@ -1952,14 +1954,14 @@ void check_options(int argc, char **argv){
 					if (!dir_exist(myarg)){
 						color_("error: no such directory: ", red); color_(myarg, red); newl(); myexit(1); }
 					/* expand recursive dir names with "/" char if missing */
-					strncpy2(path, myarg);
+					strncpy2(path, myarg, max_char);
 					l = strlen(myarg);
 					if (path[l-1] != '/'){ path[l] = '/'; path[l+1] = 0; }
 					/* alloc mem for dirs_recursive */
 					if (!dirs_recursive) dirs_recursive = memory_get(max_file);
 					/* if so, store it in recursive dir array */
-					strncpy2(dirs_recursive, path);
-					strncpy2(dirs_recursive, "\n");
+					strncpy2(dirs_recursive, path, max_file);
+					strncat2(dirs_recursive, "\n", max_file);
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (!flag_type || flag_progs){
@@ -1970,8 +1972,8 @@ void check_options(int argc, char **argv){
 					/* alloc mem for tprogs */
 					if (!tprogs) tprogs = memory_get(max_file);
 					/* if so, store it as extra executables */
-					strncat2(tprogs, res);
-					strncat2(tprogs, "\n");
+					strncat2(tprogs, res, max_file);
+					strncat2(tprogs, "\n", max_file);
 					free(res);
 				}
 			}
@@ -2073,7 +2075,7 @@ void clear()
 	/* create new configs */
 	tdomf = memory_get(max_file);
 	texcf = memory_get(max_file);
-	strncpy2(tdomf, "<kernel>\nuse_profile 0\n\n");
+	strncpy2(tdomf, "<kernel>\nuse_profile 0\n\n", max_file);
 	texcf[0] = 0;
 	/* write config files */
 	file_write(texc, texcf);
@@ -2142,8 +2144,8 @@ void domain_info(const char *pattern)
 					/* print non empty lines */
 					if (res2[0]){
 						char h[max_char] = "";
-						strncpy2(h, home);
-						strncat2(h, "/");
+						strncpy2(h, home, max_char);
+						strncat2(h, "/", max_char);
 					
 						/* print rules with reading libs in yellow */
 						if ((string_search_keyword(res2, "allow_read /lib/") > -1) ||
@@ -2185,7 +2187,7 @@ void domain_info(const char *pattern)
 		long maxl;
 		
 		/* get policy size to use it for allocating memory as a maximum value */
-		maxl = strlen(tdomf);
+		maxl = strlen(tdomf) + 1;
 
 		texcf_new = memory_get(maxl);
 		
@@ -2202,8 +2204,8 @@ void domain_info(const char *pattern)
 
 			res2 = string_get_next_wordn(&res_temp, 1);
 			if (res2){
-				strncat2(texcf_new, res2);
-				strncat2(texcf_new, "\n");
+				strncat2(texcf_new, res2, maxl);
+				strncat2(texcf_new, "\n", maxl);
 				free(res2);
 			}
 			free(res);
@@ -2254,12 +2256,12 @@ void domain_print_list_not_progs()
 		if (!res) break;
 		/* does tprogs contain any of the domain names? */
 		if (string_search_line(tprogs, res) == -1){
-			strncat2(list2, res);
-			strncat2(list2, "\n");
+			strncat2(list2, res, max_file);
+			strncat2(list2, "\n", max_file);
 			/* add domain to tprogs if no in exceptions */
 			if (string_search_line(tprogs_exc, res) == -1){
-				strncat2(tprogs, res);
-				strncat2(tprogs, "\n");
+				strncat2(tprogs, res, max_file);
+				strncat2(tprogs, "\n", max_file);
 			}
 		}
 		free(res);
@@ -2287,8 +2289,8 @@ void domain_print_list_not_progs()
 			if (!res) break;
 			res2 = string_get_filename(res);
 			if (res2){
-				strncat2(list2, res2);
-				strncat2(list2, "\n");
+				strncat2(list2, res2, max_file);
+				strncat2(list2, "\n", max_file);
 				free(res2);
 			}
 			free(res);
@@ -2335,8 +2337,8 @@ void domain_print_mode()
 		if(!prog) break;
 		
 		/* does the domain exist for the program? */
-		strncpy2(s, "initialize_domain ");
-		strncat2(s, prog);
+		strncpy2(s, "initialize_domain ", max_char);
+		strncat2(s, prog, max_char);
 		if (string_search_line(texcf, s) > -1){
 			if (flag_firstrun){
 				color(prog, blue);
@@ -2353,8 +2355,8 @@ void domain_print_mode()
 			color("create domain", green);
 			/* if the program is running already, then restart is needed for the rules to take effect */
 			if (process_running(prog)) color(" (restart needed)", red);
-			strncat2(texcf, s);
-			strncat2(texcf, "\n");
+			strncat2(texcf, s, max_file);
+			strncat2(texcf, "\n", max_file);
 		}
 		
 		/* does the rule exist for it? */
@@ -2364,15 +2366,15 @@ void domain_print_mode()
 			color("create rule with learning mode on", green);
 			if (!flag_firstrun) newl();
 			/* create a rule for it */
-			strncat2(tdomf, "\n<kernel> ");
-			strncat2(tdomf, prog);
-			strncat2(tdomf, "\nuse_profile 1\n");
+			strncat2(tdomf, "\n<kernel> ", max_file);
+			strncat2(tdomf, prog, max_file);
+			strncat2(tdomf, "\nuse_profile 1\n", max_file);
 			/* alloc mem for tprogs_learn */
 			if (!tprogs_learn) tprogs_learn = memory_get(max_file);
 			/* store prog name to know not to turn on enforcing mode for these ones on exit */
 			if(string_search_line(tprogs_learn, prog) == -1){
-				strncat2(tprogs_learn, prog);
-				strncat2(tprogs_learn, "\n");
+				strncat2(tprogs_learn, prog, max_file);
+				strncat2(tprogs_learn, "\n", max_file);
 			}
 		}
 		else{
@@ -2458,8 +2460,8 @@ void check_exceptions()
 		while(1){
 			char *res = tshellf2[i++];
 			if (!res) break;
-			strncpy2(tshellf, res);
-			strncpy2(tshellf, "\n");
+			strncpy2(tshellf, res, max_file);
+			strncat2(tshellf, "\n", max_file);
 		}
 	}
 	
@@ -2475,8 +2477,8 @@ void check_exceptions()
 		if (res[0] != '#'){
 			/* add it only if it exists */
 			if (file_exist(res)){
-				strncat2(tprogs_exc, res);
-				strncat2(tprogs_exc, "\n");
+				strncat2(tprogs_exc, res, max_file);
+				strncat2(tprogs_exc, "\n", max_file);
 			}
 		}
 		free(res);
@@ -2487,15 +2489,15 @@ void check_exceptions()
 	while(1){
 		res = tprogs_exc_manual[i++];
 		if (!res) break;
-		strncat2(tprogs_exc, res);
-		strncat2(tprogs_exc, "\n");
+		strncat2(tprogs_exc, res, max_file);
+		strncat2(tprogs_exc, "\n", max_file);
 	}
 
 	/* add my executable too to the list */
 	res = process_get_path(getpid());
 	if (res){
-		strncat2(tprogs_exc, res);
-		strncat2(tprogs_exc, "\n");
+		strncat2(tprogs_exc, res, max_file);
+		strncat2(tprogs_exc, "\n", max_file);
 		free(res);
 	}
 		
@@ -2515,7 +2517,7 @@ void check_exceptions()
 			free(tprogs);
 			/* realloc more mem above the sorted list to expand it later */
 			tprogs = memory_get(max_file);
-			strncpy2(tprogs, res);
+			strncpy2(tprogs, res, max_file);
 			free(res);
 		}
 	}
@@ -2601,9 +2603,9 @@ void check_processes()
 				temp2 = res2;
 				res3 = string_get_next_wordn(&temp2, 9);
 				if(res3){
-					strncat2(netf2, "socket:[");
-					strncat2(netf2, res3);
-					strncat2(netf2, "]\n");
+					strncat2(netf2, "socket:[", max_file);
+					strncat2(netf2, res3, max_file);
+					strncat2(netf2, "]\n", max_file);
 					free(res3);
 				}
 				free(res2);
@@ -2628,16 +2630,16 @@ void check_processes()
 		while((mydir_entry = readdir(mydir))) {
 			char mypid[max_num] = "";
 			/* get my pid number from dir name in /proc */
-			strncpy2(mypid, mydir_entry->d_name);
+			strncpy2(mypid, mydir_entry->d_name, max_num);
 			/* does it contain numbers only meaning they are pids? */
 			if (strspn(mypid, "0123456789") == strlen(mypid)) {
 				int res;
 				char mydir_name[max_char] = "";
 				char myprog[max_char] = "";
 				/* create dirname like /proc/pid/exe */
-				strncpy2(mydir_name, "/proc/");
-				strncat2(mydir_name, mypid);
-				strncat2(mydir_name, "/exe");
+				strncpy2(mydir_name, "/proc/", max_char);
+				strncat2(mydir_name, mypid, max_char);
+				strncat2(mydir_name, "/exe", max_char);
 				/* resolv the link pointing from the exe name */
 				res = readlink(mydir_name, myprog, max_char);
 				if (res > 0){
@@ -2645,9 +2647,9 @@ void check_processes()
 					struct dirent *mydir_entry2;
 					char myfd[max_char] = "";
 					/* create dir name like /proc/pid/fd/ */
-					strncpy2(myfd, "/proc/");
-					strncat2(myfd, mypid);
-					strncat2(myfd, "/fd/");
+					strncpy2(myfd, "/proc/", max_char);
+					strncat2(myfd, mypid, max_char);
+					strncat2(myfd, "/fd/", max_char);
 					mydir2 = opendir(myfd);
 					
 					if (mydir2){
@@ -2657,8 +2659,8 @@ void check_processes()
 							char mysock[max_char] = "";
 							int resfd;
 							/* create dirname like /proc/pid/fd/4 */
-							strncpy2(mydir_name2, myfd);
-							strncat2(mydir_name2, mydir_entry2->d_name);
+							strncpy2(mydir_name2, myfd, max_char);
+							strncat2(mydir_name2, mydir_entry2->d_name, max_char);
 							/* resolv the links from the /proc/pid/fd/ dir */
 							resfd = readlink(mydir_name2, mysock, max_char);
 							if (resfd > 0){
@@ -2670,8 +2672,8 @@ void check_processes()
 										if (!tprogs) tprogs = memory_get(max_file);
 										/* is it in my progs list yet? */
 										if (string_search_line(tprogs, myprog) == -1){
-											strncat2(tprogs, myprog);
-											strncat2(tprogs, "\n");
+											strncat2(tprogs, myprog, max_file);
+											strncat2(tprogs, "\n", max_file);
 											color(myprog, blue); newl();
 										}
 									}
