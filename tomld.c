@@ -1502,7 +1502,6 @@ char *file_read(const char *name, long length)
 /* open file and write content */
 void file_write(const char *name, const char *buff)
 {
-	char zero[] = "";
 	FILE *f = fopen(name, "w");
 	if (!f){
 		color_("error: cannot write file ", red);
