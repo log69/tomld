@@ -1602,11 +1602,13 @@ int process_running(const char *name){
 char *process_get_path(int pid)
 {
 	char path[max_char] = "/proc/";
-	char *buff;
+	char *buff, *str;
 
-	/* create path */	
-	strncat2(path, string_itos(pid), max_char);
+	/* create path */
+	str = string_itos(pid);
+	strncat2(path, str, max_char);
 	strncat2(path, "/exe", max_char);
+	free(str);
 
 	/* alloc mem for result */
 	buff = memory_get(max_char);
@@ -1614,6 +1616,7 @@ char *process_get_path(int pid)
 	/* resolv the link pointing from the exe name */
 	if (readlink(path, buff, max_char) > 0) return buff;
 
+	free(buff);
 	return 0;
 }
 
@@ -2500,7 +2503,7 @@ void check_exceptions()
 		strncat2(tprogs_exc, "\n", max_file);
 		free(res);
 	}
-		
+
 	/* sort exception list */
 	if (tprogs_exc){
 		res = string_sort_uniq_lines(tprogs_exc);
