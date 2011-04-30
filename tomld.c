@@ -1511,8 +1511,6 @@ void file_write(const char *name, const char *buff)
 	}
 	/* write contents if not null */
 	if (buff) fprintf(f, buff);
-	/* write null */
-	else      fprintf(f, zero);
 	fclose(f);
 }
 
