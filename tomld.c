@@ -2391,6 +2391,7 @@ void domain_get_log()
 		myexit(1);
 	}
 	l = i2 + 2;
+	if (tmarkf) free(tmarkf);
 	tmarkf = memory_get(l);
 	strncpy2(tmarkf, res + i, l);
 	free(res);
@@ -2514,6 +2515,7 @@ void domain_get_log()
 	
 	free(prog_rules);
 	free(tlogf2);
+	free(tlogf3);
 }
 
 
