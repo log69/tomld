@@ -1426,12 +1426,18 @@ char key_get()
 /* give a choice */
 int choice(const char *text)
 {
-	char c = 0;
-	printf(text);
-	printf(" [y/N]");
-	c = getchar();
-	if (c == 'y') return 1;
-	return 0;
+	char c = 0, c2;
+	if (opt_yes) newl();
+	else{
+		printf(text);
+		printf(" [y/N]");
+		c = getchar();
+		if (c == '\n') return 0;
+		while((c2 = getchar()) != '\n');
+		if (c == 'y' || c == 'Y') return 1;
+		return 0;
+	}
+	return 1;
 }
 
 
@@ -2289,13 +2295,19 @@ void domain_learn_all()
 
 /* -------------------------------------------------------------------------------------- */
 
+
 /* get recent access deny logs */
 void domain_get_log()
 {
 	/* vars */
-	char *res, *temp, *start, *tlogf2;
+	char *res, *res2, *temp, *temp2;
+	char *start, *tlogf2, *tlogf3;
+	char *prog_rules = 0;
 	char key[max_char] = "";
+	char key2[] = "denied for ";
+	char rules[max_char] = "";
 	int i, i2, l;
+	int key2_len = strlen(key2);
 	
 	/* load log mark from file if not loaded yet */
 	if (!tmarkf){
@@ -2317,6 +2329,8 @@ void domain_get_log()
 	
 	/* alloc mem for collected log */
 	tlogf2 = memory_get(max_file);
+	tlogf3 = memory_get(max_file);
+	
 	/* search for tomoyo error messages from mark */
 	/* collect access deny messages */
 	if (tomoyo_version() <= 2299) strncpy2(key, " TOMOYO-ERROR: Access ", max_char);
@@ -2351,8 +2365,8 @@ void domain_get_log()
 		res = string_get_next_line(&temp);
 		if (res){
 			/* store it */
-			strncat2(tlogf2, res, max_file);
-			strncat2(tlogf2, "\n", max_file);
+			strncat2(tlogf3, res, max_file);
+			strncat2(tlogf3, "\n", max_file);
 			free(res);
 		}
 	}
@@ -2365,6 +2379,7 @@ void domain_get_log()
 		color_("error: unexpected error, log message format is not correct\n", red);
 		free(res);
 		free(tlogf2);
+		free(tlogf3);
 		myexit(1);
 	}
 	i2 = string_search_keyword(res + i, "]");
@@ -2372,6 +2387,7 @@ void domain_get_log()
 		color_("error: unexpected error, log message format is not correct\n", red);
 		free(res);
 		free(tlogf2);
+		free(tlogf3);
 		myexit(1);
 	}
 	l = i2 + 2;
@@ -2379,10 +2395,124 @@ void domain_get_log()
 	strncpy2(tmarkf, res + i, l);
 	free(res);
 
-	debug(tlogf2);
-	debug(tmarkf);
 
+	/* alloc mem for prog names with rules */
+	prog_rules = memory_get(max_file);
+
+	/* convert logs to rules */
+	l = strlen("TOMOYO-ERROR: Access '");
+	temp = tlogf2;
+	while(1){
+		/* next rule */
+		temp2 = temp;
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		/* get allow_ type */
+		temp2 += l + 1,
+		res2 = string_get_next_word(&temp2);
+		if (!res2){
+			color_("error: unexpected error, log message format is not correct\n", red);
+			free(res);
+			free(tlogf2);
+			free(tlogf3);
+			myexit(1);
+		}
+		/* does it contain a "(" char? */
+		i = string_search_keyword(res2, "(");
+		/* if so, them remove it */
+		if (i > -1){
+			res2[i] = 0;
+		}
+		/* add together allow_ type */
+		strncpy2(rules, "allow_", max_char);
+		strncat2(rules, res2, max_char);
+		strncat2(rules, " ", max_char);
+		free(res2);
+		
+		/* get parameters of rule */
+		res2 = string_get_next_word(&temp2);
+		if (!res2){
+			color_("error: unexpected error, log message format is not correct\n", red);
+			free(res);
+			free(tlogf2);
+			free(tlogf3);
+			myexit(1);
+		}
+		i = strlen(res2);
+		if (i > 0) res2[i - 1] = 0;
+		/* add all together, and rule is complete */
+		strncat2(rules, res2, max_char);
+		free(res2);
+
+		
+		/* get program name the rule belongs to */
+		/* jump behind "denied for " part */
+		i = string_search_keyword(temp2, key2);
+		if (i == -1){
+			color_("error: unexpected error, log message format is not correct\n", red);
+			free(res);
+			free(tlogf2);
+			free(tlogf3);
+			myexit(1);
+		}
+		/* get binary name */
+		temp2 += i + key2_len;
+		res2 = string_get_next_word(&temp2);
+		if (!res2){
+			color_("error: unexpected error, log message format is not correct\n", red);
+			free(res);
+			free(tlogf2);
+			free(tlogf3);
+			myexit(1);
+		}
+		/* create text for sorting in a format like "binary allow_ rule" */
+		strncat2(prog_rules, res2,  max_file);
+		strncat2(prog_rules, " ",   max_file);
+		strncat2(prog_rules, rules, max_file);
+		strncat2(prog_rules, "\n",  max_file);
+		free(res2);
+
+		
+		free(res);
+	}
+
+	/* add rules to policy */
+	if (prog_rules){
+		
+		/* sort and uniq rules */
+		res = string_sort_uniq_lines(prog_rules);
+		if(res){
+			free(prog_rules);
+			prog_rules = res;
+		}
+
+		/* cycle through new rules */		
+		color("* adding log messages to policy\n", yellow);
+		temp = prog_rules;
+		while(1){
+			char *prog, *rule;
+			temp2 = temp;
+			/* next line */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			/* prog name */
+			prog = string_get_next_word(&temp2);
+			rule = string_get_next_line(&temp2);
+
+			color(prog, blue);
+			color(" ", clr);
+			color(rule, purple);
+			if (choice("  add rules?")){
+				
+			}
+
+			free(rule);
+			free(prog);
+			free(res);
+		}
+	}
 	
+	free(prog_rules);
 	free(tlogf2);
 }
 

@@ -1795,8 +1795,8 @@ def check():
 
 		# updating log format from tomoyo version 2.2 to 2.3
 		# 2 kinds of message types:
-		# ERROR: Access read(...) /etc/file' denied for /bin/program
-		# ERROR: Domain <kernel> /bin/this/program /bin/other/program' not defined.
+		# ERROR: Access 'read(...) /etc/file' denied for /bin/program
+		# ERROR: Domain '<kernel> /bin/this/program /bin/other/program' not defined.
 		log3 = re.findall(".*[\- ]ERROR: Access \'*.*$", logall, re.M)
 		log4 = re.findall(".*[\- ]ERROR: Domain \'*.*$", logall, re.M)
 
