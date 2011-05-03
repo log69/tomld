@@ -1527,7 +1527,11 @@ char key_get()
 int choice(const char *text)
 {
 	char c = 0, c2;
-	if (opt_yes) newl();
+	if (opt_yes){
+		printf(text);
+		printf(" [y/N] y");
+		newl();
+	}
 	else{
 		printf(text);
 		printf(" [y/N]");
@@ -1845,12 +1849,15 @@ void load()
 				/* read domain line by line */
 				res2 = string_get_next_line(&temp);
 				if (!res2) break;
-				
-				/* remove (deleted) and quota_exceeded entries */
-				if((string_search_keyword(res2, "(deleted)") == -1) && (string_search_keyword(res2, "(deleted)") == -1)){
-					/* add entry if ok */
-					strncat2(tdomf_new, res2, max_file);
-					strncat2(tdomf_new, "\n", max_file);
+
+				/* don't add empty lines */
+				if (res2[0]){
+					/* remove (deleted) and quota_exceeded entries */
+					if((string_search_keyword(res2, "(deleted)") == -1) && (string_search_keyword(res2, "(deleted)") == -1)){
+						/* add entry if ok */
+						strncat2(tdomf_new, res2, max_file);
+						strncat2(tdomf_new, "\n", max_file);
+					}
 				}
 				free(res2);
 			}
@@ -2392,6 +2399,22 @@ void domain_remove(const char *text)
 /* turn back learning mode for all domains with profile 2-3 */
 void domain_set_learn_all()
 {
+	char *res, *temp, *orig;
+	
+	/* load config files */
+	load();
+
+	/* cycle through domains */
+	temp = tdomf;
+	while(1){
+		/* get next domain */
+		orig = temp;
+		res = domain_get_next(&temp);
+		if (!res) break;
+		/* turn domain into learning mode */
+		domain_set_profile(orig, 1);
+		free(res);
+	}
 }
 
 /* -------------------------------------------------------------------------------------- */
