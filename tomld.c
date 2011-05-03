@@ -261,7 +261,7 @@ char *tload	= "/usr/sbin/tomoyo-loadpolicy";
 char *tsave	= "/usr/sbin/tomoyo-savepolicy";
 
 /* backup conf for checking change of rules */
-char *tdomf_bak = "";
+char *tdomf_bak = 0;
 
 /* system log */
 char *tlog	= "/var/log/syslog";
@@ -464,6 +464,7 @@ void myfree()
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 	if (tmarkf)					free(tmarkf);
 	if (tlogf)					free(tlogf);
+	if (tdomf_bak)				free(tdomf_bak);
 }
 
 
@@ -954,17 +955,59 @@ char *string_get_next_wordn(char **text, int num)
 	(*text) += i;
 
 	return res;
+}
 
-/*	char *res;
+
+/* return last word from a line of string */
+/* returned value must be freed by caller */
+char *string_get_last_word(char **text)
+{
+	char *res, c;
+	int i = 0;
+	int start, end;
+	int l;
 	
-	while(1){
-		res = string_get_next_word(text);
-		if (!res) return 0;
-		if (num <= 0) return res;
-		free(res);
-		num--;
-	}*/
+	/* skip white spaces or exit on end of line */
+	while (1){
+		c = (*text)[i];
+		/* exit on end */
+		if (!c || c == '\n') return 0;
+		if (c != ' ') break;
+		i++;
+	}
 
+	/* get length from here to the end of the line */
+	start = i;
+	while(1){
+		c = (*text)[i];
+		if (!c || c == '\n') break;
+		i++;
+	}
+	
+	/* get last word going backwards */
+	i--;
+	end = i;
+	while(1){
+		c = (*text)[i];
+		if (c == ' ' || i < start) break;
+		i--;
+	}
+	i++;
+	
+	/* allocate mem for the new string */
+	l = end - i + 1;
+	res = memory_get(l + 1);
+	/* copy word */
+	start = i;
+	i = l;
+	while(i--){
+		res[i] = (*text)[start + i];
+	}
+	res[l] = 0;
+	/* set pointer to the beginning of the last word */
+	(*text) += start;
+
+	return res;
 }
 
 
@@ -1219,7 +1262,24 @@ char *domain_get_name(char *text)
 	temp2 = res;
 	res2 = string_get_next_wordn(&temp2, 1);
 	free(res);
-	if (!res2) return 0;
+	return res2;
+}
+
+
+/* return a new string containing the name of the subdomain from the domain policy */
+/* returned value must be freed by caller */
+char *domain_get_name_sub(char *text)
+{
+	char *res, *res2, *temp, *temp2;
+	
+	/* get first line containing the name of the domain */
+	temp = text;
+	res = string_get_next_line(&temp);
+	if (!res) return 0;
+	/* get last word for main or subdomain name */
+	temp2 = res;
+	res2 = string_get_last_word(&temp2);
+	free(res);
 	return res2;
 }
 
@@ -1304,7 +1364,7 @@ int domain_get_profile(char *text)
 }
 
 
-/* set profile number (0-3) of domain at text position */
+/* set profile number (0-3) of a domain at text position from the beginning of domain policy */
 void domain_set_profile(char *text, int profile)
 {
 	int i, p;
@@ -1342,7 +1402,7 @@ void domain_set_profile_all(const char *prog, int profile)
 	while(1){
 		orig = temp;
 
-		/* check next domain */
+		/* get next domain policy */
 		res = domain_get_next(&temp);
 		if (!res) break;
 		/* check if domain is a main or subdomain of what i'm looking for */
@@ -1354,6 +1414,46 @@ void domain_set_profile_all(const char *prog, int profile)
 		free(res2);
 		free(res);
 	}
+}
+
+
+/* add rule to prog domain and subdomain */
+void domain_add_rule(char *prog, char *rule)
+{
+	char *res, *res2, *temp, *temp2, *tdomf_new;
+
+	/* alloc mem for new policy */	
+	tdomf_new = memory_get(max_file);
+	
+	/* cycle through the domains */
+	temp = tdomf;
+	while(1){
+		/* get next domain policy */
+		res = domain_get_next(&temp);
+		if (!res) break;
+		/* add domain policy to new policy */
+		strncat2(tdomf_new, res, max_file);
+		strncat2(tdomf_new, "\n", max_file);
+		/* check if this is what i'm looking for */
+		temp2 = res;
+		res2 = domain_get_name_sub(temp2);
+		if (res2){
+			/* prog name matches subdomain name? */
+			if (!strcmp(prog, res2)){
+				/* if so, then add rule to new policy */
+				strncat2(tdomf_new, rule, max_file);
+				strncat2(tdomf_new, "\n", max_file);
+			}
+			free(res2);
+		}
+		free(res);
+		/* add new line to new policy */
+		strncat2(tdomf_new, "\n", max_file);
+	}
+	
+	/* replace old policy with new one */
+	free(tdomf);
+	tdomf = tdomf_new;
 }
 
 
@@ -1695,7 +1795,7 @@ int file_exist(const char *name){
 void load()
 {
 	/* vars */
-	char *tdomf2, *tdomf_new, *res, *res2, *temp;
+	char *tdomf_new, *res, *res2, *temp, *temp2;
 	
 	/* load domain config */
 	tdomf = file_read(tdomk, max_file);
@@ -1707,13 +1807,13 @@ void load()
 	tdomf_new = memory_get(max_file);
 
 	/* remove disabled mode entries so runtime will be faster */
-	tdomf2 = tdomf;
+	temp2 = tdomf;
 	
 	while(1){
 		int flag_deleted = 0;
 		
 		/* get next domain */
-		res = domain_get_next(&tdomf2);
+		res = domain_get_next(&temp2);
 		/* exit on end */
 		if (!res) break;
 		temp = res;
@@ -1754,6 +1854,7 @@ void load()
 				}
 				free(res2);
 			}
+			strncat2(tdomf_new, "\n", max_file);
 		}
 		free(res);
 	}
@@ -2289,7 +2390,7 @@ void domain_remove(const char *text)
 
 
 /* turn back learning mode for all domains with profile 2-3 */
-void domain_learn_all()
+void domain_set_learn_all()
 {
 }
 
@@ -2308,7 +2409,12 @@ void domain_get_log()
 	char rules[max_char] = "";
 	int i, i2, l;
 	int key2_len = strlen(key2);
-	
+
+
+	/* ------------------- */
+	/* ----- get log ----- */
+	/* ------------------- */
+
 	/* load log mark from file if not loaded yet */
 	if (!tmarkf){
 		if (file_exist(tmark)){
@@ -2370,6 +2476,9 @@ void domain_get_log()
 			free(res);
 		}
 	}
+	
+	/* debug part to print domain deny messages if any */
+	if (tlogf3[0]) debug(tlogf3);
 
 	/* set mark to the last log line */
 	temp = tlogf;
@@ -2397,10 +2506,13 @@ void domain_get_log()
 	free(res);
 
 
+	/* --------------------------------- */
+	/* ----- convert logs to rules ----- */
+	/* --------------------------------- */
+
 	/* alloc mem for prog names with rules */
 	prog_rules = memory_get(max_file);
 
-	/* convert logs to rules */
 	l = strlen("TOMOYO-ERROR: Access '");
 	temp = tlogf2;
 	while(1){
@@ -2477,9 +2589,14 @@ void domain_get_log()
 		free(res);
 	}
 
-	/* add rules to policy */
+
+	/* ------------------------------- */
+	/* ----- add rules to policy ----- */
+	/* ------------------------------- */
+
 	if (prog_rules){
-		
+		char *tdomf_new, *prog, *rule, *orig, *prog_rules_new;
+
 		/* sort and uniq rules */
 		res = string_sort_uniq_lines(prog_rules);
 		if(res){
@@ -2487,29 +2604,90 @@ void domain_get_log()
 			prog_rules = res;
 		}
 
-		/* cycle through new rules */		
+		/* alloc mem for new list of rules after confirmation */
+		prog_rules_new = memory_get(max_file);
+
 		color("* adding log messages to policy\n", yellow);
+		/* cycle through new rules and ask for confirmation to add it to domain policy */
 		temp = prog_rules;
 		while(1){
-			char *prog, *rule;
-			temp2 = temp;
-			/* next line */
+			/* get next rule */
 			res = string_get_next_line(&temp);
 			if (!res) break;
-			/* prog name */
+			/* get prog name and its rules */
+			temp2 = res;
 			prog = string_get_next_word(&temp2);
 			rule = string_get_next_line(&temp2);
-
+			/* print and confirm */
 			color(prog, blue);
-			color(" ", clr);
+			color("  ", clr);
 			color(rule, purple);
 			if (choice("  add rules?")){
-				
+				/* add rules to new rules */
+				strncat2(prog_rules_new, res, max_file);
+				strncat2(prog_rules_new, "\n", max_file);
 			}
-
-			free(rule);
 			free(prog);
+			free(rule);
 			free(res);
+		}
+		free(prog_rules);
+		prog_rules = prog_rules_new;
+		
+		/* are there any new rules after confirmation? */
+		if (prog_rules[0]){
+
+			/* alloc mem for new domain policy */
+			tdomf_new = memory_get(max_file);
+
+			/* cycle through domains to add new rules */
+			temp = tdomf;
+			while(1){
+				orig = temp;
+				/* get next domain policy */
+				res = domain_get_next(&temp);
+				if (!res) break;
+				/* add domain policy to new policy */
+				strncat2(tdomf_new, res, max_file);
+				/* get subdomian name */
+				res2 = domain_get_name_sub(res);
+				if (res2){
+					int flag_prof = 0;
+					temp2 = prog_rules;
+					while(1){
+						/* get prog name and its rules */
+						prog = string_get_next_word(&temp2);
+						if (!prog) break;
+						rule = string_get_next_line(&temp2);
+						if (!rule){ free(prog); break; }
+
+						/* compare prog name to subdomain name */
+						if (!strcmp(prog, res2)){
+							/* if match, add rule to domain policy */
+							strncat2(tdomf_new, rule, max_file);
+							strncat2(tdomf_new, "\n", max_file);
+							/* switch domain to learning mode */
+							if (!flag_prof){
+								domain_set_profile(orig, 1);
+								/* do it only once per domain for speed */
+								flag_prof = 1;
+							}
+						}
+
+						free(rule);
+						free(prog);
+					}
+					free(res2);
+				}
+				strncat2(tdomf_new, "\n", max_file);
+				free(res);
+			}
+			
+			color("learning mode turned on for domains with new rules\n", red);
+
+			/* replace old policy with new one */
+			free(tdomf);
+			tdomf = tdomf_new;
 		}
 	}
 	
@@ -2648,7 +2826,7 @@ void domain_print_mode()
 			color("create rule with learning mode on", green);
 			if (!flag_firstrun) newl();
 			/* create a rule for it */
-			strncat2(tdomf, "\n<kernel> ", max_file);
+			strncat2(tdomf, "<kernel> ", max_file);
 			strncat2(tdomf, prog, max_file);
 			strncat2(tdomf, "\nuse_profile 1\n", max_file);
 			/* alloc mem for tprogs_learn */
@@ -2704,12 +2882,40 @@ void domain_print_mode()
 }
 
 
+/* check change of policy, and return true if changed */
+int check_policy_change(){
+	long l;
+
+	/* backup policy exists yet? */
+	if (!tdomf_bak){
+		/* if not, then copy policy */
+		l = strlen(tdomf) + 1;
+		/* alloc mem for backup policy */
+		tdomf_bak = memory_get(l);
+		/* copy policy to backup */
+		strncat2(tdomf_bak, tdomf, l);
+		return 1;
+	}
+	else{
+		/* policy files match? */
+		if (!strcmp(tdomf_bak, tdomf)) return 0;
+		else{
+			/* if no match, then store it */
+			free(tdomf_bak);
+			l = strlen(tdomf) + 1;
+			/* alloc mem for backup policy */
+			tdomf_bak = memory_get(l);
+			/* copy policy to backup */
+			strncat2(tdomf_bak, tdomf, l);
+			return 1;
+		}
+	}
+}
+
+
 /* manage policy and rules */
 void check()
 {
-	/* vars */
-/*	char *res;*/
-	
 	/* load config files */
 	load();
 	
@@ -2723,6 +2929,12 @@ void check()
 
 	/* get recent access deny logs */
 	domain_get_log();
+	
+	/* check change of policy */
+	if(check_policy_change()){
+		debug("OK");
+	}
+
 }
 
 
@@ -3067,7 +3279,7 @@ int main(int argc, char **argv){
 		if (!choice("are you sure?")) myexit(0);
 		backup();
 		color("policy file backups created\n", green);
-		domain_learn_all();
+		domain_set_learn_all();
 		color("all domains turned back to learning mode\n", red);
 		myexit(0);
 	}
