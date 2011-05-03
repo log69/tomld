@@ -1529,7 +1529,7 @@ int choice(const char *text)
 	char c = 0, c2;
 	if (opt_yes){
 		printf(text);
-		printf(" [y/N] y");
+		printf(" (y)");
 		newl();
 	}
 	else{
@@ -2909,9 +2909,8 @@ void domain_print_mode()
 int check_policy_change(){
 	long l;
 
-	/* backup policy exists yet? */
+	/* backup policy exists yet? if not, then copy policy */
 	if (!tdomf_bak){
-		/* if not, then copy policy */
 		l = strlen(tdomf) + 1;
 		/* alloc mem for backup policy */
 		tdomf_bak = memory_get(l);
@@ -2920,10 +2919,9 @@ int check_policy_change(){
 		return 1;
 	}
 	else{
-		/* policy files match? */
+		/* policy files match? if not, then store it */
 		if (!strcmp(tdomf_bak, tdomf)) return 0;
 		else{
-			/* if no match, then store it */
 			free(tdomf_bak);
 			l = strlen(tdomf) + 1;
 			/* alloc mem for backup policy */
@@ -2933,6 +2931,76 @@ int check_policy_change(){
 			return 1;
 		}
 	}
+}
+
+
+/* sort and unique all rules in all domains */
+void domain_cleanup()
+{
+	/* vars */
+	char *res, *res2, *temp, *temp2, *orig, *tdomf_new, *rules;
+	
+	/* alloc mem for new policy */
+	tdomf_new = memory_get(max_file);
+	
+	/* cycle through domains and sort and make uniq the rules of each */
+	temp = tdomf;
+	while(1){
+		/* get next domain policy */
+		orig = temp;
+		res = domain_get_next(&temp);
+		if (!res) break;
+		
+		/* copy header part of domain (first 2 lines: <kernel> and use_profile) */
+		temp2 = res;
+		res2 = string_get_next_line(&temp2);
+		if (res2){
+			strncat2(tdomf_new, res2, max_file);
+			strncat2(tdomf_new, "\n", max_file);
+			free(res2);
+			
+			res2 = string_get_next_line(&temp2);
+			if (res2){
+				strncat2(tdomf_new, res2, max_file);
+				strncat2(tdomf_new, "\n", max_file);
+				free(res2);
+				
+				/* alloc mem for sorted rules */
+				rules = memory_get(max_file);
+				/* get only rules */
+				while(1){
+					/* get next rule */
+					res2 = string_get_next_line(&temp2);
+					if (!res2) break;
+					/* copy rule */
+					strncat2(rules, res2, max_file);
+					strncat2(rules, "\n", max_file);
+					free(res2);
+				}
+				/* sort rules */
+				res2 = string_sort_uniq_lines(rules);
+				/* add sorted rules to new policy */
+				strncat2(tdomf_new, res2, max_file);
+				strncat2(tdomf_new, "\n", max_file);
+				free(res2);
+				free(rules);
+			}
+		}
+		free(res);
+	}
+
+	/* replace old policy with new one */
+	free(tdomf);
+	tdomf = tdomf_new;
+}
+
+
+/* rehsape rules */
+void domain_reshape_rules()
+{
+	domain_cleanup();
+
+	debug(tdomf);
 }
 
 
@@ -2958,6 +3026,7 @@ void check()
 		debug("OK");
 	}
 
+	domain_reshape_rules();
 }
 
 
