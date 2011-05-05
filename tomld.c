@@ -332,6 +332,7 @@ char *path_bin[] = {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin"
 /* other vars */
 struct termio terminal_backup;
 
+int debug_var = 0;
 
 
 /* ----------------------------------- */
@@ -509,16 +510,21 @@ void newl_()
 void debug(const char *text)
 {
 	long c;
-	long l = strlen(text);
-	/* count lines of text */
-	c = string_count_lines(text);
-	/* print text and info */
-	printf("--\n");
-	printf(text);
-	/* print newline if missing from the end of string */
-	if (text[l-1] != '\n') newl();
-	printf("-- debug bytes %ld and ", strlen(text));
-	printf("lines %ld\n", c);
+	long l;
+	/* isn't text a null pointer? */
+	if (text){
+		l = strlen(text);
+		/* count lines of text */
+		c = string_count_lines(text);
+		/* print text and info */
+		printf("--\n");
+		printf(text);
+		/* print newline if missing from the end of string */
+		if (text[l-1] != '\n') newl();
+		printf("-- debug bytes %ld and ", strlen(text));
+		printf("lines %ld\n", c);
+	}
+	else printf("-- null pointer\n");
 }
 
 
@@ -533,6 +539,13 @@ void debugi(int num)
 void debugl(long num)
 {
 	printf("-- debug long integer is %ld\n", num);
+}
+
+
+/* print debug info about a pointer */
+void debugp(char *p)
+{
+	printf("-- debug pointer is %p\n", p);
 }
 
 
@@ -570,9 +583,9 @@ void color_(const char *text, const char *col)
 
 /* allocate memory for char and return pointer */
 /* returned value must be freed by caller */
-char *memory_get(long num)
+char *memory_get(unsigned long num)
 {
-	char* p = malloc((sizeof(char)) * (num + 1));
+	char *p = malloc((sizeof(char)) * (num + 1));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
 	/* clear first byte */
 	p[0] = 0;
@@ -582,7 +595,7 @@ char *memory_get(long num)
 
 /* allocate memory for char pointer list and return pointer */
 /* returned value must be freed by caller */
-char **memory_get_ptr(long num)
+char **memory_get_ptr(unsigned long num)
 {
 	char** p = malloc((sizeof(char**)) * (num + 1));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
@@ -594,7 +607,7 @@ char **memory_get_ptr(long num)
 
 /* allocate memory for long and return pointer */
 /* returned value must be freed by caller */
-long *memory_get_long(long num)
+long *memory_get_long(unsigned long num)
 {
 	long *p = malloc((sizeof(long)) * (num + 1));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
@@ -762,17 +775,20 @@ char *string_get_next_line(char **text)
 
 	if (!(*text)[0]) return 0;
 
-	do{
-		c = (*text)[i++];
-	/* exit on end or on a new line */
-	} while(c && c != '\n');
+	while(1){
+		c = (*text)[i];
+		/* exit on end or on a new line */
+		if (!c || c == '\n') break;
+		i++;
+	}
 
 	/* allocate mem for the new string */
-	res = memory_get(i);
+	res = memory_get(i + 1);
 	/* copy it */
 	strncpy2(res, (*text), i);
-	res[i-1] = 0;
-	/* move pointer to the next line */
+	res[i] = 0;
+	/* move pointer to the next line, or leave it on null end */
+	if (c) i++;
 	(*text) += i;
 
 	return res;
@@ -1118,10 +1134,14 @@ char *string_sort_uniq_lines(const char *text)
 	int flag_newl = 0;
 	int flag_diff = 0;
 	int i, i2, l1, l2, count;
-	int maxl = strlen(text) + 1;
-	
-	/* create a copy of text for sorting */
+	int maxl;
+
+	/* return null on zero input */
+	if (!text[0]) return (memory_get(1));
+
+	maxl = strlen(text) + 1;
 	text_sort = memory_get(maxl);
+	/* create a copy of text for sorting */
 	strncpy2(text_sort, text, maxl);
 
 	/* count lines */
@@ -2952,17 +2972,87 @@ int check_policy_change(){
 }
 
 
-/* sort and uniq rules of the same types in a specific way */
-char *string_sort_uniq_rules(char *rules)
+/* compare paths */
+int compare_paths(char *path1, char *path2)
 {
-	char *rules_new;
-	
+	return 0;
+}
+
+
+/* compare rules */
+int compare_rules(char *rule1, char *rule2)
+{
+	return 0;
+}
+
+
+/* sort and uniq rules of the same types in a specific way */
+char *domain_sort_uniq_rules(char *rules)
+{
+	char *res, *res2, *temp, *temp2, *old, *new, *rules_new, *rules2;
+	int i1, i2, l1, l2, lo, ln;
+
 	/* alloc mem for new rules */
 	rules_new = memory_get(max_file);
+	old = memory_get(max_char);
+	new = memory_get(max_char);
 	
-	/* copy rules */
-	strncpy2(rules_new, rules, max_file);
+	/* cycle through rules and compare each to themselves */
+	i1 = 0;
+	temp = rules;
+	while(1){
+		break;
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		l1 = strlen(res);
+		
+		/* compare rule to all rules */
+		i2 = 0;
+		temp2 = rules;
+		new[0] = 0;
+		while(1){
+			/* skip comparing the same entry in the list */
+			if (i1 != i2){
+				res2 = string_get_next_line(&temp2);
+				if (!res2) break;
+				
+				/* compare rules containing wildcard */
+				if (compare_rules(res, res2)){
+					l2 = strlen(res2);
+					if (l1 < l2){ strncpy2(old, res,  max_char); lo = l1; }
+					else        { strncpy2(old, res2, max_char); lo = l2; }
+					/* if match, store only the shortest one from the matching ones */
+					ln = strlen(new);
+					if ((!new) || (ln > lo)) strncpy2(new, old, max_char);
+				}
+
+				free(res2);
+			}
+			i2++;
+		}
+
+		/* store the shorter matched rule if there was any match */
+		if (new[0]){
+			strncat2(rules_new, new,  max_file);
+			strncat2(rules_new, "\n", max_file);
+		}
+		/* store the original rule if there was no match */
+		else{
+			strncat2(rules_new, res,  max_file);
+			strncat2(rules_new, "\n", max_file);
+		}
+		
+		free(res);
+		i1++;
+	}
+
+	/* sort new rule list */
+	rules2 = string_sort_uniq_lines(rules_new);
+	free(rules_new);
+	rules_new = rules2;
 	
+	free(old);
+	free(new);
 	return rules_new;
 }
 
@@ -3067,9 +3157,11 @@ void domain_cleanup()
 						if (c > 0){
 							/* sort rules if more than 1 is in the list */
 							if (c > 1){
-								rules2 = string_sort_uniq_rules(rules);
+								rules2 = domain_sort_uniq_rules(rules);
 								free(rules);
-								rules = rules2;
+								rules = memory_get(max_file);
+								strncpy2(rules, rules2, max_file);
+								free(rules2);
 							}
 							/* add rules to new policy */
 							strncat2(tdomf_new, rules, max_file);
@@ -3104,9 +3196,11 @@ void domain_cleanup()
 							else{
 								/* sort rules if more than 1 is in the list */
 								if (c > 1){
-									rules2 = string_sort_uniq_rules(rules);
+									rules2 = domain_sort_uniq_rules(rules);
 									free(rules);
-									rules = rules2;
+									rules = memory_get(max_file);
+									strncpy2(rules, rules2, max_file);
+									free(rules2);
 								}
 								/* add rules to new policy */
 								strncat2(tdomf_new, rules, max_file);
@@ -3141,10 +3235,10 @@ void domain_cleanup()
 void domain_reshape_rules()
 {
 	mytime();
-	
 	domain_cleanup();
 
 /*	debug(tdomf);*/
+	debug("OK");
 }
 
 
