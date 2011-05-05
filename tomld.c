@@ -2415,13 +2415,8 @@ void domain_info(const char *pattern)
 		}
 		
 		res = string_sort_uniq_lines(texcf_new);
-		if (res){
-			newl_(); color(res, blue); newl();
-			free(res);
-		}
-		else{
-			newl_(); color(texcf_new, blue); newl();
-		}		
+		newl_(); color(res, blue); newl();
+		free(res);
 		free(texcf_new);
 	}
 }
@@ -2660,10 +2655,8 @@ void domain_get_log()
 
 		/* sort and uniq rules */
 		res = string_sort_uniq_lines(prog_rules);
-		if(res){
-			free(prog_rules);
-			prog_rules = res;
-		}
+		free(prog_rules);
+		prog_rules = res;
 
 		/* alloc mem for new list of rules after confirmation */
 		prog_rules_new = memory_get(max_file);
@@ -3328,22 +3321,18 @@ void check_exceptions()
 	/* sort exception list */
 	if (tprogs_exc){
 		res = string_sort_uniq_lines(tprogs_exc);
-		if (res){
-			free(tprogs_exc);
-			tprogs_exc = res;
-		}
+		free(tprogs_exc);
+		tprogs_exc = res;
 	}
 
 	/* sort program list */
 	if (tprogs){
 		res = string_sort_uniq_lines(tprogs);
-		if (res){
-			free(tprogs);
-			/* realloc more mem above the sorted list to expand it later */
-			tprogs = memory_get(max_file);
-			strncpy2(tprogs, res, max_file);
-			free(res);
-		}
+		free(tprogs);
+		/* realloc more mem above the sorted list to expand it later */
+		tprogs = memory_get(max_file);
+		strncpy2(tprogs, res, max_file);
+		free(res);
 	}
 
 	/* initialize recursive dirs' depth values */
