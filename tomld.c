@@ -1045,6 +1045,22 @@ char *string_get_last_word(char **text)
 }
 
 
+/* search for a keyword from the beginning of a string */
+/* returns true if success */
+int string_search_keyword_first(const char *text, const char *key)
+{
+	char c1, c2;
+	int i = 0;
+	while(1){
+		c1 = text[i];
+		c2 = key[i];
+		if (!c2) return 1;
+		if (!c1 || c1 != c2) return 0;
+		i++;
+	}
+}
+
+
 /* search for a keyword in a string and return the position where it starts */
 /* return -1 on fail */
 int string_search_keyword(const char *text, const char *key)
@@ -2351,8 +2367,8 @@ void domain_info(const char *pattern)
 						strncat2(h, "/", max_char);
 					
 						/* print rules with reading libs in yellow */
-						if ((string_search_keyword(res2, "allow_read /lib/") > -1) ||
-						    (string_search_keyword(res2, "allow_read /usr/lib/") > -1)){
+						if (string_search_keyword_first(res2, "allow_read /lib/") ||
+						    string_search_keyword_first(res2, "allow_read /usr/lib/")){
 							color(res2, yellow); newl();
 						}
 						/* print rules with touching /home in light blue */
@@ -3197,7 +3213,7 @@ void domain_cleanup()
 {
 	/* vars */
 	char *res, *res2, *res3, *temp, *temp2, *temp3;
-	char *orig, *tdomf_new, *rules, *rules2, *rule_type;
+	char *orig, *tdomf_new, *rules, *rules2, *rules_temp, *rule_type;
 	int c;
 	
 	/* alloc mem for new policy */
@@ -3258,6 +3274,7 @@ void domain_cleanup()
 	tdomf_new = memory_get(max_file);
 	/* alloc mem for sorted rules */
 	rules = memory_get(max_file);
+	rules_temp = memory_get(max_file);
 	rule_type = memory_get(max_char);
 
 	/* cycle through domains and sort and make uniq the rules within the same type */
@@ -3284,6 +3301,7 @@ void domain_cleanup()
 				
 				/* get only same type of rules and sort and uniq them in a specific way */
 				c = 0;
+				rules_temp[0] = 0;
 				while(1){
 					/* get next rule */
 					res2 = string_get_next_line(&temp2);
@@ -3299,66 +3317,82 @@ void domain_cleanup()
 								free(rules2);
 							}
 							/* add rules to new policy */
-							strncat2(tdomf_new, rules, max_file);
+							strncat2(rules_temp, rules, max_file);
 						}
 						break;
 					}
 
-					/* get the rule type (first param of rule) */
-					temp3 = res2;
-					res3 = string_get_next_word(&temp3);
-					if (res3){
+					/* speed up sorting by skipping lib reading rules */
+					if (string_search_keyword_first(res2, "allow_read /lib/") ||
+						string_search_keyword_first(res2, "allow_read /usr/lib/")){
 
-						/* check if there is any rule type stored yet */
-						if (!c){
-							/* if not, then store first type and store the rule too */
-							strncpy2(rule_type, res3, max_char);
-							strncpy2(rules, res2, max_file);
-							strncat2(rules, "\n", max_file);
-							/* counter for number of rules stored in list */
-							c = 1;
-						}
-						/* rule type already stored, so compare the former one with this one */
-						/* and collect the same types for special sorting */
-						else{
-							if (!strcmp(rule_type, res3)){
-								strncat2(rules, res2, max_file);
-								strncat2(rules, "\n", max_file);
-								/* increase number of rules stored already */
-								c++;
-							}
-							/* types don't match, so sort them and start collecting the next type */
-							else{
-								/* sort rules if more than 1 is in the list */
-								if (c > 1){
-									rules2 = domain_sort_uniq_rules(rules);
-									free(rules);
-									rules = memory_get(max_file);
-									strncpy2(rules, rules2, max_file);
-									free(rules2);
-								}
-								/* add rules to new policy */
-								strncat2(tdomf_new, rules, max_file);
-								/* store new rule type and next rule */
+						/* add rule to new policy */
+						strncat2(rules_temp, res2, max_file);
+						strncat2(rules_temp, "\n", max_file);
+					}
+					else{
+
+						/* get the rule type (first param of rule) */
+						temp3 = res2;
+						res3 = string_get_next_word(&temp3);
+						if (res3){
+
+							/* check if there is any rule type stored yet */
+							if (!c){
+								/* if not, then store first type and store the rule too */
 								strncpy2(rule_type, res3, max_char);
 								strncpy2(rules, res2, max_file);
 								strncat2(rules, "\n", max_file);
-								/* reset rule number */
+								/* counter for number of rules stored in list */
 								c = 1;
 							}
+							/* rule type already stored, so compare the former one with this one */
+							/* and collect the same types for special sorting */
+							else{
+								if (!strcmp(rule_type, res3)){
+									strncat2(rules, res2, max_file);
+									strncat2(rules, "\n", max_file);
+									/* increase number of rules stored already */
+									c++;
+								}
+								/* types don't match, so sort them and start collecting the next type */
+								else{
+									/* sort rules if more than 1 is in the list */
+									if (c > 1){
+										rules2 = domain_sort_uniq_rules(rules);
+										free(rules);
+										rules = memory_get(max_file);
+										strncpy2(rules, rules2, max_file);
+										free(rules2);
+									}
+									/* add rules to new temp policy */
+									strncat2(rules_temp, rules, max_file);
+									/* store new rule type and next rule */
+									strncpy2(rule_type, res3, max_char);
+									strncpy2(rules, res2, max_file);
+									strncat2(rules, "\n", max_file);
+									/* reset rule number */
+									c = 1;
+								}
+							}
+							free(res3);
 						}
-						free(res3);
 					}
 					free(res2);
 				}
-				/* new line at the end of new policy */
+				/* sort temp rules */
+				rules2 = string_sort_uniq_lines(rules_temp);
+				/* add sorted rules to new policy */
+				strncat2(tdomf_new, rules2, max_file);
 				strncat2(tdomf_new, "\n", max_file);
+				free(rules2);
 			}
 		}
 		free(res);
 	}
 	free(rule_type);
 	free(rules);
+	free(rules_temp);
 	
 	/* replace old policy with new one */
 	free(tdomf);
