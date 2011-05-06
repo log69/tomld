@@ -2965,21 +2965,164 @@ int check_policy_change(){
 }
 
 
-/* compare paths */
+/* compare paths with wildcards */
+/* a "/" or a null char must follow every wildcard in the path name */
+/* with other words, only one '*' wildcard can be used per path tag */
+/* return true if they match, even if both are null */
 int compare_paths(char *path1, char *path2)
 {
-	return 0;
+	/* vars */
+	char c1, c2, d1, d2;
+	int i1, i2;
+	char p1[max_char] = "";
+	char p2[max_char] = "";
+	
+	/* success if both are null */
+	if (!path1[0] && !path2[0]) return 1;
+	if (!path1[0] || !path2[0]) return 0;
+	
+	/* fail if none of them starts with "/" char */
+	if (path1[0] != '/' || path2[0] != '/') return 0;
+	
+	/* replace "\*" chars with "*" char in paths */
+	i1 = 0; i2 = 0;
+	while(1){
+		if (path1[i2] == '\\'){
+			if (path1[i2 + 1] == '*') i2++;
+		}
+		if (!(p1[i1++] = path1[i2++])) break;
+	}
+	i1 = 0; i2 = 0;
+	while(1){
+		if (path2[i2] == '\\'){
+			if (path2[i2 + 1] == '*') i2++;
+		}
+		if (!(p2[i1++] = path2[i2++])) break;
+	}
+	
+	/* compare paths only */
+	i1 = 0; i2 = 0;
+	c1 = 0; c2 = 0;
+	while(1){
+		/* get next chars */
+		d1 = c1; d2 = c2;
+		c1 = p1[i1];
+		c2 = p2[i2];
+		
+		/* if both chars are null then success */
+		if (!c1 && !c2) return 1;
+		
+		/* if both chars match then continue, even if chars are "/" or "\\" */
+		if (c1 == c2){
+			i1++;
+			i2++;
+		}
+		else{
+		
+			/* if any of the char is a wildcard "*", then check if before char is "\" */
+			/* and make the other jump to the next "/" */
+			if (c1 == '*'){
+				/* null or "/" should come after wildcard */
+				c1 = p1[++i1];
+				if (c1 && c1 != '/'){
+					color("error: unexpected wildcard usage in domain rules\n", red);
+					myexit(1);
+				}
+				/* if already standing on a "/" char, then ok and continue */
+				if (c2 != '/'){
+					/* else jump to next "/" */
+					while(1){
+						c2 = p2[++i2];
+						if (c2 == '/' || !c2) break;
+					}
+				}
+			}
+			else if (c2 == '*'){
+				/* null or "/" should come after wildcard */
+				c2 = p2[++i2];
+				if (c2 && c2 != '/'){
+					color("error: unexpected wildcard usage in domain rules\n", red);
+					myexit(1);
+				}
+				/* if already standing on a "/" char, then ok and continue */
+				if (c1 != '/'){
+					/* else jump to next "/" */
+					while(1){
+						c1 = p1[++i1];
+						if (c1 == '/' || !c1) break;
+					}
+				}
+			}
+			/* no match, fail */
+			else return 0;
+		}
+	}
 }
 
 
 /* compare rules */
-int compare_rules(char *rule1, char *rule2)
+int compare_rules(char *r1, char *r2)
 {
-	return 0;
+	/* vars */
+	char *type1 = 0, *type2 = 0, *rule1a = 0, *rule1b = 0, *rule2a = 0, *rule2b = 0;
+	char *temp1, *temp2;
+	int flag_double = 1;
+	int ret = 0;
+	
+	/* fail if either of the rules are null */
+	if (!r1[0] || !r2[0]) return 0;
+	
+	/* get rule types */
+	temp1 = r1;
+	type1 = string_get_next_word(&temp1);
+	temp2 = r2;
+	type2 = string_get_next_word(&temp2);
+	/* fail if types are null */
+	if (!type1 || !type2) goto exit_mem;
+	/* compare types, fail if no match */
+	if (strcmp(type1, type2)) goto exit_mem;
+	
+	/* get rule paths */
+	rule1a = string_get_next_word(&temp1);
+	rule1b = string_get_next_word(&temp1);
+	/* fail if no first params */
+	if (!rule1a || !rule1b) goto exit_mem;
+	
+	/* get second params if any */
+	rule2a = string_get_next_word(&temp2);
+	rule2b = string_get_next_word(&temp2);
+	if (!rule2a && rule2b) goto exit_mem;
+	if (rule2a && !rule2b) goto exit_mem;
+	/* second params exist too */
+	if (rule2a && rule2b) flag_double++;
+	
+	/* compare rules' paths */
+
+	/* first params */
+	if (!compare_paths(rule1a, rule2a)) goto exit_mem;
+	if (flag_double > 1){
+		/* second params */
+		if (!compare_paths(rule1b, rule2b)) goto exit_mem;
+	}
+
+	/* success here */
+	ret = 1;
+
+exit_mem:
+	/* free mem */
+	if (type1)  free(type1);
+	if (type2)  free(type2);
+	if (rule1a) free(rule1a);
+	if (rule1b) free(rule1b);
+	if (rule2a) free(rule2a);
+	if (rule2b) free(rule2b);
+
+	return ret;
 }
 
 
 /* sort and uniq rules of the same types in a specific way */
+/* returned value must be freed by caller */
 char *domain_sort_uniq_rules(char *rules)
 {
 	char *res, *res2, *temp, *temp2, *old, *new, *rules_new, *rules2;
@@ -2994,7 +3137,6 @@ char *domain_sort_uniq_rules(char *rules)
 	i1 = 0;
 	temp = rules;
 	while(1){
-		break;
 		res = string_get_next_line(&temp);
 		if (!res) break;
 		l1 = strlen(res);
