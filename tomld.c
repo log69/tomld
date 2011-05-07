@@ -193,6 +193,9 @@ int count = 10;
 /* tomoyo kernel parameter */
 char *tkern = "security=tomoyo";
 
+/* pattern string for the recursive wildcard "\{\*\}" for compares */
+char wildcard_recursive_dir[] = "\\{\\*\\}";
+
 /* tomoyo vars and files */
 char *tdomf	= 0;
 char *texcf = 0;
@@ -2988,20 +2991,23 @@ int check_policy_change(){
 int compare_paths(char *path1, char *path2)
 {
 	/* vars */
-	char c1, c2, d1, d2;
-	int i1, i2;
-	char p1[max_char] = "";
-	char p2[max_char] = "";
+	char c1, c2, c1_old, c2_old, c1_new, c2_new;
+	int i1, i2, wlen;
+/*	char p1[max_char] = "";
+	char p2[max_char] = "";*/
+	
+	c1 = path1[0];
+	c2 = path2[0];
 	
 	/* success if both are null */
-	if (!path1[0] && !path2[0]) return 1;
-	if (!path1[0] || !path2[0]) return 0;
+	if (!c1 && !c2) return 1;
+	if (!c1 || !c2) return 0;
 	
 	/* fail if none of them starts with "/" char */
-	if (path1[0] != '/' || path2[0] != '/') return 0;
+	if (c1 != '/' || c2 != '/') return 0;
 	
 	/* replace "\*" chars with "*" char in paths */
-	i1 = 0; i2 = 0;
+/*	i1 = 0; i2 = 0;
 	while(1){
 		if (path1[i2] == '\\'){
 			if (path1[i2 + 1] == '*') i2++;
@@ -3014,16 +3020,21 @@ int compare_paths(char *path1, char *path2)
 			if (path2[i2 + 1] == '*') i2++;
 		}
 		if (!(p2[i1++] = path2[i2++])) break;
-	}
+	}*/
 	
 	/* compare paths only */
+	wlen = strlen(wildcard_recursive_dir);
 	i1 = 0; i2 = 0;
 	c1 = 0; c2 = 0;
 	while(1){
 		/* get next chars */
-		d1 = c1; d2 = c2;
-		c1 = p1[i1];
-		c2 = p2[i2];
+		c1_old = c1; c2_old = c2;
+		c1 = path1[i1];
+		c2 = path2[i2];
+		
+		/* store next coming chars too for later compare if not out of bound yet */
+		if (c1) c1_new = path1[i1 + 1]; else c1_new = 0;
+		if (c2) c2_new = path2[i2 + 1]; else c2_new = 0;
 		
 		/* if both chars are null then success */
 		if (!c1 && !c2) return 1;
@@ -3034,43 +3045,118 @@ int compare_paths(char *path1, char *path2)
 			i2++;
 		}
 		else{
-		
-			/* if any of the char is a wildcard "*", then check if before char is "\" */
-			/* and make the other jump to the next "/" */
-			if (c1 == '*'){
-				/* null or "/" should come after wildcard */
-				c1 = p1[++i1];
+
+			/* ---------------------------------------- */
+			/* ----- check for recursive wildcard ----- */
+			/* ---------------------------------------- */
+			if (string_search_keyword_first(path1 + i1, wildcard_recursive_dir)){
+				/* move this after wildcard */
+				i1 += wlen;
+				c1 = path1[i1];
+				/* null or "/" should come after wildcard
+				 * cause i don't insert recursive wildcard if it's not the last one */
 				if (c1 && c1 != '/'){
 					color("error: unexpected wildcard usage in domain rules\n", red);
 					myexit(1);
 				}
-				/* if already standing on a "/" char, then ok and continue */
-				if (c2 != '/'){
-					/* else jump to next "/" */
-					while(1){
-						c2 = p2[++i2];
-						if (c2 == '/' || !c2) break;
-					}
+				/* move the other path poiter too to its last char (before null)
+				 * so their last char should be "/" or nothing (null following) */
+				while(1){
+					c2 = path2[++i2];
+					/* exit on end, and move char back one */
+					if (!c2){
+						c2 = path2[--i2];
+						break; }
 				}
+				/* if both last chars are "/", then success */
+				if (c1 == '/' && c2 == '/') return 1;
+				else if (c1 == '/' && c2 != '/') return 0;
+				else if (c1 != '/' && c2 == '/') return 0;
+				/* or if not, then if both of them are null, it's success too
+				 * (c2 would be null anyway, cause i moved it to the last char before */
+				else if (!c1) return 1;
+				return 0;
 			}
-			else if (c2 == '*'){
-				/* null or "/" should come after wildcard */
-				c2 = p2[++i2];
+			else if (string_search_keyword_first(path2 + i2, wildcard_recursive_dir)){
+				/* move this after wildcard */
+				i2 += wlen;
+				c2 = path2[i2];
+				/* null or "/" should come after wildcard
+				 * cause i don't insert recursive wildcard if it's not the last one */
 				if (c2 && c2 != '/'){
 					color("error: unexpected wildcard usage in domain rules\n", red);
 					myexit(1);
 				}
-				/* if already standing on a "/" char, then ok and continue */
-				if (c1 != '/'){
-					/* else jump to next "/" */
-					while(1){
-						c1 = p1[++i1];
-						if (c1 == '/' || !c1) break;
+				/* move the other path poiter too to its last char (before null)
+				 * so their last char should be "/" or nothing (null following) */
+				while(1){
+					c1 = path1[++i1];
+					/* exit on end, and move char back one */
+					if (!c1){
+						c1 = path1[--i1];
+						break; }
+				}
+				/* if both last chars are "/", then success */
+				if (c2 == '/' && c1 == '/') return 1;
+				else if (c2 == '/' && c1 != '/') return 0;
+				else if (c2 != '/' && c1 == '/') return 0;
+				/* or if not, then if both of them are null, it's success too
+				 * (c1 would be null anyway, cause i moved it to the last char before */
+				else if (!c2) return 1;
+				return 0;
+			}
+
+			/* ------------------------------------- */
+			/* ----- check for normal wildcard ----- */
+			/* ------------------------------------- */
+			else{
+
+				/* step 1 char forward if wildcard is coming */
+				if (c1 == '\\' && c1_new == '*'){
+					c1_old = c1; c1 = c1_new; ++i1; }
+				if (c2 == '\\' && c2_new == '*'){
+					c2_old = c2; c2 = c2_new; ++i2; }
+				
+				/* if any of the char is a wildcard "*", then check if before char is "\"
+				 * and make the other jump to the next "/"
+				 * this one is needed because it can happen that the "\" char matches
+				 * but not "*" comes after one of them */
+				if (c1 == '*' && c1_old == '\\'){
+					/* null or "/" should come after wildcard
+					 * cause i'm not using wildcard withing words, only by itself */
+					c1 = path1[++i1];
+					if (c1 && c1 != '/'){
+						color("error: unexpected wildcard usage in domain rules\n", red);
+						myexit(1);
+					}
+					/* if already standing on a "/" char, then ok and continue */
+					if (c2 != '/'){
+						/* else jump to next "/" */
+						while(1){
+							c2 = path2[++i2];
+							if (c2 == '/' || !c2) break;
+						}
 					}
 				}
+				else if (c2 == '*' && c2_old == '\\'){
+					/* null or "/" should come after wildcard */
+					c2 = path2[++i2];
+					if (c2 && c2 != '/'){
+						color("error: unexpected wildcard usage in domain rules\n", red);
+						myexit(1);
+					}
+					/* if already standing on a "/" char, then ok and continue */
+					if (c1 != '/'){
+						/* else jump to next "/" */
+						while(1){
+							c1 = path1[++i1];
+							if (c1 == '/' || !c1) break;
+						}
+					}
+				}
+				/* no match, fail */
+				else return 0;
 			}
-			/* no match, fail */
-			else return 0;
 		}
 	}
 }
