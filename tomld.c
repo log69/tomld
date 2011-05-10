@@ -295,6 +295,7 @@ char opt_info2     [max_char]  = "";
 char opt_remove2   [max_char]  = "";
 char *dirs_recursive = 0;
 long *dirs_recursive_depth = 0;
+long *dirs_recursive_sub = 0;
 
 int flag_reset		= 0;
 int flag_check		= 0;
@@ -466,6 +467,7 @@ void myfree()
 	if (tprogs_learn)			free(tprogs_learn);
 	if (dirs_recursive)			free(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
+	if (dirs_recursive_sub)		free(dirs_recursive_sub);
 	if (tmarkf)					free(tmarkf);
 	if (tlogf)					free(tlogf);
 	if (tdomf_bak)				free(tdomf_bak);
@@ -1255,6 +1257,191 @@ char *string_sort_uniq_lines(const char *text)
 	free(text_new);
 
 	return text_final;
+}
+
+
+/* check if path string ends with "/" char meaning it's a dir */
+/* returns true if so */
+int path_is_dir(const char *path)
+{
+	long l = strlen(path);
+	if (!l) return 0;
+	if (path[l - 1] == '/') return 1;
+	return 0;
+}
+
+
+/* count subdirs in path name */
+/* returns the number of subdir names between "/" chars in a path name */
+/* path must start with "/" char */
+/* only one "/" counts 1 */
+int path_count_subdirs_name(const char *path)
+{
+	char c, d;
+	int i, i2;
+	
+	i = 0;
+	i2 = 0;
+	c = 0;
+	while(1){
+		d = c;
+		c = path[i];
+		if (!c) break;
+		if (c == '/' && d != '/') i2++;
+		i++;
+	}
+	return i2;
+}
+
+
+/* get n part of subdir names from path name */
+/* value 1 of num gets only a single "/" char if any */
+/* path must start with "/" char */
+/* returned value must be freed by caller */
+char *path_get_subdirs_name(const char *path, int num)
+{
+	char *path_new;
+	char c, d;
+	int n, i, i2;
+
+	/* alloc mem for new path name */
+	path_new = memory_get(max_char);
+	
+	/* return empty string if num is null */
+	if (!num) return path_new;
+
+	/* copy path to new path */
+	strncpy2(path_new, path, max_char);
+	
+	n = 0;
+	i = 0;
+	i2 = 0;
+	c = 0;
+	while(1){
+		d = c;
+		c = path[i];
+		if (!c) break;
+		/* move i2 to every end of subdir names following a "/" char */
+		if (c == '/' && d != '/'){ i2 = i + 1; n++; }
+		i++;
+		if (n >= num){
+			break;
+		}
+	}
+	/* give back only subdir names */
+	path_new[i2] = 0;
+	
+	return path_new;
+}
+
+
+/* join 2 paths together to make it a full path */
+/* returned value must be freed by caller */
+char *path_join(char *path1, char *path2)
+{
+	long l1 = strlen(path1);
+	long l2 = strlen(path2);
+	long maxl = l1 + l2 + 3;
+	char *res = memory_get(maxl);
+	
+	/* create new joined path */
+	strncpy2(res, path1, maxl);
+	/* does path1 end with "/" char? if not, then add "/" char too */
+	if (path1[l1 - 1] != '/') strncat2(res, "/", maxl);
+	strncat2(res, path2, maxl);
+	
+	return res;
+}
+
+
+/* return the parent dir if path is a file */
+/* returned value must be freed by caller */
+char *path_get_parent_dir(char *path)
+{
+	char c;
+	int i;
+	long l;
+	
+	/* alloc mem for new path */
+	char *path_new = memory_get(max_char);
+	/* copy old path */
+	strncpy2(path_new, path, max_char);
+	
+	/* if path is a dir, then return it */
+	if (path_is_dir(path)) return path_new;
+	
+	/* if it's a file, then get dir part */
+	l = strlen(path) - 1;
+	i = 0;
+	while(1){
+		if (l < 0) break;
+		c = path[l];
+		if (c == '/'){ i = l + 1; break; }
+		l--;
+	}
+	path_new[i] = 0;
+	return path_new;
+}
+
+
+/* get dirlist depth for recursive call */
+int path_count_dir_depth_r(char *path)
+{
+	DIR *mydir;
+	struct dirent *md;
+	static int depth = 0;
+	
+	if (!depth) depth = path_count_subdirs_name(path);
+
+	/* open path dir */
+	mydir = opendir(path);
+	/* return null if dir cannot be opened */
+	if (!mydir) return 0;
+	/* cycle through dir recursively */
+	while((md = readdir(mydir))) {
+		/* skip dir . and .. */
+		if(!strcmp(md->d_name, ".") || !strcmp(md->d_name, "..")) continue;
+		/* is it a dir? */
+		if (md->d_type == 4){
+			int d;
+			/* join paths */
+			char *res = path_join(path, md->d_name);
+			/* add "/" char to the end of path */
+			long l = strlen(res) + 2;
+			char *res2 = memory_get(l);
+			strncpy2(res2, res, l);
+			strncat2(res2, "/", l);
+			free(res);
+			/* get dir depth for current dir */
+			path_count_dir_depth_r(res2);
+			/* count dir depth by checking subdir names in path and store the deepest */
+			d = path_count_subdirs_name(res2);
+			if (depth < d) depth = d;
+			free(res2);
+		}
+	}
+	closedir(mydir);
+	
+	/* return dir depth by calculating depth minus number of original subdir names */
+	return (depth - path_count_subdirs_name(path) + 1);
+}
+
+
+/* count directory depth of a directory */
+int path_count_dir_depth(char *path)
+{
+	char *res;
+	int c;
+	
+	/* get parent dir */
+	res = path_get_parent_dir(path);
+
+	/* get dir depth */	
+	c = path_count_dir_depth_r(res);
+	
+	free(res);
+	
+	return c;
 }
 
 
@@ -2182,7 +2369,7 @@ void check_options(int argc, char **argv){
 					/* alloc mem for dirs_recursive */
 					if (!dirs_recursive) dirs_recursive = memory_get(max_file);
 					/* if so, store it in recursive dir array */
-					strncpy2(dirs_recursive, path, max_file);
+					strncat2(dirs_recursive, path, max_file);
 					strncat2(dirs_recursive, "\n", max_file);
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
@@ -3006,22 +3193,6 @@ int compare_paths(char *path1, char *path2)
 	/* fail if none of them starts with "/" char */
 	if (c1 != '/' || c2 != '/') return 0;
 	
-	/* replace "\*" chars with "*" char in paths */
-/*	i1 = 0; i2 = 0;
-	while(1){
-		if (path1[i2] == '\\'){
-			if (path1[i2 + 1] == '*') i2++;
-		}
-		if (!(p1[i1++] = path1[i2++])) break;
-	}
-	i1 = 0; i2 = 0;
-	while(1){
-		if (path2[i2] == '\\'){
-			if (path2[i2 + 1] == '*') i2++;
-		}
-		if (!(p2[i1++] = path2[i2++])) break;
-	}*/
-	
 	/* compare paths only */
 	wlen = strlen(wildcard_recursive_dir);
 	i1 = 0; i2 = 0;
@@ -3220,6 +3391,281 @@ exit_mem:
 	if (rule2b) free(rule2b);
 
 	return ret;
+}
+
+
+/* return new rules based on the input rule with wildcards of matching recursive dirs */
+/* returned value must be freed by caller */
+char *get_rules_with_recursive_dirs(char *rule)
+{
+	char *type, *path1, *path2;
+	char *res, *res2, *temp, *rules_new;
+	char *path_new1, *path_new2;
+	int i, count1, count2;
+	long c = 0;
+
+	/* return null if input rule is null */
+	if (!rule) return 0;
+
+	/* are there any recursive dirs specified? */
+	if (!dirs_recursive) return 0;
+
+	/* get rule type */
+	temp = rule;
+	type = string_get_next_word(&temp);
+	/* return null on empty line */
+	if(!type) return 0;
+	/* get path param 1 */
+	path1 = string_get_next_word(&temp);
+	/* get path param 2 */
+	path2 = string_get_next_word(&temp);
+
+	path_new1 = memory_get(max_char);
+	path_new2 = memory_get(max_char);
+	count1 = 0;
+	count2 = 0;
+
+	/* ----------------------- */
+	/* ----- first param ----- */
+	/* ----------------------- */
+	/* cycle through recursive dirs */
+	temp = dirs_recursive;
+	i = 0;
+	while(1){
+		/* get next recursive dir name */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+
+		/* check if subdir name in the recursive dir is calculated yet */
+		c = dirs_recursive_sub[i];
+		if (c == -1){
+			c = path_count_subdirs_name(res);
+			dirs_recursive_sub[i] = c;
+		}
+		/* get beginning of path to compare it to recursive dir */
+		res2 = path_get_subdirs_name(path1, c);
+		
+		/* compare them */
+		if (compare_paths(res, res2)){
+			/* success, store it on match and exit */
+			strncpy2(path_new1, res, max_char);
+
+			/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
+			 * to recursive dirs, so i have to calculate dir depth */
+			if (tomoyo_version() <= 2299){
+				/* check if depth is already caclulated yet */
+				c = dirs_recursive_depth[i];
+				if (c == -1){
+					/* calculate depth */
+					c = path_count_dir_depth(res);
+					dirs_recursive_depth[i] = c;
+				}
+				count1 = c;
+			}
+			else count1 = 1;
+			
+			free(res2);
+			free(res);
+			break;
+		}
+		free(res2);
+		free(res);
+		i++;
+	}
+
+	/* ------------------------ */
+	/* ----- second param ----- */
+	/* ------------------------ */
+	if (path2){
+		/* cycle through recursive dirs */
+		temp = dirs_recursive;
+		i = 0;
+		while(1){
+			/* get next recursive dir name */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+
+			/* check if subdir name in the recursive dir is calculated yet */
+			c = dirs_recursive_sub[i];
+			if (c == -1){
+				c = path_count_subdirs_name(res);
+				dirs_recursive_sub[i] = c;
+			}
+			/* get beginning of path to compare it to recursive dir */
+			res2 = path_get_subdirs_name(path2, c);
+			
+			/* compare them */
+			if (compare_paths(res, res2)){
+				/* success, store it on match and exit */
+				strncpy2(path_new2, res, max_char);
+
+				/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
+				 * to recursive dirs, so i have to calculate dir depth */
+				if (tomoyo_version() <= 2299){
+					/* check if depth is already caclulated yet */
+					c = dirs_recursive_depth[i];
+					if (c == -1){
+						/* calculate depth */
+						c = path_count_dir_depth(res);
+						dirs_recursive_depth[i] = c;
+					}
+					count2 = c;
+				}
+				else count2 = 1;
+				
+				free(res2);
+				free(res);
+				break;
+			}
+			free(res2);
+			free(res);
+			i++;
+		}
+	}
+
+	/* return null if no match */	
+	if (!count1 && !count2){
+		if(type)  free(type);
+		if(path1) free(path1);
+		if(path2) free(path2);
+		free(path_new1);
+		free(path_new2);
+		return 0;
+	}
+	
+	/* alloc mem for temp dir name */
+	rules_new = memory_get(max_file);
+
+	/* add new rules with recursive wildcard if any match */
+	/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
+	 * to recursive dirs */
+	if (tomoyo_version() <= 2299){
+		/* only 1 param? */
+		if (!path2){
+			if (count1){
+				while(count1--){
+					int flag = 0;
+					/* add rule type */
+					strncat2(rules_new, type, max_file);
+					strncat2(rules_new, " ", max_file);
+					/* add new first param */
+					strncat2(rules_new, path_new1, max_file);
+					/* add wildcards */
+					c = count1 + 1;
+					while(c--){
+						if (!flag){ strncat2(rules_new, "\\*", max_file); flag = 1; }
+						else        strncat2(rules_new, "/\\*", max_file);
+					}
+					/* add "/" char if path is a dir */
+					if (path_is_dir(path1)) strncat2(rules_new, "/", max_file);
+					strncat2(rules_new, "\n", max_file);
+				}
+			}
+		}
+		/* 2 params */
+		else{
+			if (count1 && !count2){
+				while(count1--){
+					int flag = 0;
+					/* add rule type */
+					strncat2(rules_new, type, max_file);
+					strncat2(rules_new, " ", max_file);
+					/* add new first param */
+					strncat2(rules_new, path_new1, max_file);
+					/* add wildcards */
+					c = count1 + 1;
+					while(c--){
+						if (!flag){ strncat2(rules_new, "\\*", max_file); flag = 1; }
+						else        strncat2(rules_new, "/\\*", max_file);
+					}
+					/* add "/" char if path is a dir */
+					if (path_is_dir(path1)) strncat2(rules_new, "/", max_file);
+					strncat2(rules_new, " ", max_file);
+					/* add old second param */
+					strncat2(rules_new, path2, max_file);
+					strncat2(rules_new, "\n", max_file);
+				}
+			}
+			if (!count1 && count2){
+				while(count2--){
+					int flag = 0;
+					/* add rule type */
+					strncat2(rules_new, type, max_file);
+					strncat2(rules_new, " ", max_file);
+					/* add old first param */
+					strncat2(rules_new, path1, max_file);
+					strncat2(rules_new, " ", max_file);
+					/* add new second param */
+					strncat2(rules_new, path_new2, max_file);
+					/* add wildcards */
+					c = count2 + 1;
+					while(c--){
+						if (!flag){ strncat2(rules_new, "\\*", max_file); flag = 1; }
+						else        strncat2(rules_new, "/\\*", max_file);
+					}
+					/* add "/" char if path is a dir */
+					if (path_is_dir(path2)) strncat2(rules_new, "/", max_file);
+					strncat2(rules_new, "\n", max_file);
+				}
+			}
+		}
+	}
+	/* newer tomoyo version, so use special wildcard */
+	else{
+		/* only 1 param? */
+		if (!path2){
+			if (count1){
+				/* add rule type */
+				strncat2(rules_new, type, max_file);
+				strncat2(rules_new, " ", max_file);
+				/* add new first param */
+				strncat2(rules_new, path_new1, max_file);
+				strncat2(rules_new, wildcard_recursive_dir, max_file);
+				/* add "/" char if path is a dir */
+				if (path_is_dir(path1)) strncat2(rules_new, "/", max_file);
+				strncat2(rules_new, "\n", max_file);
+			}
+		}
+		/* 2 params */
+		else{
+			if (count1 && !count2){
+				/* add rule type */
+				strncat2(rules_new, type, max_file);
+				strncat2(rules_new, " ", max_file);
+				/* add new first param */
+				strncat2(rules_new, path_new1, max_file);
+				strncat2(rules_new, wildcard_recursive_dir, max_file);
+				/* add "/" char if path is a dir */
+				if (path_is_dir(path1)) strncat2(rules_new, "/", max_file);
+				/* add old second param */
+				strncat2(rules_new, " ", max_file);
+				strncat2(rules_new, path2, max_file);
+				strncat2(rules_new, "\n", max_file);
+			}
+			if (!count1 && count2){
+				/* add rule type */
+				strncat2(rules_new, type, max_file);
+				strncat2(rules_new, " ", max_file);
+				/* add old first param */
+				strncat2(rules_new, path1, max_file);
+				/* add new second param */
+				strncat2(rules_new, " ", max_file);
+				strncat2(rules_new, path_new2, max_file);
+				strncat2(rules_new, wildcard_recursive_dir, max_file);
+				/* add "/" char if path is a dir */
+				if (path_is_dir(path2)) strncat2(rules_new, "/", max_file);
+				strncat2(rules_new, "\n", max_file);
+			}
+		}
+	}
+	
+	if(type)  free(type);
+	if(path1) free(path1);
+	if(path2) free(path2);
+	free(path_new1);
+	free(path_new2);
+
+	return rules_new;
 }
 
 
@@ -3486,11 +3932,93 @@ void domain_cleanup()
 }
 
 
+/* add rules with wildcarded recursive dirs to all domain policy rules if they contain any */
+void domain_reshape_rules_recursive_dirs()
+{
+	/* vars */
+	char *res, *res2, *res3, *temp, *temp2;
+	char *orig, *tdomf_new, *rules, *rules2;
+
+	/* do the whole check if there are any recursive dirs at all, or else exit */	
+	if (!dirs_recursive) return;
+	
+	/* alloc mem for new policy */
+	tdomf_new = memory_get(max_file);
+	/* alloc mem for new rule */
+	rules  = memory_get(max_file);
+	rules2 = memory_get(max_file);
+	
+	/* cycle through domains and change all subdir names of all recursive dirs to fully wildcarded */
+	temp = tdomf;
+	while(1){
+		/* get next domain policy */
+		orig = temp;
+		res = domain_get_next(&temp);
+		if (!res) break;
+
+		/* copy header part of domain (first 2 lines: <kernel> and use_profile) */
+		temp2 = res;
+		res2 = string_get_next_line(&temp2);
+		if (res2){
+			strncat2(tdomf_new, res2, max_file);
+			strncat2(tdomf_new, "\n", max_file);
+			free(res2);
+			
+			res2 = string_get_next_line(&temp2);
+			if (res2){
+				strncat2(tdomf_new, res2, max_file);
+				strncat2(tdomf_new, "\n", max_file);
+				free(res2);
+				
+				/* cycle through the rules */
+				while(1){
+					/* get next rule */
+					res2 = string_get_next_line(&temp2);
+					if (!res2) break;
+					
+					/* store old rules */
+					strncpy2(rules, res2, max_file);
+					strncat2(rules, "\n", max_file);
+					
+					/* get a modified rule by recursive dirs if any */
+					res3 = get_rules_with_recursive_dirs(res2);
+					if (res3){
+						strncpy2(rules, res3, max_file);
+						strncat2(rules, "\n", max_file);
+						free(res3);
+					}
+
+					free(res2);
+				}
+				/* insert rule only if the former rule was not the same */
+				/* this is to avoid massive multiplication of the rules because of the recursive check */
+				if (strcmp(rules, rules2)){
+					/* add if no match */
+					strncat2(tdomf_new, rules, max_file);
+					strncat2(tdomf_new, "\n", max_file);
+					/* store new rule as old for next check */
+					strncpy2(rules2, rules, max_file);
+				}
+			}
+		}
+		free(res);
+	}
+	free(rules);
+	free(rules2);
+	
+	/* replace old policy with new one */
+	free(tdomf);
+	tdomf = tdomf_new;
+}
+
+
 /* rehsape rules */
 void domain_reshape_rules()
 {
 	mytime();
 	domain_cleanup();
+	
+	domain_reshape_rules_recursive_dirs();
 
 /*	debug(tdomf);*/
 	debug("OK");
@@ -3597,13 +4125,15 @@ void check_exceptions()
 		free(res);
 	}
 
-	/* initialize recursive dirs' depth values */
+	/* initialize recursive dirs' depth and sub values */
 	if (dirs_recursive){
 		i = string_count_lines(dirs_recursive);
 		if (i > 0){
 			if (!dirs_recursive_depth) dirs_recursive_depth = memory_get_long(i+1);
+			if (!dirs_recursive_sub)   dirs_recursive_sub   = memory_get_long(i+1);
 			while(i--){
 				dirs_recursive_depth[i] = -1;
+				dirs_recursive_sub[i]   = -1;
 			}
 		}
 	}
