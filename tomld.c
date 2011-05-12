@@ -186,6 +186,7 @@ char *home = "/home";
 
 /* interval of policy check in seconds */
 int count = 10;
+int recheck = 0;
 
 /* number of max entries in profile config */
 #define max_mem "10000"
@@ -304,6 +305,7 @@ int flag_check3		= 0;
 int flag_firstrun	= 1;
 int flag_clock		= 0;
 int flag_safe		= 0;
+int flag_new_proc	= 0;
 int flag_kernel_version = 0;
 
 /* colors */
@@ -547,6 +549,13 @@ void debugl(long num)
 }
 
 
+/* print debug info about a float */
+void debugf(float num)
+{
+	printf("-- debug float is %f\n", num);
+}
+
+
 /* print debug info about a pointer */
 void debugp(char *p)
 {
@@ -777,7 +786,8 @@ char *string_get_next_line(char **text)
 {
 	char *res, c;
 	int i = 0;
-
+	
+	if (!(*text)) return 0;
 	if (!(*text)[0]) return 0;
 
 	while(1){
@@ -859,6 +869,8 @@ int string_jump_next_line(char **text)
 	char c;
 	int i = 0;
 
+	if (!(*text)) return 0;
+
 	/* jump to next line */
 	while(1){
 		c = (*text)[i++];
@@ -892,6 +904,8 @@ char *string_get_next_word(char **text)
 	char *res, c;
 	int i = 0;
 	int start, l;
+
+	if (!(*text)) return 0;
 
 	/* skip white spaces or exit on end of line */
 	while (1){
@@ -943,6 +957,8 @@ char *string_get_next_wordn(char **text, int num)
 	int i = 0;
 	int start = 0;
 	int l;
+
+	if (!(*text)) return 0;
 
 	/* count num pieces of words */
 	if (num < 0) num = 0;
@@ -1005,7 +1021,9 @@ char *string_get_last_word(char **text)
 	int i = 0;
 	int start, end;
 	int l;
-	
+
+	if (!(*text)) return 0;
+
 	/* skip white spaces or exit on end of line */
 	while (1){
 		c = (*text)[i];
@@ -1056,6 +1074,9 @@ int string_search_keyword_first(const char *text, const char *key)
 {
 	char c1, c2;
 	int i = 0;
+	
+	if (!text) return 0;
+
 	while(1){
 		c1 = text[i];
 		c2 = key[i];
@@ -1072,6 +1093,8 @@ int string_search_keyword(const char *text, const char *key)
 {
 	char c1, c2;
 	int i, i2, start;
+
+	if (!text) return -1;
 
 	/* search for the keyword */
 	i = 0;
@@ -1103,6 +1126,9 @@ int string_search_line(const char *text, const char *line)
 {
 	char c1, c2;
 	int i, i2, start;
+	
+	/* fail on null pointer */
+	if (!text) return -1;
 
 	/* search for the line */
 	i = 0;
@@ -1156,6 +1182,8 @@ char *string_sort_uniq_lines(const char *text)
 	int flag_diff = 0;
 	int i, i2, l1, l2, count;
 	int maxl;
+
+	if (!text) return 0;
 
 	/* return null on zero input */
 	if (!text[0]) return (memory_get(1));
@@ -1528,6 +1556,33 @@ char *domain_get_name_sub(char *text)
 }
 
 
+/* return true if prog exists as a main domain */
+int domain_main_exist(char *prog)
+{
+	char *res, *res2, *temp;
+	
+	temp = tdomf;
+	while(1){
+		/* get first line containing the name of the domain */
+		res = domain_get_next(&temp);
+		if (!res) break;
+		/* get main domain name */
+		res2 = domain_get_name(res);
+		if (res2){
+			/* if prog names matches main domain name, then prog exists as a main domain and success */
+			if (!strcmp(prog, res2)){
+				free(res2);
+				free(res);
+				return 1;
+			}
+			free(res2);
+		}
+		free(res);
+	}
+	return 0;
+}
+
+
 /* return a new string containing a list of all domain names */
 /* returned value must be freed by caller */
 char *domain_get_list()
@@ -1705,18 +1760,18 @@ void domain_add_rule(char *prog, char *rule)
 
 
 /* print time elapsed since program start */
-void mytime()
+float mytime()
 {
 	static int flag_time = 0;
 	static struct timeval start, end;
 	static long seconds, useconds;
-	static float t, t_old;
+	static float t = 0, t_old = 0;
+	float t_diff = 0;
 
 	/* first run? */
 	if (!flag_time){
 		gettimeofday(&start, 0);
 		flag_time = 1;
-		t_old = 0;
 	}
 	else{
 		gettimeofday(&end, 0);
@@ -1724,10 +1779,11 @@ void mytime()
 		useconds = end.tv_usec - start.tv_usec;
 
 		t = (((seconds) * 1000 + useconds/1000.0) + 0.5) / 1000;
-
-		printf("-- time %.3fs (+%.3f)\n", t, t - t_old);
+		t_diff = t - t_old;
 		t_old = t;
 	}
+	
+	return t_diff;
 }
 
 
@@ -1795,10 +1851,10 @@ char *pipe_read(const char *comm, long length)
 {
 	char *buff;
 	
-	/* open file for reading */
+	/* open pipe for reading */
 	FILE *p = popen(comm, "r");
 	if (!p){
-		color_("error: cannot read pipe from command: ", red);
+		color_("error: cannot open pipe for command: ", red);
 		color_(comm, red); newl();
 		myexit(1);
 	}
@@ -1811,6 +1867,24 @@ char *pipe_read(const char *comm, long length)
 	pclose(p);
 	
 	return buff;
+}
+
+
+/* open pipe and write content as input to command */
+/* returned value must be freed by caller */
+void pipe_write(const char *comm, const char *buff)
+{
+	/* open pipe for writing */
+	FILE *p = popen(comm, "w");
+	if (!p){
+		color_("error: cannot open pipe for command: ", red);
+		color_(comm, red); newl();
+		myexit(1);
+	}
+	
+	/* write pipe */
+	fprintf(p, "%s\n", buff);
+	pclose(p);
 }
 
 
@@ -2032,10 +2106,22 @@ int dir_exist(const char *name){
 
 /* check if file exists */
 int file_exist(const char *name){
-	FILE *f = fopen(name, "r+");
-	if (!f) return 0;
-	fclose(f);
-	return 1;
+	FILE *f;
+	int res = 0;
+
+	f = fopen(name, "r+");
+	if (f){
+		res = 1;
+		fclose(f);
+	}
+
+	f = fopen(name, "r");
+	if (f){
+		res = 1;
+		fclose(f);
+	}
+
+	return res;
 }
 
 
@@ -2118,8 +2204,27 @@ void load()
 /* reload config files from variables to kernel memory */
 void reload()
 {
-	file_write(tdom, tdomk);
-	file_write(texc, texck);
+	char comm[max_char] = "";
+	
+/*	file_write(tdomk, tdomf);
+	file_write(texck, texcf);*/
+
+/*	strncpy2(comm, tload, max_char);
+	strncat2(comm, " d -", max_char);
+	pipe_write(comm, tdomf);
+
+	strncpy2(comm, tload, max_char);
+	strncat2(comm, " e -", max_char);
+	pipe_write(comm, texcf);*/
+
+	/* save configs to disk */
+	file_write(tdom, tdomf);
+	file_write(texc, texcf);
+
+	/* load configs from from disk to memory */
+	strncpy2(comm, tload, max_char);
+	strncat2(comm, " fa", max_char);
+	system(comm);
 }
 
 
@@ -2380,7 +2485,7 @@ void check_options(int argc, char **argv){
 						color_("error: no such file: ", red); color_(myarg, red); newl(); myexit(1); }
 					/* alloc mem for tprogs */
 					if (!tprogs) tprogs = memory_get(max_file);
-					/* if so, store it as extra executables */
+					/* if file exists, store it as extra executables */
 					strncat2(tprogs, res, max_file);
 					strncat2(tprogs, "\n", max_file);
 					free(res);
@@ -2476,8 +2581,6 @@ void check_tomoyo()
 /* clear config files */
 void clear()
 {
-	/* create backup of fromber config files */
-	backup();
 	/* free up memory of configs */
 	if (tdomf) free(tdomf);
 	if (texcf) free(texcf);
@@ -2485,7 +2588,7 @@ void clear()
 	tdomf = memory_get(max_file);
 	texcf = memory_get(max_file);
 	strncpy2(tdomf, "<kernel>\nuse_profile 0\n\n", max_file);
-	texcf[0] = 0;
+	strncpy2(texcf, "initialize_domain /sbin/init\n", max_file);
 	/* write config files */
 	file_write(texc, texcf);
 	file_write(tdom, tdomf);
@@ -2656,6 +2759,84 @@ void domain_set_learn_all()
 	}
 }
 
+
+/* turn on enforcing mode for old domains only with profile 1-2 */
+void domain_set_enforce_old()
+{
+	char *res, *prog, *prog_sub, *temp, *orig;
+	int m;
+	int flag_old = 0;
+	int flag_turned = 0;
+
+	/* is --keep option on? */
+	if (!opt_keep){
+
+		/* check if there are old domains with enforcing mode */
+		temp = tdomf;
+		while(1){
+			/* get next domain */
+			orig = temp;
+			res = domain_get_next(&temp);
+			if (!res) break;
+			/* get domain profile */
+			m = domain_get_profile(orig);
+			/* there are old enforcing mode domains, i have the answer, so quit */
+			if (m == 3){ flag_old = 1; break; }
+			free(res);
+		}
+
+		/* turn old domains into enforcing mode */
+		temp = tdomf;
+		while(1){
+			/* get next domain */
+			orig = temp;
+			res = domain_get_next(&temp);
+			if (!res) break;
+			/* get domain profile */
+			m = domain_get_profile(orig);
+			/* is domain in mode 1 or 2? */
+			if (m == 1 || m == 2){
+				/* get domain name */
+				prog = domain_get_name(res);
+				prog_sub = domain_get_name_sub(res);
+
+				/* check if it's not a newly created domain */
+				if (string_search_line(tprogs_learn, prog_sub) == -1){
+					int i = string_search_line(tprogs_exc, prog_sub);
+					/* check if not an exception domain */
+					/* or if an exception domain, check if it's not a main domain */
+					if ((i == -1) || (i != -1 && !domain_main_exist(prog))){
+
+						/* print info once */
+						if (!flag_turned){
+							flag_turned = 1;
+							color("* turn on enforcing mode for old domains\n", green);
+						}
+						/* turn enforcing mode on for domain and all its subdomains */
+						color(prog, blue); newl();
+						domain_set_profile_all(prog, 3);
+					}
+				}
+				free(prog);
+				free(prog_sub);
+			}
+			free(res);
+		}
+
+		/* save config files to disk and load them to kernel */		
+		reload();
+		
+		/* did i turn any old domains into enforcing mode? */
+		if (!flag_turned){
+			if (flag_old) color("* all old domains in enforcing mode already\n", green);
+			else color("* no domains in enforcing mode currently\n", green);
+		}
+	}
+	else{
+		color("keep domains unchanged for now on demand\n", red);
+	}
+}
+
 /* -------------------------------------------------------------------------------------- */
 
 
@@ -2746,25 +2927,13 @@ void domain_get_log()
 	temp = tlogf;
 	res = string_get_last_line(&temp);
 	i = string_search_keyword(res, "kernel: [");
-	if (i == -1){
-		color_("error: unexpected error, log message format is not correct\n", red);
-		free(res);
-		free(tlogf2);
-		free(tlogf3);
-		myexit(1);
-	}
 	i2 = string_search_keyword(res + i, "]");
-	if (i2 == -1){
-		color_("error: unexpected error, log message format is not correct\n", red);
-		free(res);
-		free(tlogf2);
-		free(tlogf3);
-		myexit(1);
+	if (i > -1 && i2 > -1){
+		l = i2 + 2;
+		if (tmarkf) free(tmarkf);
+		tmarkf = memory_get(l);
+		strncpy2(tmarkf, res + i, l);
 	}
-	l = i2 + 2;
-	if (tmarkf) free(tmarkf);
-	tmarkf = memory_get(l);
-	strncpy2(tmarkf, res + i, l);
 	free(res);
 
 
@@ -2867,7 +3036,8 @@ void domain_get_log()
 		/* alloc mem for new list of rules after confirmation */
 		prog_rules_new = memory_get(max_file);
 
-		color("* adding log messages to policy\n", yellow);
+		if (prog_rules[0]) color("* adding log messages to policy\n", yellow);
+
 		/* cycle through new rules and ask for confirmation to add it to domain policy */
 		temp = prog_rules;
 		while(1){
@@ -2978,7 +3148,7 @@ void domain_print_list_not_progs()
 		if (string_search_line(tprogs, res) == -1){
 			strncat2(list2, res, max_file);
 			strncat2(list2, "\n", max_file);
-			/* add domain to tprogs if no in exceptions */
+			/* add domain to tprogs if not in exceptions */
 			if (string_search_line(tprogs_exc, res) == -1){
 				strncat2(tprogs, res, max_file);
 				strncat2(tprogs, "\n", max_file);
@@ -3047,7 +3217,7 @@ void domain_print_mode()
 	int pos;
 	
 	if (flag_firstrun) color("* checking policy and rules\n", yellow);
-	
+
 	/* cycle thorugh progs */
 	temp = tprogs;
 	while(1){
@@ -4015,13 +4185,9 @@ void domain_reshape_rules_recursive_dirs()
 /* rehsape rules */
 void domain_reshape_rules()
 {
-	mytime();
 	domain_cleanup();
 	
 	domain_reshape_rules_recursive_dirs();
-
-/*	debug(tdomf);*/
-	debug("OK");
 }
 
 
@@ -4029,24 +4195,37 @@ void domain_reshape_rules()
 void check()
 {
 	/* load config files */
+	sand_clock(0);
 	load();
 	
-	mytime();
-	
 	/* print programs already in domain but not in progs list */
+	sand_clock(0);
 	domain_print_list_not_progs();
 	
 	/* check if domain exist and which mode it's in */
+	sand_clock(0);
 	domain_print_mode();
 
 	/* get recent access deny logs */
+	sand_clock(0);
 	domain_get_log();
 	
-	/* check change of policy */
+	/* check change of policy and run if there is any change only, don't do unnecessary work */
 	if(check_policy_change()){
-	}
 
-	domain_reshape_rules();
+		/* reshape rules */
+		sand_clock(0);
+		domain_reshape_rules();
+		
+		/* reload config files into memory */
+		sand_clock(0);
+		reload();
+
+		sand_clock(2);
+	}
+	else{
+		sand_clock(1);
+	}
 }
 
 
@@ -4153,31 +4332,33 @@ void check_processes()
 	/* get my pid */
 	mypid = getpid();
 
-	/* print exceptions */
-	if (tprogs_exc){
-		char *temp = tprogs_exc;
-		color("* exception domains\n", green);
-		while(1){
-			char *res = string_get_next_line(&temp);
-			if (!res) break;
-			color(res, purple);
-			color(" ", purple);
-			free(res);
+	/* run these only once */
+	if (!flag_new_proc){
+		flag_new_proc = 1;
+
+		/* print exceptions */
+		if (tprogs_exc){
+			char *temp = tprogs_exc;
+			color("* exception domains\n", green);
+			while(1){
+				char *res = string_get_next_line(&temp);
+				if (!res) break;
+				color(res, purple);
+				color(" ", purple);
+				free(res);
+			}
+			newl();
 		}
-		newl();
-	}
 
-	/* print on demand programs */
-	if (tprogs){
-		color("* additional programs on demand\n", green);
-		color(tprogs, blue);
+		/* print on demand programs */
+		if (tprogs){
+			color("* additional programs on demand\n", green);
+			color(tprogs, blue);
+		}
+		
+		/* check processes using network */
+		color("* new processes using network", green); newl();
 	}
-	
-	/* store start of my process time for later to check speed */
-	mytime();
-
-	/* check processes using network */
-	color("* processes using network", green); newl();	
 
 	count2 = 0;
 	while(1){
@@ -4276,7 +4457,7 @@ void check_processes()
 										/* alloc mem for list if not created yet */
 										if (!tprogs) tprogs = memory_get(max_file);
 										/* is it in my progs list yet? */
-										if (string_search_line(tprogs, myprog) == -1){
+										if (string_search_line(tprogs, myprog) == -1 && string_search_line(tprogs_exc, myprog) == -1){
 											strncat2(tprogs, myprog, max_file);
 											strncat2(tprogs, "\n", max_file);
 											color(myprog, blue); newl();
@@ -4297,16 +4478,43 @@ void check_processes()
 		free(netf3);
 		break;
 	}
+}
 
-	/* print running time */
-	mytime();
-	
-	/* manage policy and rules */
-	check();
 
-	/* print running time */
-	mytime();
+/* print statistics about domains */
+void statistics()
+{
+	char *res, *temp, *sd, *sr;
+	int d = 0;
+	int r = 0;
 	
+	/* count domains */
+	temp = tdomf;
+	while(1){
+		res = domain_get_next(&temp);
+		if (!res) break;
+		d++;
+		free(res);
+	}
+
+	/* count rules */
+	temp = tdomf;
+	while(1){
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		if (string_search_keyword_first(res, "allow_")) r++;
+		free(res);
+	}
+	
+	/* print stat */
+	sd = string_itos(d);
+	sr = string_itos(r);
+	color(sd, clr);
+	color(" active domains, ", clr);
+	color(sr, clr);
+	color(" rules\n", clr);
+	free(sd);
+	free(sr);
 }
 
 
@@ -4397,9 +4605,52 @@ int main(int argc, char **argv){
 	/* create excaption list from program names and available shells */
 	check_exceptions();
 
-	/* check running processes */
-	check_processes();
+	while(1){
 
+		/* check running processes */
+		check_processes();
+
+		/* run policy check from time to time */
+		recheck--;
+		if (recheck < 0){
+			recheck = count;
+			flag_safe = 0;
+
+			/* manage policy and rules */
+			check();
+			
+			/* print only once */
+			if (flag_firstrun){
+				flag_firstrun = 0;
+				color("* whole running cycle took ", green);
+				printf("%.2fs\n", mytime());
+				if (!opt_once){
+					color("(press q to quit)", red); newl();
+				}
+			}
+
+			/* now it's safe to enforce mode and save config on interrupt, cause check() finished running */
+			flag_safe = 1;
+			
+			/* exit if --once option is on */
+			if (opt_once) break;
+		}
+		
+		/* sleep some */
+		usleep(500000);
+		if (key_get() == 'q'){ newl(); break; }
+	}
+
+	if (flag_safe){
+		/* turn on enforcing mode for all old domains before exiting */
+		domain_set_enforce_old();
+		/* save config files */
+		save();
+	}
+	else if (flag_firstrun) color("* haven't finished to run at least once\n", red);
+	
+	/* print statistics */
+	statistics();
 
 	/* free all my pointers */
 	myfree();
