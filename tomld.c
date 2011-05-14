@@ -188,6 +188,9 @@ char *home = "/home";
 int count = 10;
 int recheck = 0;
 
+/* path to my executable */
+char *my_exe_path = 0;
+
 /* number of max entries in profile config */
 #define max_mem "10000"
 
@@ -461,6 +464,7 @@ void help() {
 /* free my pointers */
 void myfree()
 {
+	if (my_exe_path)			free(my_exe_path);
 	if (tdomf)					free(tdomf);
 	if (texcf)					free(texcf);
 	if (tshellf)				free(tshellf);
@@ -2270,6 +2274,10 @@ void backup()
 /* check if only one instance of the program is running */
 int check_instance(){
 	char *mypid;
+
+	/* store path to my executable */
+	my_exe_path = process_get_path(getpid());
+
 	/* get my pid number and convert it to string */
 	mypid = string_itos(getpid());
 	/* check if my pid file exists */
@@ -2298,7 +2306,7 @@ int check_instance(){
 	}
 
 	free(mypid);
-
+	
 	return 1;
 }
 
@@ -2365,31 +2373,69 @@ char *which(const char *name){
 }
 
 
-/* create profile.conf and manager.conf files */
+/* create profile.conf and manager.conf files and load them to kernel if they are different */
 void create_prof()
 {
+	char *tmanf_old, *tmanf, *tmanf2, *tprof_old, *tprof, *tprof2, *res;
+	char comm[max_char] = "";
+	
 	/* check tomoyo version */
-	if (tomoyo_version() <= 2299){
+	if (tomoyo_version() <= 2299){ tmanf = tmanf22; tprof = tprof22; }
+	else                         { tmanf = tmanf23; tprof = tprof23; }
+
+	/* load manager.conf from kernel and check if it's the same what i have */
+	/* if identical, then no reload is needed */
+	tmanf_old = file_read(tmank, max_file);
+	tmanf2 = memory_get(max_file);
+	strncpy2(tmanf2, tmanf, strlen(tmanf) + 1);
+
+	/* add my executable too to the binary list in manager.conf */
+	strncat2(tmanf2, my_exe_path, max_file);
+	strncat2(tmanf2, "\n",        max_file);
+
+	/* sort lines before compare */
+	res = string_sort_uniq_lines(tmanf_old);
+	free(tmanf_old); tmanf_old = res;
+	res = string_sort_uniq_lines(tmanf2);
+	free(tmanf2); tmanf2 = res;
+	
+	/* compare kernel manager config and mine */
+	/* reload it to kernel if they are not identical */
+	if (strcmp(tmanf2, tmanf_old)){
+		/* write config to disk */
+		file_write(tman, tmanf2);
+		/* load config from disk to kernel */
+		strncpy2(comm, tload, max_char);
+		strncat2(comm, " m",  max_char);
+		/* this system() call here is the only one and this is unavoidable
+		 * because only the external tomoyo-loadpolicy had the right to
+		 * upload my new manager.conf config to the kernel,
+		 * but from now on i have the right too to change policy through /sys */
+		system(comm);
+	}
+	
+	/* load profile.conf from kernel and check if it's the same what i have */
+	/* if identical, then no reload is needed */
+	tprof_old = file_read(tprok, max_file);
+
+	/* sort lines before compare */
+	res = string_sort_uniq_lines(tprof_old);
+	free(tprof_old); tprof_old = res;
+	tprof2 = string_sort_uniq_lines(tprof);
+	
+	/* compare kernel profile config and mine */
+	/* reload it to kernel if they are not identical */
+	if (strcmp(tprof2, tprof_old)){
 		/* write profiles to disk */
-		file_write(tpro, tprof22);
-		file_write(tman, tmanf22);
-		/* load profiles to kernel memory */
-		file_write(tprok, tprof22);
-		file_write(tmank, tmanf22);
+		file_write(tpro, tprof);
+		/* write profiles to kernel */
+		file_write(tprok, tprof);
 	}
-	/* use profile for tomoyo version 2.3.x */
-	else if (tomoyo_version() >= 2300){
-		/* write profiles to disk */
-		file_write(tpro, tprof23);
-		file_write(tman, tmanf23);
-		/* load profiles to kernel memory */
-		file_write(tprok, tprof23);
-		file_write(tmank, tmanf23);
-	}
-	else{
-		color_("error: tomoyo version is not compatible\n", red);
-		myexit(1);
-	}
+
+	free(tmanf_old);
+	free(tprof_old);
+	free(tmanf2);
+	free(tprof2);
 }
 
 
@@ -4284,11 +4330,9 @@ void check_exceptions()
 	}
 
 	/* add my executable too to the list */
-	res = process_get_path(getpid());
-	if (res){
-		strncat2(tprogs_exc, res, max_file);
+	if (my_exe_path){
+		strncat2(tprogs_exc, my_exe_path, max_file);
 		strncat2(tprogs_exc, "\n", max_file);
-		free(res);
 	}
 
 	/* sort exception list */
