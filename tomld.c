@@ -2757,6 +2757,9 @@ void domain_set_learn_all()
 		domain_set_profile(orig, 1);
 		free(res);
 	}
+	
+	/* save config files and load them to kernel */
+	reload();
 }
 
 
@@ -3360,7 +3363,7 @@ int compare_paths(char *path1, char *path2)
 	if (!c1 && !c2) return 1;
 	if (!c1 || !c2) return 0;
 	
-	/* fail if none of them starts with "/" char */
+	/* fail if they don't start with "/" char */
 	if (c1 != '/' || c2 != '/') return 0;
 	
 	/* compare paths only */
@@ -3528,16 +3531,16 @@ int compare_rules(char *r1, char *r2)
 	/* get rule paths */
 	rule1a = string_get_next_word(&temp1);
 	rule1b = string_get_next_word(&temp1);
-	/* fail if no first params */
-	if (!rule1a || !rule1b) goto exit_mem;
+	/* fail if no first path in param 1 */
+	if (!rule1a) goto exit_mem;
 	
 	/* get second params if any */
 	rule2a = string_get_next_word(&temp2);
 	rule2b = string_get_next_word(&temp2);
-	if (!rule2a && rule2b) goto exit_mem;
-	if (rule2a && !rule2b) goto exit_mem;
+	/* fail if no first path in param 2 */
+	if (!rule2a) goto exit_mem;
 	/* second params exist too */
-	if (rule2a && rule2b) flag_double++;
+	if (rule2b) flag_double++;
 	
 	/* compare rules' paths */
 
@@ -3876,7 +3879,7 @@ char *domain_sort_uniq_rules(char *rules)
 					else        { strncpy2(old, res2, max_char); lo = l2; }
 					/* if match, store only the shortest one from the matching ones */
 					ln = strlen(new);
-					if ((!new) || (ln > lo)) strncpy2(new, old, max_char);
+					if ((!new[0]) || (ln > lo)) strncpy2(new, old, max_char);
 				}
 
 				free(res2);
@@ -4147,14 +4150,13 @@ void domain_reshape_rules_recursive_dirs()
 					if (!res2) break;
 					
 					/* store old rules */
-					strncpy2(rules, res2, max_file);
+					strncat2(rules, res2, max_file);
 					strncat2(rules, "\n", max_file);
 					
 					/* get a modified rule by recursive dirs if any */
 					res3 = get_rules_with_recursive_dirs(res2);
 					if (res3){
-						strncpy2(rules, res3, max_file);
-						strncat2(rules, "\n", max_file);
+						strncat2(rules, res3, max_file);
 						free(res3);
 					}
 
@@ -4188,6 +4190,8 @@ void domain_reshape_rules()
 	domain_cleanup();
 	
 	domain_reshape_rules_recursive_dirs();
+
+	domain_cleanup();
 }
 
 
@@ -4645,7 +4649,7 @@ int main(int argc, char **argv){
 		/* turn on enforcing mode for all old domains before exiting */
 		domain_set_enforce_old();
 		/* save config files */
-		save();
+		reload();
 	}
 	else if (flag_firstrun) color("* haven't finished to run at least once\n", red);
 	
