@@ -2893,7 +2893,7 @@ void domain_set_enforce_old()
 void domain_get_log()
 {
 	/* vars */
-	char *res, *res2, *temp, *temp2;
+	char *res, *res2, *temp, *temp2, *orig;
 	char *start, *tlogf2, *tlogf3;
 	char *prog_rules = 0;
 	char key[max_char] = "";
@@ -2923,6 +2923,8 @@ void domain_get_log()
 	if (tmarkf){
 		i = string_search_keyword(start, tmarkf);
 		if (i > -1) start += i;
+		/* jump after the next line where i found the log mark */
+		string_jump_next_line(&start);
 	}
 	
 	/* alloc mem for collected log */
@@ -2974,16 +2976,34 @@ void domain_get_log()
 
 	/* set mark to the last log line */
 	temp = tlogf;
-	res = string_get_last_line(&temp);
-	i = string_search_keyword(res, "kernel: [");
-	i2 = string_search_keyword(res + i, "]");
-	if (i > -1 && i2 > -1){
-		l = i2 + 2;
-		if (tmarkf) free(tmarkf);
-		tmarkf = memory_get(l);
-		strncpy2(tmarkf, res + i, l);
+	temp2 = 0;
+	i = -1;
+	/* search for the last kernel message in the log */
+	while(1){
+		orig = temp;
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		i = string_search_keyword(res, "kernel: [");
+		if (i > -1) temp2 = orig;
+		free(res);
 	}
-	free(res);
+
+	/* temp2 shows the beginning of the line of the last kernel message */
+	if (temp2){
+		i = string_search_keyword(temp2, "kernel: [");
+		i2 = string_search_keyword(temp2 + i, "]");
+		if (i > 1 && i2 > -1){
+			/* set tmarkf to the last kernel messages time stamp */
+			l = i2 + 2;
+			if (tmarkf) free(tmarkf);
+			tmarkf = memory_get(l);
+			strncpy2(tmarkf, temp2 + i, l);
+		}
+	}
+	/* clear tmarkf if no kernel messages */
+	else{
+		if (tmarkf) tmarkf[0] = 0;
+	}
 
 
 	/* --------------------------------- */
@@ -3559,7 +3579,6 @@ int compare_rules(char *r1, char *r2)
 	char *type1 = 0, *type2 = 0, *rule1a = 0, *rule1b = 0, *rule2a = 0, *rule2b = 0;
 	char *temp1, *temp2;
 	int flag_double = 1;
-	int ret = 0;
 	
 	/* fail if either of the rules are null */
 	if (!r1[0] || !r2[0]) return 0;
@@ -3570,46 +3589,60 @@ int compare_rules(char *r1, char *r2)
 	temp2 = r2;
 	type2 = string_get_next_word(&temp2);
 	/* fail if types are null */
-	if (!type1 || !type2) goto exit_mem;
+	if (!type1 || !type2){
+		if (type1)  free(type1);
+		if (type2)  free(type2);
+		return 0; }
 	/* compare types, fail if no match */
-	if (strcmp(type1, type2)) goto exit_mem;
+	if (strcmp(type1, type2)){
+		free(type1); free(type2); return 0; }
 	
 	/* get rule paths */
 	rule1a = string_get_next_word(&temp1);
 	rule1b = string_get_next_word(&temp1);
 	/* fail if no first path in param 1 */
-	if (!rule1a) goto exit_mem;
+	if (!rule1a){
+		free(type1); free(type2); return 0; }
 	
 	/* get second params if any */
 	rule2a = string_get_next_word(&temp2);
 	rule2b = string_get_next_word(&temp2);
 	/* fail if no first path in param 2 */
-	if (!rule2a) goto exit_mem;
+	if (!rule2a){
+		free(type1); free(type2); free(rule1a);
+		if (rule1b) free(rule1b);
+		return 0;
+	}
 	/* second params exist too */
 	if (rule2b) flag_double++;
 	
 	/* compare rules' paths */
 
 	/* first params */
-	if (!compare_paths(rule1a, rule2a)) goto exit_mem;
+	if (!compare_paths(rule1a, rule2a)){
+		free(type1); free(type2); free(rule1a); free(rule2a);
+		if (rule1b) free(rule1b);
+		if (rule2b) free(rule2b);
+		return 0;
+	}
 	if (flag_double > 1){
 		/* second params */
-		if (!compare_paths(rule1b, rule2b)) goto exit_mem;
+		if (!compare_paths(rule1b, rule2b)){
+			free(type1);  free(type2);  free(rule1a);
+			free(rule2a); free(rule1b); free(rule2b);
+			return 0;
+		}
 	}
 
-	/* success here */
-	ret = 1;
-
-exit_mem:
 	/* free mem */
-	if (type1)  free(type1);
-	if (type2)  free(type2);
-	if (rule1a) free(rule1a);
+	free(type1);
+	free(type2);
+	free(rule1a);
+	free(rule2a);
 	if (rule1b) free(rule1b);
-	if (rule2a) free(rule2a);
 	if (rule2b) free(rule2b);
 
-	return ret;
+	return 1;
 }
 
 
@@ -4699,6 +4732,9 @@ int main(int argc, char **argv){
 	
 	/* print statistics */
 	statistics();
+
+	/* save configs to disk */
+	save();
 
 	/* free all my pointers */
 	myfree();
