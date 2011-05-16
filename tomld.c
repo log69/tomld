@@ -184,9 +184,8 @@ char *ver = "0.31";
 /* home dir */
 char *home = "/home";
 
-/* interval of policy check in seconds */
-int count = 10;
-int recheck = 0;
+/* interval of policy check to run in seconds */
+float time_check = 10;
 
 /* path to my executable */
 char *my_exe_path = 0;
@@ -1769,8 +1768,7 @@ float mytime()
 	static int flag_time = 0;
 	static struct timeval start, end;
 	static long seconds, useconds;
-	static float t = 0, t_old = 0;
-	float t_diff = 0;
+	static float t = 0;
 
 	/* first run? */
 	if (!flag_time){
@@ -1783,11 +1781,9 @@ float mytime()
 		useconds = end.tv_usec - start.tv_usec;
 
 		t = (((seconds) * 1000 + useconds/1000.0) + 0.5) / 1000;
-		t_diff = t - t_old;
-		t_old = t;
 	}
 	
-	return t_diff;
+	return t;
 }
 
 
@@ -2136,9 +2132,11 @@ void load()
 	char *tdomf_new, *res, *res2, *temp, *temp2;
 	
 	/* load domain config */
+	if (tdomf) free(tdomf);
 	tdomf = file_read(tdomk, max_file);
 
 	/* load exception config */
+	if (texcf) free(texcf);
 	texcf = file_read(texck, max_file);
 	
 	/* alloc memory for new policy */
@@ -2300,7 +2298,7 @@ void reload()
 			free(res);
 		}
 		
-		/* safety code: load old policy again to check if it hasn't change
+		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
 		tdomf_old2 = file_read(tdomk, max_file);
 		if (!strcmp(tdomf_old, tdomf_old2)){
@@ -2349,7 +2347,7 @@ void reload()
 			free(res);
 		}
 		
-		/* safety code: load old policy again to check if it hasn't change
+		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
 		texcf_old2 = file_read(texck, max_file);
 		if (!strcmp(texcf_old, texcf_old2)){
@@ -4753,8 +4751,10 @@ void statistics()
 
 int main(int argc, char **argv){
 
+	float t_start, t;
+
 	/* store start time */
-	mytime();
+	t_start = mytime();
 
 	/* is output colored? set only color option here before anything else */
 	check_options_colored(argc, argv);
@@ -4834,15 +4834,16 @@ int main(int argc, char **argv){
 	/* create excaption list from program names and available shells */
 	check_exceptions();
 
+	/* store negatív reference time for check() function to make check() run at least once */	
+	t = -time_check;
+
 	while(1){
 
 		/* check running processes */
 		check_processes();
 
 		/* run policy check from time to time */
-		recheck--;
-		if (recheck < 0){
-			recheck = count;
+		if ((mytime() - t) >= time_check){
 			flag_safe = 0;
 
 			/* manage policy and rules */
@@ -4863,6 +4864,9 @@ int main(int argc, char **argv){
 			
 			/* exit if --once option is on */
 			if (opt_once) break;
+			
+			/* reset time */
+			t = mytime();
 		}
 		
 		/* sleep some */
