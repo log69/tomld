@@ -2216,125 +2216,153 @@ void load()
 void reload()
 {
 	char *myappend;
-	char *res, *res2, *rule, *temp, *temp2, *tdomf_old, *texcf_old;
+	char *res, *res2, *rule, *temp, *temp2;
+	char *tdomf_old, *tdomf_old2, *texcf_old, *texcf_old2;
 	
 	/* alloc mem for transitions */
 	myappend = memory_get(max_file);
 	
-	/* load old policy */
+	/* load old policy from kernel */
 	tdomf_old = file_read(tdomk, max_file);
-	
-	/* create append list with deleting old policy from kernel
-	 * using "select" and "delete" keywords */
-	temp = tdomf_old;
-	while(1){
-		/* get next domain policy */
-		res = domain_get_next(&temp);
-		if (!res) break;
 
-		/* get full domain name with "<kernel>" tag */
-		temp2 = res;
-		res2 = string_get_next_line(&temp2);
-		if (res2){
-			/* append list with select <kernel> /bin/... */
-			strncat2(myappend, "select ", max_file);
-			strncat2(myappend, res2, max_file);
-			strncat2(myappend, "\n", max_file);
+	/* load domain policy to the kernel */
+	while(1){	
+		/* create append list with deleting old policy from kernel
+		 * using "select" and "delete" keywords */
+		temp = tdomf_old;
+		while(1){
+			/* get next domain policy */
+			res = domain_get_next(&temp);
+			if (!res) break;
 
-			/* append list with delete rules */
-			while(1){
-				/* get next rule */
-				rule = string_get_next_line(&temp2);
-				if (!rule) break;
-				/* add only if not an empty line */
-				if (rule[0]){
-					/* add delete keyword and rule to append list */
-					strncat2(myappend, "delete ", max_file);
-					strncat2(myappend, rule, max_file);
-					strncat2(myappend, "\n", max_file);
+			/* get full domain name with "<kernel>" tag */
+			temp2 = res;
+			res2 = string_get_next_line(&temp2);
+			if (res2){
+				/* append list with select <kernel> /bin/... */
+				strncat2(myappend, "select ", max_file);
+				strncat2(myappend, res2, max_file);
+				strncat2(myappend, "\n", max_file);
+
+				/* append list with delete rules */
+				while(1){
+					/* get next rule */
+					rule = string_get_next_line(&temp2);
+					if (!rule) break;
+					/* add only if not an empty line */
+					if (rule[0]){
+						/* add delete keyword and rule to append list */
+						strncat2(myappend, "delete ", max_file);
+						strncat2(myappend, rule, max_file);
+						strncat2(myappend, "\n", max_file);
+					}
+					free(rule);
 				}
-				free(rule);
+				free(res2);
+
+				/* add "use_profile 0" tag to set domain's profile back to zero too */
+				strncat2(myappend, "use_profile 0\n", max_file);
 			}
-			free(res2);
-
-			/* add "use_profile 0" tag to set domain's profile back to zero too */
-			strncat2(myappend, "use_profile 0\n", max_file);
+			free(res);
 		}
-		free(res);
-	}
 
-	/* add new policy to append list */
-	temp = tdomf;
-	while(1){
-		/* get next domain policy */
-		res = domain_get_next(&temp);
-		if (!res) break;
+		/* add new policy to append list */
+		temp = tdomf;
+		while(1){
+			/* get next domain policy */
+			res = domain_get_next(&temp);
+			if (!res) break;
 
-		/* get full domain name with "<kernel>" tag */
-		temp2 = res;
-		res2 = string_get_next_line(&temp2);
-		if (res2){
-			/* append list with select <kernel> /bin/... */
-			strncat2(myappend, "select ", max_file);
-			strncat2(myappend, res2, max_file);
-			strncat2(myappend, "\n", max_file);
+			/* get full domain name with "<kernel>" tag */
+			temp2 = res;
+			res2 = string_get_next_line(&temp2);
+			if (res2){
+				/* append list with select <kernel> /bin/... */
+				strncat2(myappend, "select ", max_file);
+				strncat2(myappend, res2, max_file);
+				strncat2(myappend, "\n", max_file);
 
-			/* append list with delete rules */
-			while(1){
-				/* get next rule */
-				rule = string_get_next_line(&temp2);
-				if (!rule) break;
-				/* add only if not an empty line */
-				if (rule[0]){
-					/* add rule to append list */
-					strncat2(myappend, rule, max_file);
-					strncat2(myappend, "\n", max_file);
+				/* append list with delete rules */
+				while(1){
+					/* get next rule */
+					rule = string_get_next_line(&temp2);
+					if (!rule) break;
+					/* add only if not an empty line */
+					if (rule[0]){
+						/* add rule to append list */
+						strncat2(myappend, rule, max_file);
+						strncat2(myappend, "\n", max_file);
+					}
+					free(rule);
 				}
-				free(rule);
+				free(res2);
 			}
-			free(res2);
+			free(res);
 		}
-		free(res);
+		
+		/* safety code: load old policy again to check if it hasn't change
+		 * since i started creating the new one */
+		tdomf_old2 = file_read(tdomk, max_file);
+		if (!strcmp(tdomf_old, tdomf_old2)){
+			free(tdomf_old2);
+			/* write changes to kernel */
+			file_write(tdomk, myappend);
+			break;
+		}
+		else{
+			free(tdomf_old);
+			tdomf_old = tdomf_old2;
+		}
 	}
-	
-	/* write changes to kernel */
-	file_write(tdomk, myappend);
 	
 	free(tdomf_old);
 
-	/* load old policy */
+	/* load old policy from kernel */
 	texcf_old = file_read(texck, max_file);
 	
 	/* load exception policy to kernel too */
-
-	/* create another append list with deleting exception policy lines */
-	myappend[0] = 0;
-	temp = texcf_old;
 	while(1){
-		/* get next line of exception policy */
-		res = string_get_next_line(&temp);
-		if (!res) break;
-		/* append lines with delete keyword */
-		strncat2(myappend, "delete ", max_file);
-		strncat2(myappend, res, max_file);
-		strncat2(myappend, "\n", max_file);
-		free(res);
-	}
-
-	/* cadd new rules to append list */
-	temp = texcf;
-	while(1){
-		/* get next line of exception policy */
-		res = string_get_next_line(&temp);
-		if (!res) break;
-		/* append lines with delete keyword */
-		strncat2(myappend, res, max_file);
-		strncat2(myappend, "\n", max_file);
-		free(res);
-	}
 	
-	/* write changes to kernel */
-	file_write(texck, myappend);
+		/* create another append list with deleting exception policy lines */
+		myappend[0] = 0;
+		temp = texcf_old;
+		while(1){
+			/* get next line of exception policy */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			/* append lines with delete keyword */
+			strncat2(myappend, "delete ", max_file);
+			strncat2(myappend, res, max_file);
+			strncat2(myappend, "\n", max_file);
+			free(res);
+		}
+
+		/* cadd new rules to append list */
+		temp = texcf;
+		while(1){
+			/* get next line of exception policy */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			/* append lines with delete keyword */
+			strncat2(myappend, res, max_file);
+			strncat2(myappend, "\n", max_file);
+			free(res);
+		}
+		
+		/* safety code: load old policy again to check if it hasn't change
+		 * since i started creating the new one */
+		texcf_old2 = file_read(texck, max_file);
+		if (!strcmp(texcf_old, texcf_old2)){
+			free(texcf_old2);
+			/* write changes to kernel */
+			file_write(texck, myappend);
+			break;
+		}
+		else{
+			free(texcf_old);
+			texcf_old = texcf_old2;
+		}
+	}
 
 	free(texcf_old);
 	free(myappend);
