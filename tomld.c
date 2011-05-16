@@ -2299,6 +2299,8 @@ void reload()
 	
 	/* write changes to kernel */
 	file_write(tdomk, myappend);
+	
+	free(tdomf_old);
 
 	/* load old policy */
 	texcf_old = file_read(texck, max_file);
@@ -2334,6 +2336,7 @@ void reload()
 	/* write changes to kernel */
 	file_write(texck, myappend);
 
+	free(texcf_old);
 	free(myappend);
 }
 
