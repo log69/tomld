@@ -2206,29 +2206,135 @@ void load()
 
 
 /* reload config files from variables to kernel memory */
+/* this is done using "select" and "delete" keywords during file write */
+/* for example:
+ * select <kernel> /usr/sbin/httpd
+ * allow_read /var/www/html/\*.html
+ * delete allow_read /var/www/html/index.html
+ * delete allow_read /var/www/html/welcome.html
+*/
 void reload()
 {
-	char comm[max_char] = "";
+	char *myappend;
+	char *res, *res2, *rule, *temp, *temp2, *tdomf_old, *texcf_old;
 	
-/*	file_write(tdomk, tdomf);
-	file_write(texck, texcf);*/
+	/* alloc mem for transitions */
+	myappend = memory_get(max_file);
+	
+	/* load old policy */
+	tdomf_old = file_read(tdomk, max_file);
+	
+	/* create append list with deleting old policy from kernel
+	 * using "select" and "delete" keywords */
+	temp = tdomf_old;
+	while(1){
+		/* get next domain policy */
+		res = domain_get_next(&temp);
+		if (!res) break;
 
-/*	strncpy2(comm, tload, max_char);
-	strncat2(comm, " d -", max_char);
-	pipe_write(comm, tdomf);
+		/* get full domain name with "<kernel>" tag */
+		temp2 = res;
+		res2 = string_get_next_line(&temp2);
+		if (res2){
+			/* append list with select <kernel> /bin/... */
+			strncat2(myappend, "select ", max_file);
+			strncat2(myappend, res2, max_file);
+			strncat2(myappend, "\n", max_file);
 
-	strncpy2(comm, tload, max_char);
-	strncat2(comm, " e -", max_char);
-	pipe_write(comm, texcf);*/
+			/* append list with delete rules */
+			while(1){
+				/* get next rule */
+				rule = string_get_next_line(&temp2);
+				if (!rule) break;
+				/* add only if not an empty line */
+				if (rule[0]){
+					/* add delete keyword and rule to append list */
+					strncat2(myappend, "delete ", max_file);
+					strncat2(myappend, rule, max_file);
+					strncat2(myappend, "\n", max_file);
+				}
+				free(rule);
+			}
+			free(res2);
 
-	/* save configs to disk */
-	file_write(tdom, tdomf);
-	file_write(texc, texcf);
+			/* add "use_profile 0" tag to set domain's profile back to zero too */
+			strncat2(myappend, "use_profile 0\n", max_file);
+		}
+		free(res);
+	}
 
-	/* load configs from from disk to memory */
-	strncpy2(comm, tload, max_char);
-	strncat2(comm, " fa", max_char);
-	system(comm);
+	/* add new policy to append list */
+	temp = tdomf;
+	while(1){
+		/* get next domain policy */
+		res = domain_get_next(&temp);
+		if (!res) break;
+
+		/* get full domain name with "<kernel>" tag */
+		temp2 = res;
+		res2 = string_get_next_line(&temp2);
+		if (res2){
+			/* append list with select <kernel> /bin/... */
+			strncat2(myappend, "select ", max_file);
+			strncat2(myappend, res2, max_file);
+			strncat2(myappend, "\n", max_file);
+
+			/* append list with delete rules */
+			while(1){
+				/* get next rule */
+				rule = string_get_next_line(&temp2);
+				if (!rule) break;
+				/* add only if not an empty line */
+				if (rule[0]){
+					/* add rule to append list */
+					strncat2(myappend, rule, max_file);
+					strncat2(myappend, "\n", max_file);
+				}
+				free(rule);
+			}
+			free(res2);
+		}
+		free(res);
+	}
+	
+	/* write changes to kernel */
+	file_write(tdomk, myappend);
+
+	/* load old policy */
+	texcf_old = file_read(texck, max_file);
+	
+	/* load exception policy to kernel too */
+
+	/* create another append list with deleting exception policy lines */
+	myappend[0] = 0;
+	temp = texcf_old;
+	while(1){
+		/* get next line of exception policy */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		/* append lines with delete keyword */
+		strncat2(myappend, "delete ", max_file);
+		strncat2(myappend, res, max_file);
+		strncat2(myappend, "\n", max_file);
+		free(res);
+	}
+
+	/* cadd new rules to append list */
+	temp = texcf;
+	while(1){
+		/* get next line of exception policy */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		/* append lines with delete keyword */
+		strncat2(myappend, res, max_file);
+		strncat2(myappend, "\n", max_file);
+		free(res);
+	}
+	
+	/* write changes to kernel */
+	file_write(texck, myappend);
+
+	free(myappend);
 }
 
 
@@ -2616,7 +2722,7 @@ void check_tomoyo()
 
 	/* check tomoyo tool files */
 	if (!file_exist(tinit)){ color_("error: ", red); color_(tinit, red); color_(" executable binary missing\n", red); myexit(1); }
-/*	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); myexit(1); }*/
+	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); myexit(1); }
 /*	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); myexit(1); }*/
 
 	/* create tomoyo dir if it doesn't exist yet */
@@ -2820,6 +2926,9 @@ void domain_set_enforce_old()
 	/* is --keep option on? */
 	if (!opt_keep){
 
+		/* load config files */
+		load();
+
 		/* check if there are old domains with enforcing mode */
 		temp = tdomf;
 		while(1){
@@ -2922,9 +3031,17 @@ void domain_get_log()
 	start = tlogf;
 	if (tmarkf){
 		i = string_search_keyword(start, tmarkf);
-		if (i > -1) start += i;
-		/* jump after the next line where i found the log mark */
-		string_jump_next_line(&start);
+		if (i > -1){
+			start += i;
+			/* jump after the next line where i found the log mark */
+			string_jump_next_line(&start);
+		}
+		/* clear tmarkf if no previous log mark found */
+		/* it might mean the log has been rotated already */
+		else{
+			if (tmarkf) tmarkf[0] = 0;
+			start = tlogf;
+		}
 	}
 	
 	/* alloc mem for collected log */
@@ -4725,8 +4842,6 @@ int main(int argc, char **argv){
 	if (flag_safe){
 		/* turn on enforcing mode for all old domains before exiting */
 		domain_set_enforce_old();
-		/* save config files */
-		reload();
 	}
 	else if (flag_firstrun) color("* haven't finished to run at least once\n", red);
 	
