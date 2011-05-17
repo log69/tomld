@@ -598,6 +598,35 @@ void color_(const char *text, const char *col)
 }
 
 
+/* free my allocated dynamic string space */
+void free3(char *ptr)
+{
+	free(ptr - sizeof(unsigned long) - sizeof(unsigned long));
+}
+
+
+/* allocate dynamic string memory for char and return pointer */
+/* my dynamic string looks like this: */
+/* [ maxlen ] [ len ] [ s t r i n g ] */
+/* i make the pointer point to the data part only after maxlen and len data */
+/* returned value must be freed by caller */
+char *memory_get3(unsigned long num)
+{
+	char *p = malloc(sizeof(char) * (num + 1) + sizeof(unsigned long) + sizeof(unsigned long));
+	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	/* store memory size as the first data in pointer */
+	*p = num + 1;
+	p += sizeof(unsigned long);
+	/* store string length as the second data in pointer */
+	*p = 0;
+	/* set pointer to string data */
+	p += sizeof(unsigned long);
+	/* clear string */
+	p[0] = 0;
+	return p;
+}
+
+
 /* allocate memory for char and return pointer */
 /* returned value must be freed by caller */
 char *memory_get(unsigned long num)
@@ -631,6 +660,40 @@ long *memory_get_long(unsigned long num)
 	/* clear first byte */
 	p[0] = 0;
 	return p;
+}
+
+
+/* my strcpy for dynamic strings */
+void strncpy3(char **s1, const char *s2)
+{
+	unsigned long l2 = strlen(s2) + 1;
+	unsigned long size = *((*s1) - sizeof(unsigned long) - sizeof(unsigned long));
+	if (size < l2){
+		char *s3 = memory_get3(l2 * 2);
+		free3((*s1));
+		*s1 = s3;
+	}
+	*((*s1) - sizeof(unsigned long)) = l2 - 1;
+	while(l2--) (*s1)[l2] = s2[l2];
+}
+
+
+/* my strcat for dynamic strings */
+void strncat3(char **s1, const char *s2)
+{
+	unsigned long l1 = *((*s1) - sizeof(unsigned long));
+	unsigned long l2 = strlen(s2) + 1;
+	unsigned long l3 = l1 + l2;
+	unsigned long size = *((*s1) - sizeof(unsigned long) - sizeof(unsigned long));
+	if (size < l3){
+		char *s3 = memory_get3(l3 * 2);
+		unsigned long l4 = l1 + 1;
+		while(l4--) s3[l4] = (*s1)[l4];
+		free3((*s1));
+		*s1 = s3;
+	}
+	*((*s1) - sizeof(unsigned long)) = l3 - 1;
+	while(l2--) (*s1)[l1 + l2] = s2[l2];
 }
 
 
@@ -1894,7 +1957,7 @@ char *file_read(const char *name, long length)
 {
 	char *buff;
 	long len = 0;
-
+	
 	/* open file for reading */
 	FILE *f = fopen(name, "r");
 	if (!f){
@@ -1909,14 +1972,36 @@ char *file_read(const char *name, long length)
 		len = ftell(f) + 1;
 		fseek(f, 0, SEEK_SET);
 	}
-	/* length is manually set */
+	/* length will be unknown (like with /proc files)
+	 * so check it by buffered reading because i need the exact length.
+	 * unfortunately at tomoyo proc files,
+	 * neither ftell nor fread can tell me the number of file position
+	 * or the number of read bytes,
+	 * so i have to trick with filling the buffer with zero
+	 * and check the string length at the end */
 	else{
-		len = length;
+		int c = 0;
+		len = max_char;
+		buff = memory_get(len);
+		while(1){
+			memset(buff, 0, len);
+			if (!fread(buff, len, 1, f)) break;
+			c++;
+		}
+		len = strlen(buff) + 1 + c * len;
+		free(buff);
+		fclose(f);
+		f = fopen(name, "r");
+	}
+	
+	if (len < 1){
+		color_("error: cannot read file ", red);
+		color_(name, red); newl();
+		myexit(1);
 	}
 
 	/* alloc mem */
 	buff = memory_get(len);
-	memset(buff, 0, len);
 	/* read file */
 	fread(buff, len, 1, f);
 	fclose(f);
@@ -1951,7 +2036,7 @@ int kernel_version()
 	int ver = 0;
 	char n;
 	/* read kernel version from /proc in a format as 2.6.32-5-amd64 */
-	buff = file_read(v, max_char);
+	buff = file_read(v, 1);
 	c = 0;
 	/* create version numbers */
 	c2 = 100000;
@@ -1982,7 +2067,7 @@ int tomoyo_version()
 	if (ver) return ver;
 
 	/* read version string */
-	buff = file_read(tverk, max_char);
+	buff = file_read(tverk, 1);
 
 	c = 0;
 	/* create version numbers */
@@ -2133,11 +2218,11 @@ void load()
 	
 	/* load domain config */
 	if (tdomf) free(tdomf);
-	tdomf = file_read(tdomk, max_file);
+	tdomf = file_read(tdomk, 1);
 
 	/* load exception config */
 	if (texcf) free(texcf);
-	texcf = file_read(texck, max_file);
+	texcf = file_read(texck, 1);
 	
 	/* alloc memory for new policy */
 	tdomf_new = memory_get(max_file);
@@ -2221,7 +2306,7 @@ void reload()
 	myappend = memory_get(max_file);
 	
 	/* load old policy from kernel */
-	tdomf_old = file_read(tdomk, max_file);
+	tdomf_old = file_read(tdomk, 1);
 
 	/* load domain policy to the kernel */
 	while(1){	
@@ -2300,7 +2385,7 @@ void reload()
 		
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
-		tdomf_old2 = file_read(tdomk, max_file);
+		tdomf_old2 = file_read(tdomk, 1);
 		if (!strcmp(tdomf_old, tdomf_old2)){
 			free(tdomf_old2);
 			/* write changes to kernel */
@@ -2316,7 +2401,7 @@ void reload()
 	free(tdomf_old);
 
 	/* load old policy from kernel */
-	texcf_old = file_read(texck, max_file);
+	texcf_old = file_read(texck, 1);
 	
 	/* load exception policy to kernel too */
 	while(1){
@@ -2349,7 +2434,7 @@ void reload()
 		
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
-		texcf_old2 = file_read(texck, max_file);
+		texcf_old2 = file_read(texck, 1);
 		if (!strcmp(texcf_old, texcf_old2)){
 			free(texcf_old2);
 			/* write changes to kernel */
@@ -2520,7 +2605,7 @@ void create_prof()
 
 	/* load manager.conf from kernel and check if it's the same what i have */
 	/* if identical, then no reload is needed */
-	tmanf_old = file_read(tmank, max_file);
+	tmanf_old = file_read(tmank, 1);
 	tmanf2 = memory_get(max_file);
 	strncpy2(tmanf2, tmanf, strlen(tmanf) + 1);
 
@@ -2551,7 +2636,7 @@ void create_prof()
 	
 	/* load profile.conf from kernel and check if it's the same what i have */
 	/* if identical, then no reload is needed */
-	tprof_old = file_read(tprok, max_file);
+	tprof_old = file_read(tprok, 1);
 
 	/* sort lines before compare */
 	res = string_sort_uniq_lines(tprof_old);
@@ -2717,7 +2802,7 @@ void check_tomoyo()
 	int tver;
 
 	/* check kernel command line */
-	cmd = file_read("/proc/cmdline", max_char);
+	cmd = file_read("/proc/cmdline", 1);
 	if (string_search_keyword(cmd, " security=tomoyo") == -1){
 		free(cmd);
 		color_("error: tomoyo kernel mode is not activated\n", red);
@@ -2726,7 +2811,7 @@ void check_tomoyo()
 	free(cmd);
 
 	/* check mount state of securityfs */
-	cmd = file_read("/proc/mounts", max_file);
+	cmd = file_read("/proc/mounts", 1);
 	if (string_search_keyword(cmd, "none /sys/kernel/security securityfs") == -1){
 		int flag_mount = 0;
 		/* mount tomoyo securityfs if not mounted */
@@ -4603,7 +4688,7 @@ void check_processes()
 			char *res, *res2, *res3, *temp, *temp2;
 			if (!netf[i]) break;
 			/* read file */
-			res = file_read(netf[i++], max_char);
+			res = file_read(netf[i++], 1);
 			temp = res;
 			/* skip one line */
 			res2 = string_get_next_line(&temp);
@@ -4751,7 +4836,7 @@ void statistics()
 
 int main(int argc, char **argv){
 
-	float t_start, t;
+	float t, t_start;
 
 	/* store start time */
 	t_start = mytime();
@@ -4888,7 +4973,7 @@ int main(int argc, char **argv){
 
 	/* free all my pointers */
 	myfree();
-
+	
 	return 0;
 }
 
