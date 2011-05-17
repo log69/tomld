@@ -171,7 +171,6 @@ flow chart:
 
 #define max_char	4096
 #define max_num		32
-#define max_file	10*1024*1024
 
 
 /* ------------------------------------------ */
@@ -294,8 +293,8 @@ int opt_keep		= 0;
 int opt_recursive	= 0;
 int opt_once		= 0;
 
-char opt_info2     [max_char]  = "";
-char opt_remove2   [max_char]  = "";
+char *opt_info2		= 0;
+char *opt_remove2	= 0;
 char *dirs_recursive = 0;
 long *dirs_recursive_depth = 0;
 long *dirs_recursive_sub = 0;
@@ -460,22 +459,31 @@ void help() {
 }
 
 
+/* free my allocated dynamic string space */
+void free2(char *ptr)
+{
+	free((unsigned long*)(ptr) - 2);
+}
+
+
 /* free my pointers */
 void myfree()
 {
-	if (my_exe_path)			free(my_exe_path);
-	if (tdomf)					free(tdomf);
-	if (texcf)					free(texcf);
-	if (tshellf)				free(tshellf);
-	if (tprogs)					free(tprogs);
-	if (tprogs_exc)				free(tprogs_exc);
-	if (tprogs_learn)			free(tprogs_learn);
-	if (dirs_recursive)			free(dirs_recursive);
+	if (my_exe_path)			free2(my_exe_path);
+	if (tdomf)					free2(tdomf);
+	if (texcf)					free2(texcf);
+	if (tshellf)				free2(tshellf);
+	if (tprogs)					free2(tprogs);
+	if (tprogs_exc)				free2(tprogs_exc);
+	if (tprogs_learn)			free2(tprogs_learn);
+	if (dirs_recursive)			free2(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 	if (dirs_recursive_sub)		free(dirs_recursive_sub);
-	if (tmarkf)					free(tmarkf);
-	if (tlogf)					free(tlogf);
-	if (tdomf_bak)				free(tdomf_bak);
+	if (opt_info2)				free2(opt_info2);
+	if (opt_remove2)			free2(opt_remove2);
+	if (tmarkf)					free2(tmarkf);
+	if (tlogf)					free2(tlogf);
+	if (tdomf_bak)				free2(tdomf_bak);
 }
 
 
@@ -598,29 +606,26 @@ void color_(const char *text, const char *col)
 }
 
 
-/* free my allocated dynamic string space */
-void free3(char *ptr)
-{
-	free(ptr - sizeof(unsigned long) - sizeof(unsigned long));
-}
-
-
 /* allocate dynamic string memory for char and return pointer */
 /* my dynamic string looks like this: */
-/* [ maxlen ] [ len ] [ s t r i n g ] */
-/* i make the pointer point to the data part only after maxlen and len data */
+/* [maxlen] [len] [s t r i n g c h a r s \0 \0 \0] */
+/* i make the pointer point to the data part after maxlen and len data */
 /* returned value must be freed by caller */
-char *memory_get3(unsigned long num)
+char *memget2(unsigned long num)
 {
+	/* get long pointer for extra datas */
+	unsigned long *p2;
+	/* alloc mem */
 	char *p = malloc(sizeof(char) * (num + 1) + sizeof(unsigned long) + sizeof(unsigned long));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	/* convert pointer */
+	p2 = (unsigned long*)(p);
 	/* store memory size as the first data in pointer */
-	*p = num + 1;
-	p += sizeof(unsigned long);
+	*p2 = num + 1; p2++;
 	/* store string length as the second data in pointer */
-	*p = 0;
+	*p2 = 0; p2++;
 	/* set pointer to string data */
-	p += sizeof(unsigned long);
+	p = (char*)(p2);
 	/* clear string */
 	p[0] = 0;
 	return p;
@@ -629,7 +634,7 @@ char *memory_get3(unsigned long num)
 
 /* allocate memory for char and return pointer */
 /* returned value must be freed by caller */
-char *memory_get(unsigned long num)
+char *memget(unsigned long num)
 {
 	char *p = malloc((sizeof(char)) * (num + 1));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
@@ -641,7 +646,7 @@ char *memory_get(unsigned long num)
 
 /* allocate memory for char pointer list and return pointer */
 /* returned value must be freed by caller */
-char **memory_get_ptr(unsigned long num)
+char **memget_ptr(unsigned long num)
 {
 	char** p = malloc((sizeof(char**)) * (num + 1));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
@@ -653,7 +658,7 @@ char **memory_get_ptr(unsigned long num)
 
 /* allocate memory for long and return pointer */
 /* returned value must be freed by caller */
-long *memory_get_long(unsigned long num)
+long *memget_long(unsigned long num)
 {
 	long *p = malloc((sizeof(long)) * (num + 1));
 	if (!p){ color_("error: out of memory\n", red); myexit(1); }
@@ -663,45 +668,73 @@ long *memory_get_long(unsigned long num)
 }
 
 
-/* my strcpy for dynamic strings */
-void strncpy3(char **s1, const char *s2)
+/* my setting length for dynamic strings */
+void setlen2(char **s1)
 {
+	*((*s1) - sizeof(unsigned long)) = strlen((*s1));
+}
+
+
+/* my strcpy for dynamic strings */
+void strcpy2(char **s1, const char *s2)
+{
+	/* get long pointer for extra datas */
+	unsigned long *p2 = (unsigned long*)(*s1);
+	/* length of source string */
 	unsigned long l2 = strlen(s2) + 1;
-	unsigned long size = *((*s1) - sizeof(unsigned long) - sizeof(unsigned long));
+	/* maximum size of string memory */
+	unsigned long size = *(p2 - 2);
+	/* allocate new bigger one if space is smaller than needed */
 	if (size < l2){
-		char *s3 = memory_get3(l2 * 2);
-		free3((*s1));
+		/* new mem */
+		char *s3 = memget2(l2 * 2);
+		free2((*s1));
 		*s1 = s3;
+		p2 = (unsigned long*)(*s1);
 	}
-	*((*s1) - sizeof(unsigned long)) = l2 - 1;
+	/* store length of new result string */
+	*(p2 - 1) = l2 - 1;
+	/* copy source to dest string */
 	while(l2--) (*s1)[l2] = s2[l2];
 }
 
 
 /* my strcat for dynamic strings */
-void strncat3(char **s1, const char *s2)
+void strcat2(char **s1, const char *s2)
 {
-	unsigned long l1 = *((*s1) - sizeof(unsigned long));
+	/* get long pointer for extra datas */
+	unsigned long *p2 = (unsigned long*)(*s1);
+	/* length of destination string */
+	unsigned long l1 = *(p2 - 1);
+	/* length of source string */
 	unsigned long l2 = strlen(s2) + 1;
+	/* total length needed to store result */
 	unsigned long l3 = l1 + l2;
-	unsigned long size = *((*s1) - sizeof(unsigned long) - sizeof(unsigned long));
+	/* maximum size of string memory */
+	unsigned long size = *(p2 - 2);
+	/* allocate new bigger one if space is smaller than needed */
 	if (size < l3){
-		char *s3 = memory_get3(l3 * 2);
+		/* new mem */
+		char *s3 = memget2(l3 * 2);
 		unsigned long l4 = l1 + 1;
+		/* copy old string */
 		while(l4--) s3[l4] = (*s1)[l4];
-		free3((*s1));
+		free2((*s1));
 		*s1 = s3;
+		p2 = (unsigned long*)(*s1);
 	}
-	*((*s1) - sizeof(unsigned long)) = l3 - 1;
+	/* store length of new result string */
+	*(p2 - 1) = l3 - 1;
+	/* copy source behind dest string */
 	while(l2--) (*s1)[l1 + l2] = s2[l2];
 }
 
 
 /* my strncat */
-char *strncat2(char *s1, const char *s2, unsigned long size)
+/*char *strncat2(char *s1, const char *s2, unsigned long size)
 {
 	return (strncat(s1, s2, size - strlen(s1) - 1));
-
+*/
 /*	char *res = s1;
 	if (size > 0) {
 		while (*res++);
@@ -711,12 +744,13 @@ char *strncat2(char *s1, const char *s2, unsigned long size)
 		return s1;
 	}
 	else return res;*/
-}
+/*}*/
 
 
 /* my strncpy */
+/*
 char *strncpy2(char *s1, const char *s2, unsigned long size)
-{
+{*/
 	/* this version of strncpy takes ages to finish running */
 	/* because it fills all the the rest of the bytes too */
 /*	char *res = strncpy(s1, s2, size);
@@ -724,11 +758,11 @@ char *strncpy2(char *s1, const char *s2, unsigned long size)
 	return res;*/
 
 	/* this version of strncpy is fast */
-	char *res = s1;
+/*	char *res = s1;
 	while((*s1++ = *s2++) && (size--));
 	*(--s1) = 0;
 	return res;
-}
+}*/
 
 
 /* convert char to integer */
@@ -752,8 +786,9 @@ char string_itoc(int i)
 /* returned value must be freed by caller */
 char *string_itos(int num)
 {
-	char *res = memory_get(max_num);
+	char *res = memget2(max_num);
 	sprintf(res, "%d", num);
+	setlen2(&res);
 	return res;
 }
 
@@ -762,9 +797,24 @@ char *string_itos(int num)
 /* returned value must be freed by caller */
 char *string_ltos(unsigned long num)
 {
-	char *res = memory_get(max_num);
+	char *res = memget2(max_num);
 	sprintf(res, "%ld", num);
+	setlen2(&res);
 	return res;
+}
+
+
+/* check if link exists and return string with resolved link path */
+/* return null on fail */
+/* returned value must be freed by caller */
+char *link_read(const char *name)
+{
+	char *buff = memget2(max_char);
+	/* read link path */
+	int i = readlink(name, buff, max_char);
+	if (i > -1) return buff;
+	free2(buff);
+	return 0;
 }
 
 
@@ -777,7 +827,7 @@ char *string_get_filename(const char *text)
 	int i, i2, l;
 	
 	/* alloc mem for result */
-	res = memory_get(max_char);
+	res = memget2(max_char);
 
 	/* search for filename part */
 	l = strlen(text);
@@ -834,7 +884,7 @@ char *string_get_number(const char *text)
 	if (l < 1) return 0;
 
 	/* allocate mem for the new string */
-	res = memory_get(l);
+	res = memget2(l);
 	/* copy word */
 	i = l;
 	while(i--){
@@ -864,9 +914,12 @@ char *string_get_next_line(char **text)
 	}
 
 	/* allocate mem for the new string */
-	res = memory_get(i + 1);
-	/* copy it */
-	strncpy2(res, (*text), i);
+	res = memget2(i + 1);
+	/* copy only "i" chars */
+	c = (*text)[i];
+	(*text)[i] = 0;
+	strcpy2(&res, (*text));
+	(*text)[i] = c;
 	res[i] = 0;
 	/* move pointer to the next line, or leave it on null end */
 	if (c) i++;
@@ -887,7 +940,7 @@ char *string_get_last_line(char **text)
 	l = strlen((*text));
 	/* return null if input string is null too */
 	if (l < 1){
-		res = memory_get(1);
+		res = memget2(1);
 		return res;
 	}
 	
@@ -904,11 +957,14 @@ char *string_get_last_line(char **text)
 	l = l - i + 1;
 
 	/* allocate mem for the new string */
-	res = memory_get(l);
+	res = memget2(l);
 	/* move pointer to the next line */
 	(*text) += i;
-	/* copy it */
-	strncpy2(res, (*text), l);
+	/* copy onyl "l" chars */
+	c = (*text)[l];
+	(*text)[l] = 0;
+	strcpy2(&res, (*text));
+	(*text)[l] = c;
 	res[l - 1] = 0;
 
 	return res;
@@ -995,7 +1051,7 @@ char *string_get_next_word(char **text)
 	if (l < 1) return 0;
 
 	/* allocate mem for the new string */
-	res = memory_get(l);
+	res = memget2(l);
 	/* copy word */
 	i = l;
 	while(i--){
@@ -1059,7 +1115,7 @@ char *string_get_next_wordn(char **text, int num)
 	if (l < 1) return 0;
 
 	/* allocate mem for the new string */
-	res = memory_get(l);
+	res = memget2(l);
 	/* copy word */
 	i = l;
 	while(i--){
@@ -1119,7 +1175,7 @@ char *string_get_last_word(char **text)
 	
 	/* allocate mem for the new string */
 	l = end - i + 1;
-	res = memory_get(l + 1);
+	res = memget2(l + 1);
 	/* copy word */
 	start = i;
 	i = l;
@@ -1252,12 +1308,12 @@ char *string_sort_uniq_lines(const char *text)
 	if (!text) return 0;
 
 	/* return null on zero input */
-	if (!text[0]) return (memory_get(1));
+	if (!text[0]) return (memget2(1));
 
 	maxl = strlen(text) + 1;
-	text_sort = memory_get(maxl);
+	text_sort = memget2(maxl);
 	/* create a copy of text for sorting */
-	strncpy2(text_sort, text, maxl);
+	strcpy2(&text_sort, text);
 
 	/* count lines */
 	i = 0;
@@ -1270,7 +1326,7 @@ char *string_sort_uniq_lines(const char *text)
 	}
 
 	/* alloc mem for char pointers pointing to string lines */
-	ptr = memory_get_ptr(count);
+	ptr = memget_ptr(count);
 	
 	/* change new line chars to nulls and create pointer list to string lines */
 	i = 0;
@@ -1297,21 +1353,21 @@ char *string_sort_uniq_lines(const char *text)
 	qsort(ptr, count, sizeof(char *), string_cmp);
 
 	/* create another string holder */
-	text_new = memory_get(maxl);
+	text_new = memget2(maxl);
 
 	/* collect lines back from pointer list */
 	i = 0;
 	i2 = count;
 	while(i2--){
 		char *s = ptr[i++];
-		strncat2(text_new, s, maxl);
-		strncat2(text_new, "\n", maxl);
+		strcat2(&text_new, s);
+		strcat2(&text_new, "\n");
 	}
-	free(text_sort);
+	free2(text_sort);
 	free(ptr);
 
 	/* create another string holder */
-	text_final = memory_get(maxl);
+	text_final = memget2(maxl);
 
 	/* make it uniq */
 	text_temp = text_new;
@@ -1320,15 +1376,15 @@ char *string_sort_uniq_lines(const char *text)
 		res = string_get_next_line(&text_temp);
 		/* exit on end */
 		if (!res){
-			if (flag_first) free(res2);
+			if (flag_first) free2(res2);
 			break;
 		}
 
 		/* first run */		
 		if (!flag_first){
 			l1 = strlen(res);
-			strncat2(text_final, res, maxl);
-			strncat2(text_final, "\n", maxl);
+			strcat2(&text_final, res);
+			strcat2(&text_final, "\n");
 		}
 		else{
 			/* compare 2 lines */
@@ -1339,16 +1395,16 @@ char *string_sort_uniq_lines(const char *text)
 			else if (strcmp(res, res2)) flag_diff = 1;
 			/* store if different */
 			if (flag_diff){
-				strncat2(text_final, res, maxl);
-				strncat2(text_final, "\n", maxl);
+				strcat2(&text_final, res);
+				strcat2(&text_final, "\n");
 			}
-			free(res2);
+			free2(res2);
 		}
 		
 		res2 = res;
 		flag_first = 1;
 	}
-	free(text_new);
+	free2(text_new);
 
 	return text_final;
 }
@@ -1399,13 +1455,13 @@ char *path_get_subdirs_name(const char *path, int num)
 	int n, i, i2;
 
 	/* alloc mem for new path name */
-	path_new = memory_get(max_char);
+	path_new = memget2(max_char);
 	
 	/* return empty string if num is null */
 	if (!num) return path_new;
 
 	/* copy path to new path */
-	strncpy2(path_new, path, max_char);
+	strcpy2(&path_new, path);
 	
 	n = 0;
 	i = 0;
@@ -1436,13 +1492,13 @@ char *path_join(char *path1, char *path2)
 	long l1 = strlen(path1);
 	long l2 = strlen(path2);
 	long maxl = l1 + l2 + 3;
-	char *res = memory_get(maxl);
+	char *res = memget2(maxl);
 	
 	/* create new joined path */
-	strncpy2(res, path1, maxl);
+	strcpy2(&res, path1);
 	/* does path1 end with "/" char? if not, then add "/" char too */
-	if (path1[l1 - 1] != '/') strncat2(res, "/", maxl);
-	strncat2(res, path2, maxl);
+	if (path1[l1 - 1] != '/') strcat2(&res, "/");
+	strcat2(&res, path2);
 	
 	return res;
 }
@@ -1457,9 +1513,9 @@ char *path_get_parent_dir(char *path)
 	long l;
 	
 	/* alloc mem for new path */
-	char *path_new = memory_get(max_char);
+	char *path_new = memget2(max_char);
 	/* copy old path */
-	strncpy2(path_new, path, max_char);
+	strcpy2(&path_new, path);
 	
 	/* if path is a dir, then return it */
 	if (path_is_dir(path)) return path_new;
@@ -1502,16 +1558,16 @@ int path_count_dir_depth_r(char *path)
 			char *res = path_join(path, md->d_name);
 			/* add "/" char to the end of path */
 			long l = strlen(res) + 2;
-			char *res2 = memory_get(l);
-			strncpy2(res2, res, l);
-			strncat2(res2, "/", l);
-			free(res);
+			char *res2 = memget2(l);
+			strcpy2(&res2, res);
+			strcat2(&res2, "/");
+			free2(res);
 			/* get dir depth for current dir */
 			path_count_dir_depth_r(res2);
 			/* count dir depth by checking subdir names in path and store the deepest */
 			d = path_count_subdirs_name(res2);
 			if (depth < d) depth = d;
-			free(res2);
+			free2(res2);
 		}
 	}
 	closedir(mydir);
@@ -1533,7 +1589,7 @@ int path_count_dir_depth(char *path)
 	/* get dir depth */	
 	c = path_count_dir_depth_r(res);
 	
-	free(res);
+	free2(res);
 	
 	return c;
 }
@@ -1571,7 +1627,7 @@ char *domain_get_next(char **text)
 	l = keyl + end - 1;
 
 	/* allocate mem for the new string */
-	res = memory_get(l);
+	res = memget2(l);
 	/* copy mem block */
 	i = l;
 	while(i--){
@@ -1599,7 +1655,7 @@ char *domain_get_name(char *text)
 	/* get second word for domain name */
 	temp2 = res;
 	res2 = string_get_next_wordn(&temp2, 1);
-	free(res);
+	free2(res);
 	return res2;
 }
 
@@ -1617,7 +1673,7 @@ char *domain_get_name_sub(char *text)
 	/* get last word for main or subdomain name */
 	temp2 = res;
 	res2 = string_get_last_word(&temp2);
-	free(res);
+	free2(res);
 	return res2;
 }
 
@@ -1637,13 +1693,13 @@ int domain_main_exist(char *prog)
 		if (res2){
 			/* if prog names matches main domain name, then prog exists as a main domain and success */
 			if (!strcmp(prog, res2)){
-				free(res2);
-				free(res);
+				free2(res2);
+				free2(res);
 				return 1;
 			}
-			free(res2);
+			free2(res2);
 		}
-		free(res);
+		free2(res);
 	}
 	return 0;
 }
@@ -1656,7 +1712,7 @@ char *domain_get_list()
 	char *tdomf2, *res, *res2, *list, *list2;
 	
 	/* alloc mem for new list */
-	list = memory_get(max_file);
+	list = memget2(max_char);
 
 	/* collect domain names */
 	tdomf2 = tdomf;
@@ -1668,17 +1724,17 @@ char *domain_get_list()
 		/* get domain name */
 		res2 = domain_get_name(res);
 		if (res2){
-			strncat2(list, res2, max_file);
-			strncat2(list, "\n", max_file);
-			free(res2);
+			strcat2(&list, res2);
+			strcat2(&list, "\n");
+			free2(res2);
 		}
-		free(res);
+		free2(res);
 	}
 	
 	/* sort and uniq list because there many same entries because of subdomains */
 	if (list[0]){
 		list2 = string_sort_uniq_lines(list);
-		free(list);
+		free2(list);
 		list = list2;
 	}
 
@@ -1690,11 +1746,16 @@ char *domain_get_list()
 /* return -1 if domain does not exist */
 int domain_exist(const char *text)
 {
-	char temp[max_char] = "<kernel> ";
+	int i;
+	char *temp;
 	
-	strncat2(temp, text, max_char);
+	temp = memget2(max_char);
+	strcpy2(&temp, "<kernel> ");
+	strcat2(&temp, text);
+	i = string_search_line(tdomf, temp);
+	free2(temp);
 
-	return string_search_line(tdomf, temp);
+	return i;
 }
 
 
@@ -1715,7 +1776,7 @@ int domain_get_profile(char *text)
 
 		/* search for the keyword */
 		i = string_search_keyword(res, key);
-		free(res);
+		free2(res);
 
 		/* if match */
 		if (i > -1){
@@ -1745,7 +1806,7 @@ void domain_set_profile(char *text, int profile)
 
 		/* search for the keyword */
 		i = string_search_keyword(res, key);
-		free(res);
+		free2(res);
 
 		/* if match */
 		if (i > -1){
@@ -1776,8 +1837,8 @@ void domain_set_profile_all(const char *prog, int profile)
 		/* if so, then set its profile mode */
 		if (!strcmp(prog, res2)) domain_set_profile(orig, profile);
 
-		free(res2);
-		free(res);
+		free2(res2);
+		free2(res);
 	}
 }
 
@@ -1788,7 +1849,7 @@ void domain_add_rule(char *prog, char *rule)
 	char *res, *res2, *temp, *temp2, *tdomf_new;
 
 	/* alloc mem for new policy */	
-	tdomf_new = memory_get(max_file);
+	tdomf_new = memget2(max_char);
 	
 	/* cycle through the domains */
 	temp = tdomf;
@@ -1797,8 +1858,8 @@ void domain_add_rule(char *prog, char *rule)
 		res = domain_get_next(&temp);
 		if (!res) break;
 		/* add domain policy to new policy */
-		strncat2(tdomf_new, res, max_file);
-		strncat2(tdomf_new, "\n", max_file);
+		strcat2(&tdomf_new, res);
+		strcat2(&tdomf_new, "\n");
 		/* check if this is what i'm looking for */
 		temp2 = res;
 		res2 = domain_get_name_sub(temp2);
@@ -1806,18 +1867,18 @@ void domain_add_rule(char *prog, char *rule)
 			/* prog name matches subdomain name? */
 			if (!strcmp(prog, res2)){
 				/* if so, then add rule to new policy */
-				strncat2(tdomf_new, rule, max_file);
-				strncat2(tdomf_new, "\n", max_file);
+				strcat2(&tdomf_new, rule);
+				strcat2(&tdomf_new, "\n");
 			}
-			free(res2);
+			free2(res2);
 		}
-		free(res);
+		free2(res);
 		/* add new line to new policy */
-		strncat2(tdomf_new, "\n", max_file);
+		strcat2(&tdomf_new, "\n");
 	}
 	
 	/* replace old policy with new one */
-	free(tdomf);
+	free2(tdomf);
 	tdomf = tdomf_new;
 }
 
@@ -1880,7 +1941,7 @@ char key_get()
 	key_set_mode();
 	fd = fileno(stdin);
 	key = read(fd, &c, 1);
-	if (key == 0) c = '\0';
+	if (!key) c = '\0';
 	key_clear_mode();
 	return c;
 }
@@ -1923,7 +1984,7 @@ char *pipe_read(const char *comm, long length)
 	}
 	
 	/* alloc mem for it */
-	buff = memory_get(length);
+	buff = memget2(length);
 	memset(buff, 0, length);
 	/* read pipe */
 	fread(buff, length, 1, p);
@@ -1982,14 +2043,14 @@ char *file_read(const char *name, long length)
 	else{
 		int c = 0;
 		len = max_char;
-		buff = memory_get(len);
+		buff = memget2(len);
 		while(1){
 			memset(buff, 0, len);
 			if (!fread(buff, len, 1, f)) break;
 			c++;
 		}
 		len = strlen(buff) + 1 + c * len;
-		free(buff);
+		free2(buff);
 		fclose(f);
 		f = fopen(name, "r");
 	}
@@ -2001,7 +2062,7 @@ char *file_read(const char *name, long length)
 	}
 
 	/* alloc mem */
-	buff = memory_get(len);
+	buff = memget2(len);
 	/* read file */
 	fread(buff, len, 1, f);
 	fclose(f);
@@ -2044,13 +2105,13 @@ int kernel_version()
 		n = buff[c++];
 		if (n != '.'){
 			/* exit if no numbers or at end of string */
-			if (!(n >= '0' && n <= '9') || !n){ free(buff); return ver; }
+			if (!(n >= '0' && n <= '9') || !n){ free2(buff); return ver; }
 			/* convert string to integer and add it to result */
 			ver += c2 * string_ctoi(n);
 			c2 /= 10;
 		}
 	}
-	free(buff);
+	free2(buff);
 
 	return ver;
 }
@@ -2076,13 +2137,13 @@ int tomoyo_version()
 		n = buff[c++];
 		if (n != '.'){
 			/* exit if no numbers or at end of string */
-			if (!(n >= '0' && n <= '9') || !n){ free(buff); return ver; }
+			if (!(n >= '0' && n <= '9') || !n){ free2(buff); return ver; }
 			/* convert string to integer and add it to result */
 			ver += c2 * string_ctoi(n);
 			c2 /= 10;
 		}
 	}
-	free(buff);
+	free2(buff);
 	
 	return ver;
 }
@@ -2120,36 +2181,47 @@ void sand_clock(int dot)
 int process_running(const char *name){
 	DIR *mydir;
 	struct dirent *mydir_entry;
-	char mydir_name[max_char] = "";
-	char mypid[max_num] = "";
+	char *mydir_name, *mypid;
 	
 	/* open /proc dir */
 	mydir = opendir("/proc/");
 	if (!mydir){ color_("error: cannot open /proc/ directory\n", red); return 0; }
+
+	mydir_name = memget2(max_char);
+	mypid = memget2(max_num);
+
 	/* cycle through dirs in /proc */
 	while((mydir_entry = readdir(mydir))) {
 		/* get the dir names inside /proc dir */
-		strncpy2(mypid, mydir_entry->d_name, max_num);
+		strcpy2(&mypid, mydir_entry->d_name);
+
 		/* does it contain numbers only meaning they are pids? */
 		if (strspn(mypid, "0123456789") == strlen(mypid)) {
-			int res;
-			char buff[max_char] = "";
+			char *res;
 			/* create dirname like /proc/pid/exe */
-			strncpy2(mydir_name, "/proc/", max_char);
-			strncat2(mydir_name, mypid, max_char);
-			strncat2(mydir_name, "/exe", max_char);
+			strcpy2(&mydir_name, "/proc/");
+			strcat2(&mydir_name, mypid);
+			strcat2(&mydir_name, "/exe");
+
 			/* resolv the link pointing from the exe name */
-			res = readlink(mydir_name, buff, max_char);
-			if (res > 0){
+			res = link_read(mydir_name);
+			if (res){
 				/* compare the link to the process name */
-				if (strcmp(buff, name) == 0) {
+				if (!strcmp(res, name)) {
 					closedir(mydir);
+					free2(res);
+					free2(mydir_name);
+					free2(mypid);
 					return 1;
 				}
+				free2(res);
 			}
 		}
 	}
 	closedir(mydir);
+
+	free2(mydir_name);
+	free2(mypid);
 
 	return 0;
 	
@@ -2160,23 +2232,21 @@ int process_running(const char *name){
 /* returned value must be freed by caller */
 char *process_get_path(int pid)
 {
-	char path[max_char] = "/proc/";
-	char *buff, *str;
+	char *path, *str, *res;
+
+	path = memget2(max_char);
+	strcpy2(&path, "/proc/");
 
 	/* create path */
 	str = string_itos(pid);
-	strncat2(path, str, max_char);
-	strncat2(path, "/exe", max_char);
-	free(str);
-
-	/* alloc mem for result */
-	buff = memory_get(max_char);
+	strcat2(&path, str);
+	strcat2(&path, "/exe");
+	free2(str);
 
 	/* resolv the link pointing from the exe name */
-	if (readlink(path, buff, max_char) > 0) return buff;
-
-	free(buff);
-	return 0;
+	res = link_read(path);
+	free2(path);
+	return res;
 }
 
 
@@ -2190,7 +2260,8 @@ int dir_exist(const char *name){
 
 
 /* check if file exists */
-int file_exist(const char *name){
+int file_exist(const char *name)
+{
 	FILE *f;
 	int res = 0;
 
@@ -2217,15 +2288,15 @@ void load()
 	char *tdomf_new, *res, *res2, *temp, *temp2;
 	
 	/* load domain config */
-	if (tdomf) free(tdomf);
+	if (tdomf) free2(tdomf);
 	tdomf = file_read(tdomk, 1);
 
 	/* load exception config */
-	if (texcf) free(texcf);
+	if (texcf) free2(texcf);
 	texcf = file_read(texck, 1);
 	
 	/* alloc memory for new policy */
-	tdomf_new = memory_get(max_file);
+	tdomf_new = memget2(max_char);
 
 	/* remove disabled mode entries so runtime will be faster */
 	temp2 = tdomf;
@@ -2244,7 +2315,7 @@ void load()
 		if (res2){
 			/* don't add domain marked as (deleted) */
 			if (string_search_keyword(res2, "(deleted)") > -1) flag_deleted = 1;
-			free(res2);
+			free2(res2);
 		}
 		
 		/* root domain <kernel> with profile 0 should stay */
@@ -2272,18 +2343,18 @@ void load()
 					/* remove (deleted) and quota_exceeded entries */
 					if((string_search_keyword(res2, "(deleted)") == -1) && (string_search_keyword(res2, "(deleted)") == -1)){
 						/* add entry if ok */
-						strncat2(tdomf_new, res2, max_file);
-						strncat2(tdomf_new, "\n", max_file);
+						strcat2(&tdomf_new, res2);
+						strcat2(&tdomf_new, "\n");
 					}
 				}
-				free(res2);
+				free2(res2);
 			}
-			strncat2(tdomf_new, "\n", max_file);
+			strcat2(&tdomf_new, "\n");
 		}
-		free(res);
+		free2(res);
 	}
 
-	free(tdomf);
+	free2(tdomf);
 	tdomf = tdomf_new;
 }
 
@@ -2303,7 +2374,7 @@ void reload()
 	char *tdomf_old, *tdomf_old2, *texcf_old, *texcf_old2;
 	
 	/* alloc mem for transitions */
-	myappend = memory_get(max_file);
+	myappend = memget2(max_char);
 	
 	/* load old policy from kernel */
 	tdomf_old = file_read(tdomk, 1);
@@ -2323,9 +2394,9 @@ void reload()
 			res2 = string_get_next_line(&temp2);
 			if (res2){
 				/* append list with select <kernel> /bin/... */
-				strncat2(myappend, "select ", max_file);
-				strncat2(myappend, res2, max_file);
-				strncat2(myappend, "\n", max_file);
+				strcat2(&myappend, "select ");
+				strcat2(&myappend, res2);
+				strcat2(&myappend, "\n");
 
 				/* append list with delete rules */
 				while(1){
@@ -2335,18 +2406,18 @@ void reload()
 					/* add only if not an empty line */
 					if (rule[0]){
 						/* add delete keyword and rule to append list */
-						strncat2(myappend, "delete ", max_file);
-						strncat2(myappend, rule, max_file);
-						strncat2(myappend, "\n", max_file);
+						strcat2(&myappend, "delete ");
+						strcat2(&myappend, rule);
+						strcat2(&myappend, "\n");
 					}
-					free(rule);
+					free2(rule);
 				}
-				free(res2);
+				free2(res2);
 
 				/* add "use_profile 0" tag to set domain's profile back to zero too */
-				strncat2(myappend, "use_profile 0\n", max_file);
+				strcat2(&myappend, "use_profile 0\n");
 			}
-			free(res);
+			free2(res);
 		}
 
 		/* add new policy to append list */
@@ -2361,9 +2432,9 @@ void reload()
 			res2 = string_get_next_line(&temp2);
 			if (res2){
 				/* append list with select <kernel> /bin/... */
-				strncat2(myappend, "select ", max_file);
-				strncat2(myappend, res2, max_file);
-				strncat2(myappend, "\n", max_file);
+				strcat2(&myappend, "select ");
+				strcat2(&myappend, res2);
+				strcat2(&myappend, "\n");
 
 				/* append list with delete rules */
 				while(1){
@@ -2373,32 +2444,32 @@ void reload()
 					/* add only if not an empty line */
 					if (rule[0]){
 						/* add rule to append list */
-						strncat2(myappend, rule, max_file);
-						strncat2(myappend, "\n", max_file);
+						strcat2(&myappend, rule);
+						strcat2(&myappend, "\n");
 					}
-					free(rule);
+					free2(rule);
 				}
-				free(res2);
+				free2(res2);
 			}
-			free(res);
+			free2(res);
 		}
 		
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
 		tdomf_old2 = file_read(tdomk, 1);
 		if (!strcmp(tdomf_old, tdomf_old2)){
-			free(tdomf_old2);
+			free2(tdomf_old2);
 			/* write changes to kernel */
 			file_write(tdomk, myappend);
 			break;
 		}
 		else{
-			free(tdomf_old);
+			free2(tdomf_old);
 			tdomf_old = tdomf_old2;
 		}
 	}
 	
-	free(tdomf_old);
+	free2(tdomf_old);
 
 	/* load old policy from kernel */
 	texcf_old = file_read(texck, 1);
@@ -2414,10 +2485,10 @@ void reload()
 			res = string_get_next_line(&temp);
 			if (!res) break;
 			/* append lines with delete keyword */
-			strncat2(myappend, "delete ", max_file);
-			strncat2(myappend, res, max_file);
-			strncat2(myappend, "\n", max_file);
-			free(res);
+			strcat2(&myappend, "delete ");
+			strcat2(&myappend, res);
+			strcat2(&myappend, "\n");
+			free2(res);
 		}
 
 		/* cadd new rules to append list */
@@ -2427,28 +2498,28 @@ void reload()
 			res = string_get_next_line(&temp);
 			if (!res) break;
 			/* append lines with delete keyword */
-			strncat2(myappend, res, max_file);
-			strncat2(myappend, "\n", max_file);
-			free(res);
+			strcat2(&myappend, res);
+			strcat2(&myappend, "\n");
+			free2(res);
 		}
 		
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
 		texcf_old2 = file_read(texck, 1);
 		if (!strcmp(texcf_old, texcf_old2)){
-			free(texcf_old2);
+			free2(texcf_old2);
 			/* write changes to kernel */
 			file_write(texck, myappend);
 			break;
 		}
 		else{
-			free(texcf_old);
+			free2(texcf_old);
 			texcf_old = texcf_old2;
 		}
 	}
 
-	free(texcf_old);
-	free(myappend);
+	free2(texcf_old);
+	free2(myappend);
 }
 
 
@@ -2466,10 +2537,11 @@ void save()
 /* create backup and save config files from variables to disk with new names */
 void backup()
 {
-	char tdom2[max_char] = "";
-	char texc2[max_char] = "";
-	char *num;
+	char *tdom2, *texc2, *num;
 	struct timeval t;
+	
+	tdom2 = memget2(max_char);
+	texc2 = memget2(max_char);
 
 	/* get elapsed seconds since 1970 */
 	gettimeofday(&t, 0);
@@ -2477,17 +2549,20 @@ void backup()
 	num = string_ltos(t.tv_sec);
 
 	/* create new uniqe names to config files */
-	strncpy2(tdom2, tdom, max_char);
-	strncat2(tdom2, ".backup.", max_char);
-	strncat2(tdom2, num, max_char);
-	strncpy2(texc2, texc, max_char);
-	strncat2(texc2, ".backup.", max_char);
-	strncat2(texc2, num, max_char);
-	free(num);
+	strcpy2(&tdom2, tdom);
+	strcat2(&tdom2, ".backup.");
+	strcat2(&tdom2, num);
+	strcpy2(&texc2, texc);
+	strcat2(&texc2, ".backup.");
+	strcat2(&texc2, num);
+	free2(num);
 
 	/* save configs to backup files on disk */
 	file_write(tdom2, tdomf);
 	file_write(texc2, texcf);
+	
+	free2(tdom2);
+	free2(texc2);
 }
 
 
@@ -2496,6 +2571,7 @@ int check_instance(){
 	char *mypid;
 
 	/* store path to my executable */
+	/* to a global variable for later */
 	my_exe_path = process_get_path(getpid());
 
 	/* get my pid number and convert it to string */
@@ -2506,26 +2582,29 @@ int check_instance(){
 		/* read pid number from pid file */
 		pid2 = file_read(tpid, 0);
 		/* is it me? */
-		if (strcmp(mypid, pid2) == 0){ free(mypid); free(pid2); return 0; }
+		if (!strcmp(mypid, pid2)){ free2(mypid); free2(pid2); return 0; }
 		else{
 			/* is the process with the foreign pid still running? */
-			char path[max_char] = "/proc/";
-			strncat2(path, pid2, max_char);
+			char *path;
+			path = memget2(max_char);
+			strcpy2(&path, "/proc/");
+			strcat2(&path, pid2);
 			/* if running, then return false */
-			if (dir_exist(path)){ free(mypid); free(pid2); return 1; }
+			if (dir_exist(path)){ free2(mypid); free2(pid2); free2(path); return 1; }
 			/* if not running, then overwrite pid number in pid file */
 			else{
 				file_write(tpid, mypid);
 			}
+			free2(path);
 		}
-		free(pid2);
+		free2(pid2);
 	}
 	/* create pid file if it doesn't exist */
 	else{
 		file_write(tpid, mypid);
 	}
 
-	free(mypid);
+	free2(mypid);
 	
 	return 1;
 }
@@ -2534,39 +2613,29 @@ int check_instance(){
 /* search file name in current dir first, then in bin locations and give back full path on success */
 /* returned value must be freed by caller */
 char *which(const char *name){
-	char *res;
-	char full[max_char] = "";
-	char buff[max_char] = "";
+	char *res, *full;
 	int i;
-
+	
 	/* name starts with "/" char? */
 	if (name[0] == '/'){
 		/* file exists? if not, then fail */
-		if (file_exist(full)){
-			int maxl;
-			/* read link path */
-			i = readlink(name, buff, max_char);
-			if (i > -1){ strncpy2(full, buff, max_char); }
-			maxl = strlen(full) + 1;
-			res = memory_get(maxl);
-			strncpy2(res, full, maxl);
-			return res;
+		if (file_exist(name)){
+			/* return resolved link path */
+			return link_read(name);
 		}
 		return 0;
 	}
+	
+	full = memget2(max_char);
 
 	/* fle exists in the current dir? */
 	getcwd(full, max_char);
-	strncat2(full, "/", max_char);
-	strncat2(full, name, max_char);
+	strcat2(&full, "/");
+	strcat2(&full, name);
 	if (file_exist(full)){
-		int maxl;
-		/* read link path */
-		i = readlink(full, buff, max_char);
-		if (i > -1){ strncpy2(full, buff, max_char); }
-		maxl = strlen(full) + 1;
-		res = memory_get(maxl);
-		strncpy2(res, full, maxl);
+		/* return resolved link path */
+		res = link_read(full);
+		free2(full);
 		return res;
 	}
 
@@ -2574,22 +2643,21 @@ char *which(const char *name){
 	i = 0;
 	while(1){
 		res = path_bin[i++];
-		if (!res) return 0;
-		strncpy2(full, res, max_char);
-		strncat2(full, "/", max_char);
-		strncat2(full, name, max_char);
+		if (!res) break;
+		strcpy2(&full, res);
+		strcat2(&full, "/");
+		strcat2(&full, name);
 		if (file_exist(full)){
-			int maxl;
-			/* read link path */
-			i = readlink(full, buff, max_char);
-			if (i > -1){ strncpy2(full, buff, max_char); }
-			maxl = strlen(full) + 1;
-			res = memory_get(maxl);
-			strncpy2(res, full, maxl);
+			/* return resolved link path */
+			res = link_read(full);
+			free2(full);
 			return res;
 		}
 		full[0] = 0;
 	}
+
+	free2(full);
+	return 0;
 }
 
 
@@ -2597,7 +2665,6 @@ char *which(const char *name){
 void create_prof()
 {
 	char *tmanf_old, *tmanf, *tmanf2, *tprof_old, *tprof, *tprof2, *res;
-	char comm[max_char] = "";
 	
 	/* check tomoyo version */
 	if (tomoyo_version() <= 2299){ tmanf = tmanf22; tprof = tprof22; }
@@ -2606,32 +2673,34 @@ void create_prof()
 	/* load manager.conf from kernel and check if it's the same what i have */
 	/* if identical, then no reload is needed */
 	tmanf_old = file_read(tmank, 1);
-	tmanf2 = memory_get(max_file);
-	strncpy2(tmanf2, tmanf, strlen(tmanf) + 1);
+	tmanf2 = memget2(max_char);
+	strcpy2(&tmanf2, tmanf);
 
 	/* add my executable too to the binary list in manager.conf */
-	strncat2(tmanf2, my_exe_path, max_file);
-	strncat2(tmanf2, "\n",        max_file);
+	strcat2(&tmanf2, my_exe_path);
+	strcat2(&tmanf2, "\n");
 
 	/* sort lines before compare */
 	res = string_sort_uniq_lines(tmanf_old);
-	free(tmanf_old); tmanf_old = res;
+	free2(tmanf_old); tmanf_old = res;
 	res = string_sort_uniq_lines(tmanf2);
-	free(tmanf2); tmanf2 = res;
+	free2(tmanf2); tmanf2 = res;
 	
 	/* compare kernel manager config and mine */
 	/* reload it to kernel if they are not identical */
 	if (strcmp(tmanf2, tmanf_old)){
+		char *comm = memget2(max_char);
 		/* write config to disk */
 		file_write(tman, tmanf2);
 		/* load config from disk to kernel */
-		strncpy2(comm, tload, max_char);
-		strncat2(comm, " m",  max_char);
+		strcpy2(&comm, tload);
+		strcat2(&comm, " m");
 		/* this system() call here is the only one and this is unavoidable
 		 * because only the external tomoyo-loadpolicy had the right to
 		 * upload my new manager.conf config to the kernel,
 		 * but from now on i have the right too to change policy through /sys */
 		system(comm);
+		free2(comm);
 	}
 	
 	/* load profile.conf from kernel and check if it's the same what i have */
@@ -2640,7 +2709,7 @@ void create_prof()
 
 	/* sort lines before compare */
 	res = string_sort_uniq_lines(tprof_old);
-	free(tprof_old); tprof_old = res;
+	free2(tprof_old); tprof_old = res;
 	tprof2 = string_sort_uniq_lines(tprof);
 	
 	/* compare kernel profile config and mine */
@@ -2652,10 +2721,10 @@ void create_prof()
 		file_write(tprok, tprof);
 	}
 
-	free(tmanf_old);
-	free(tprof_old);
-	free(tmanf2);
-	free(tprof2);
+	free2(tmanf_old);
+	free2(tprof_old);
+	free2(tmanf2);
+	free2(tprof2);
 }
 
 
@@ -2671,15 +2740,14 @@ void check_options(int argc, char **argv){
 		int flag_type = 0;
 		int flag_last = 0;
 		int c = 1;
-		char myarg[max_char] = "";
+		char *myarg = memget2(max_char);
+		opt_info2   = memget2(max_char);
+		opt_remove2 = memget2(max_char);
 		
 		/* cycle through the arguments */
 		while (argc2--){
 			int flag_ok = 0;
-			/* clear argument buffer for security */
-			int i = max_char;
-			while(--i) myarg[i] = 0;
-			strncpy2(myarg, argv[c], max_char);
+			strcpy2(&myarg, argv[c]);
 			
 			if (!strcmp(myarg, "-v") || !strcmp(myarg, "--verson"))	{ opt_version = 1;	flag_ok = 1; }
 			if (!strcmp(myarg, "-h") || !strcmp(myarg, "--help"  ))	{ opt_help    = 1;	flag_ok = 1; }
@@ -2708,7 +2776,7 @@ void check_options(int argc, char **argv){
 					/* if former arg was an option, then it belongs to it */
 					if (flag_last){
 						/* store as --info parameter */
-						strncpy2(opt_info2, myarg, max_char);
+						strcpy2(&opt_info2, myarg);
 					}
 					/* it belongs to the extra executables, so store it */
 					else flag_progs = 1;
@@ -2718,43 +2786,41 @@ void check_options(int argc, char **argv){
 					/* if former arg was an option, then it belongs to it */
 					if (flag_last){
 						/* store as --remove parameter */
-						strncpy2(opt_remove2, myarg, max_char);
+						strcpy2(&opt_remove2, myarg);
 					}
 					/* it belongs to the extra executables, so store it */
 					else flag_progs = 1;
 				}
 				/* if last option arg was --recursive, then this belongs to it */
 				if (flag_type == 4){
-					char path[max_char] = "";
 					int l;
 					flag_progs = 0;
 					/* root "/" dir not allowed */
-					if (strcmp(myarg, "/") == 0){ color_("error: root directory is not allowed", red); myexit(1); }
+					if (!strcmp(myarg, "/")){ color_("error: root directory is not allowed", red); free2(myarg); myexit(1); }
 					/* check if dir name exist */
 					if (!dir_exist(myarg)){
-						color_("error: no such directory: ", red); color_(myarg, red); newl(); myexit(1); }
+						color_("error: no such directory: ", red); color_(myarg, red); newl(); free2(myarg); myexit(1); }
 					/* expand recursive dir names with "/" char if missing */
-					strncpy2(path, myarg, max_char);
 					l = strlen(myarg);
-					if (path[l-1] != '/'){ path[l] = '/'; path[l+1] = 0; }
+					if (myarg[l-1] != '/'){ myarg[l] = '/'; myarg[l+1] = 0; }
 					/* alloc mem for dirs_recursive */
-					if (!dirs_recursive) dirs_recursive = memory_get(max_file);
+					if (!dirs_recursive) dirs_recursive = memget2(max_char);
 					/* if so, store it in recursive dir array */
-					strncat2(dirs_recursive, path, max_file);
-					strncat2(dirs_recursive, "\n", max_file);
+					strcat2(&dirs_recursive, myarg);
+					strcat2(&dirs_recursive, "\n");
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (!flag_type || flag_progs){
 					/* search for name in paths and check if file exists */
 					char *res = which(myarg);
 					if(!res){
-						color_("error: no such file: ", red); color_(myarg, red); newl(); myexit(1); }
+						color_("error: no such file: ", red); color_(myarg, red); newl(); free2(myarg); myexit(1); }
 					/* alloc mem for tprogs */
-					if (!tprogs) tprogs = memory_get(max_file);
+					if (!tprogs) tprogs = memget2(max_char);
 					/* if file exists, store it as extra executables */
-					strncat2(tprogs, res, max_file);
-					strncat2(tprogs, "\n", max_file);
-					free(res);
+					strcat2(&tprogs, res);
+					strcat2(&tprogs, "\n");
+					free2(res);
 				}
 			}
 
@@ -2763,6 +2829,8 @@ void check_options(int argc, char **argv){
 
 			c++;
 		}
+		
+		free2(myarg);
 
 		/* exit after --version or --help option */
 		if (opt_version || opt_help){
@@ -2772,7 +2840,7 @@ void check_options(int argc, char **argv){
 		}
 
 		/* fail if no arguments for --remove option */
-		if (opt_remove && opt_remove2[0] == 0){ color_("error: bad argument\n", red); myexit(1); }
+		if (opt_remove && !opt_remove2[0]){ color_("error: bad argument\n", red); myexit(1); }
 		/* fail if no arguments for --recursive option */
 		if (opt_recursive && !dirs_recursive){ color_("error: bad argument\n", red); myexit(1); }
 
@@ -2804,11 +2872,11 @@ void check_tomoyo()
 	/* check kernel command line */
 	cmd = file_read("/proc/cmdline", 1);
 	if (string_search_keyword(cmd, " security=tomoyo") == -1){
-		free(cmd);
+		free2(cmd);
 		color_("error: tomoyo kernel mode is not activated\n", red);
 		myexit(1);
 	}
-	free(cmd);
+	free2(cmd);
 
 	/* check mount state of securityfs */
 	cmd = file_read("/proc/mounts", 1);
@@ -2818,12 +2886,12 @@ void check_tomoyo()
 		/* shell command: mount -t securityfs none /sys/kernel/security */
 		flag_mount = mount("none", "/sys/kernel/security", "securityfs", MS_NOATIME, 0);
 		if (flag_mount == -1){
-			free(cmd);
+			free2(cmd);
 			color_("error: tomoyo securityfs cannot be mounted\n", red);
 			myexit(1);
 		}
 	}
-	free(cmd);
+	free2(cmd);
 
 	color_("tomoyo kernel mode is active\n", clr);
 	
@@ -2848,13 +2916,13 @@ void check_tomoyo()
 void clear()
 {
 	/* free up memory of configs */
-	if (tdomf) free(tdomf);
-	if (texcf) free(texcf);
+	if (tdomf) free2(tdomf);
+	if (texcf) free2(texcf);
 	/* create new configs */
-	tdomf = memory_get(max_file);
-	texcf = memory_get(max_file);
-	strncpy2(tdomf, "<kernel>\nuse_profile 0\n\n", max_file);
-	strncpy2(texcf, "initialize_domain /sbin/init\n", max_file);
+	tdomf = memget2(max_char);
+	texcf = memget2(max_char);
+	strcpy2(&tdomf, "<kernel>\nuse_profile 0\n\n");
+	strcpy2(&texcf, "initialize_domain /sbin/init\n");
 	/* write config files */
 	file_write(texc, texcf);
 	file_write(tdom, tdomf);
@@ -2892,7 +2960,7 @@ void domain_info(const char *pattern)
 			i = string_search_keyword(res2, pattern);
 			
 			/* print domain if match */
-			if (i == -1) free(res2);
+			if (i == -1) free2(res2);
 			else{
 				char *text_new, *text_temp;
 			
@@ -2904,11 +2972,11 @@ void domain_info(const char *pattern)
 				else newl();
 				/* print header part in blue */
 				color(res2, blue); newl();
-				free(res2);
+				free2(res2);
 				/* print use_profile here too */
 				res2 = string_get_next_line(&res_temp);
 				color(res2, green); newl();
-				free(res2);
+				free2(res2);
 				
 				/* sort the rest of the policy text */
 				text_new = string_sort_uniq_lines(res_temp);
@@ -2921,9 +2989,9 @@ void domain_info(const char *pattern)
 					if (!res2) break;
 					/* print non empty lines */
 					if (res2[0]){
-						char h[max_char] = "";
-						strncpy2(h, home, max_char);
-						strncat2(h, "/", max_char);
+						char *h = memget2(max_char);
+						strcpy2(&h, home);
+						strcat2(&h, "/");
 					
 						/* print rules with reading libs in yellow */
 						if (string_search_keyword_first(res2, "allow_read /lib/") ||
@@ -2938,12 +3006,13 @@ void domain_info(const char *pattern)
 						else{
 							color(res2, red); newl();
 						}
+						free2(h);
 					}
-					free(res2);
+					free2(res2);
 				}
-				free(text_new);
+				free2(text_new);
 			}
-			free(res);
+			free2(res);
 		}
 		
 		/* print summary */
@@ -2953,7 +3022,7 @@ void domain_info(const char *pattern)
 			color_("(found ", clr); color_(res, clr);
 			if (count == 1) color_(" domain)\n", clr);
 			else            color_(" domains)\n", clr);
-			free(res);
+			free2(res);
 		}
 		else color_("error: no domains found\n", red);
 	}
@@ -2967,7 +3036,7 @@ void domain_info(const char *pattern)
 		/* get policy size to use it for allocating memory as a maximum value */
 		maxl = strlen(tdomf) + 1;
 
-		texcf_new = memory_get(maxl);
+		texcf_new = memget2(maxl);
 		
 		tdomf2 = tdomf;
 		while(1){
@@ -2982,17 +3051,17 @@ void domain_info(const char *pattern)
 
 			res2 = string_get_next_wordn(&res_temp, 1);
 			if (res2){
-				strncat2(texcf_new, res2, maxl);
-				strncat2(texcf_new, "\n", maxl);
-				free(res2);
+				strcat2(&texcf_new, res2);
+				strcat2(&texcf_new, "\n");
+				free2(res2);
 			}
-			free(res);
+			free2(res);
 		}
 		
 		res = string_sort_uniq_lines(texcf_new);
 		newl_(); color(res, blue); newl();
-		free(res);
-		free(texcf_new);
+		free2(res);
+		free2(texcf_new);
 	}
 }
 
@@ -3021,7 +3090,7 @@ void domain_set_learn_all()
 		if (!res) break;
 		/* turn domain into learning mode */
 		domain_set_profile(orig, 1);
-		free(res);
+		free2(res);
 	}
 	
 	/* save config files and load them to kernel */
@@ -3054,7 +3123,7 @@ void domain_set_enforce_old()
 			m = domain_get_profile(orig);
 			/* there are old enforcing mode domains, i have the answer, so quit */
 			if (m == 3){ flag_old = 1; break; }
-			free(res);
+			free2(res);
 		}
 
 		/* turn old domains into enforcing mode */
@@ -3089,10 +3158,10 @@ void domain_set_enforce_old()
 						domain_set_profile_all(prog, 3);
 					}
 				}
-				free(prog);
-				free(prog_sub);
+				free2(prog);
+				free2(prog_sub);
 			}
-			free(res);
+			free2(res);
 		}
 
 		/* save config files to disk and load them to kernel */		
@@ -3118,10 +3187,9 @@ void domain_get_log()
 	/* vars */
 	char *res, *res2, *temp, *temp2, *orig;
 	char *start, *tlogf2, *tlogf3;
-	char *prog_rules = 0;
-	char key[max_char] = "";
+	char *rules, *prog_rules = 0;
+	char *key;
 	char key2[] = "denied for ";
-	char rules[max_char] = "";
 	int i, i2, l;
 	int key2_len = strlen(key2);
 
@@ -3137,7 +3205,7 @@ void domain_get_log()
 		}
 	}
 	/* delete former log */
-	if (tlogf) free(tlogf);
+	if (tlogf) free2(tlogf);
 	/* read in new log */
 	tlogf = file_read(tlog, 0);
 	
@@ -3159,13 +3227,14 @@ void domain_get_log()
 	}
 	
 	/* alloc mem for collected log */
-	tlogf2 = memory_get(max_file);
-	tlogf3 = memory_get(max_file);
+	tlogf2 = memget2(max_char);
+	tlogf3 = memget2(max_char);
+	key = memget2(max_char);
 	
 	/* search for tomoyo error messages from mark */
 	/* collect access deny messages */
-	if (tomoyo_version() <= 2299) strncpy2(key, " TOMOYO-ERROR: Access ", max_char);
-	else strncpy2(key, " ERROR: Access ", max_char);
+	if (tomoyo_version() <= 2299) strcpy2(&key, " TOMOYO-ERROR: Access ");
+	else strcpy2(&key, " ERROR: Access ");
 	temp = start;
 	while(1){
 		/* jump to the beginning of the next tomoyo error message */
@@ -3177,14 +3246,14 @@ void domain_get_log()
 		res = string_get_next_line(&temp);
 		if (res){
 			/* store it */
-			strncat2(tlogf2, res, max_file);
-			strncat2(tlogf2, "\n", max_file);
-			free(res);
+			strcat2(&tlogf2, res);
+			strcat2(&tlogf2, "\n");
+			free2(res);
 		}
 	}
 	/* collect domain deny messages */
-	if (tomoyo_version() <= 2299) strncpy2(key, " TOMOYO-ERROR: Domain ", max_char);
-	else strncpy2(key, " ERROR: Domain ", max_char);
+	if (tomoyo_version() <= 2299) strcpy2(&key, " TOMOYO-ERROR: Domain ");
+	else strcpy2(&key, " ERROR: Domain ");
 	temp = start;
 	while(1){
 		/* jump to the beginning of the next tomoyo error message */
@@ -3196,11 +3265,13 @@ void domain_get_log()
 		res = string_get_next_line(&temp);
 		if (res){
 			/* store it */
-			strncat2(tlogf3, res, max_file);
-			strncat2(tlogf3, "\n", max_file);
-			free(res);
+			strcat2(&tlogf3, res);
+			strcat2(&tlogf3, "\n");
+			free2(res);
 		}
 	}
+	
+	free2(key);
 	
 	/* debug part to print domain deny messages if any */
 	if (tlogf3[0]) debug(tlogf3);
@@ -3216,7 +3287,7 @@ void domain_get_log()
 		if (!res) break;
 		i = string_search_keyword(res, "kernel: [");
 		if (i > -1) temp2 = orig;
-		free(res);
+		free2(res);
 	}
 
 	/* temp2 shows the beginning of the line of the last kernel message */
@@ -3226,9 +3297,9 @@ void domain_get_log()
 		if (i > 1 && i2 > -1){
 			/* set tmarkf to the last kernel messages time stamp */
 			l = i2 + 2;
-			if (tmarkf) free(tmarkf);
-			tmarkf = memory_get(l);
-			strncpy2(tmarkf, temp2 + i, l);
+			if (tmarkf) free2(tmarkf);
+			tmarkf = memget2(l);
+			strcpy2(&tmarkf, temp2 + i);
 		}
 	}
 	/* clear tmarkf if no kernel messages */
@@ -3242,7 +3313,8 @@ void domain_get_log()
 	/* --------------------------------- */
 
 	/* alloc mem for prog names with rules */
-	prog_rules = memory_get(max_file);
+	prog_rules = memget2(max_char);
+	rules = memget2(max_char);
 
 	l = strlen("TOMOYO-ERROR: Access '");
 	temp = tlogf2;
@@ -3256,9 +3328,11 @@ void domain_get_log()
 		res2 = string_get_next_word(&temp2);
 		if (!res2){
 			color_("error: unexpected error, log message format is not correct\n", red);
-			free(res);
-			free(tlogf2);
-			free(tlogf3);
+			free2(res);
+			free2(tlogf2);
+			free2(tlogf3);
+			free2(prog_rules);
+			free2(rules);
 			myexit(1);
 		}
 		/* does it contain a "(" char? */
@@ -3268,25 +3342,27 @@ void domain_get_log()
 			res2[i] = 0;
 		}
 		/* add together allow_ type */
-		strncpy2(rules, "allow_", max_char);
-		strncat2(rules, res2, max_char);
-		strncat2(rules, " ", max_char);
-		free(res2);
+		strcpy2(&rules, "allow_");
+		strcat2(&rules, res2);
+		strcat2(&rules, " ");
+		free2(res2);
 		
 		/* get parameters of rule */
 		res2 = string_get_next_word(&temp2);
 		if (!res2){
 			color_("error: unexpected error, log message format is not correct\n", red);
-			free(res);
-			free(tlogf2);
-			free(tlogf3);
+			free2(res);
+			free2(tlogf2);
+			free2(tlogf3);
+			free2(prog_rules);
+			free2(rules);
 			myexit(1);
 		}
 		i = strlen(res2);
 		if (i > 0) res2[i - 1] = 0;
 		/* add all together, and rule is complete */
-		strncat2(rules, res2, max_char);
-		free(res2);
+		strcat2(&rules, res2);
+		free2(res2);
 
 		
 		/* get program name the rule belongs to */
@@ -3294,9 +3370,11 @@ void domain_get_log()
 		i = string_search_keyword(temp2, key2);
 		if (i == -1){
 			color_("error: unexpected error, log message format is not correct\n", red);
-			free(res);
-			free(tlogf2);
-			free(tlogf3);
+			free2(res);
+			free2(tlogf2);
+			free2(tlogf3);
+			free2(prog_rules);
+			free2(rules);
 			myexit(1);
 		}
 		/* get binary name */
@@ -3304,20 +3382,22 @@ void domain_get_log()
 		res2 = string_get_next_word(&temp2);
 		if (!res2){
 			color_("error: unexpected error, log message format is not correct\n", red);
-			free(res);
-			free(tlogf2);
-			free(tlogf3);
+			free2(res);
+			free2(tlogf2);
+			free2(tlogf3);
+			free2(prog_rules);
+			free2(rules);
 			myexit(1);
 		}
 		/* create text for sorting in a format like "binary allow_ rule" */
-		strncat2(prog_rules, res2,  max_file);
-		strncat2(prog_rules, " ",   max_file);
-		strncat2(prog_rules, rules, max_file);
-		strncat2(prog_rules, "\n",  max_file);
-		free(res2);
+		strcat2(&prog_rules, res2);
+		strcat2(&prog_rules, " ");
+		strcat2(&prog_rules, rules);
+		strcat2(&prog_rules, "\n");
+		free2(res2);
 
 		
-		free(res);
+		free2(res);
 	}
 
 
@@ -3330,11 +3410,11 @@ void domain_get_log()
 
 		/* sort and uniq rules */
 		res = string_sort_uniq_lines(prog_rules);
-		free(prog_rules);
+		free2(prog_rules);
 		prog_rules = res;
 
 		/* alloc mem for new list of rules after confirmation */
-		prog_rules_new = memory_get(max_file);
+		prog_rules_new = memget2(max_char);
 
 		if (prog_rules[0]) color("* adding log messages to policy\n", yellow);
 
@@ -3354,21 +3434,21 @@ void domain_get_log()
 			color(rule, purple);
 			if (choice("  add rules?")){
 				/* add rules to new rules */
-				strncat2(prog_rules_new, res, max_file);
-				strncat2(prog_rules_new, "\n", max_file);
+				strcat2(&prog_rules_new, res);
+				strcat2(&prog_rules_new, "\n");
 			}
-			free(prog);
-			free(rule);
-			free(res);
+			free2(prog);
+			free2(rule);
+			free2(res);
 		}
-		free(prog_rules);
+		free2(prog_rules);
 		prog_rules = prog_rules_new;
 		
 		/* are there any new rules after confirmation? */
 		if (prog_rules[0]){
 
 			/* alloc mem for new domain policy */
-			tdomf_new = memory_get(max_file);
+			tdomf_new = memget2(max_char);
 
 			/* cycle through domains to add new rules */
 			temp = tdomf;
@@ -3378,7 +3458,7 @@ void domain_get_log()
 				res = domain_get_next(&temp);
 				if (!res) break;
 				/* add domain policy to new policy */
-				strncat2(tdomf_new, res, max_file);
+				strcat2(&tdomf_new, res);
 				/* get subdomian name */
 				res2 = domain_get_name_sub(res);
 				if (res2){
@@ -3389,13 +3469,13 @@ void domain_get_log()
 						prog = string_get_next_word(&temp2);
 						if (!prog) break;
 						rule = string_get_next_line(&temp2);
-						if (!rule){ free(prog); break; }
+						if (!rule){ free2(prog); break; }
 
 						/* compare prog name to subdomain name */
 						if (!strcmp(prog, res2)){
 							/* if match, add rule to domain policy */
-							strncat2(tdomf_new, rule, max_file);
-							strncat2(tdomf_new, "\n", max_file);
+							strcat2(&tdomf_new, rule);
+							strcat2(&tdomf_new, "\n");
 							/* switch domain to learning mode */
 							if (!flag_prof){
 								domain_set_profile(orig, 1);
@@ -3404,26 +3484,26 @@ void domain_get_log()
 							}
 						}
 
-						free(rule);
-						free(prog);
+						free2(rule);
+						free2(prog);
 					}
-					free(res2);
+					free2(res2);
 				}
-				strncat2(tdomf_new, "\n", max_file);
-				free(res);
+				strcat2(&tdomf_new, "\n");
+				free2(res);
 			}
 			
 			color("learning mode turned on for domains with new rules\n", red);
 
 			/* replace old policy with new one */
-			free(tdomf);
+			free2(tdomf);
 			tdomf = tdomf_new;
 		}
 	}
 	
-	free(prog_rules);
-	free(tlogf2);
-	free(tlogf3);
+	free2(prog_rules);
+	free2(tlogf2);
+	free2(tlogf3);
 }
 
 
@@ -3437,7 +3517,7 @@ void domain_print_list_not_progs()
 	list = domain_get_list();
 	
 	/* alloc mem for new list */
-	list2 = memory_get(max_file);
+	list2 = memget2(max_char);
 
 	/* remove entries from the list that are in tprogs too */
 	temp = list;
@@ -3446,31 +3526,31 @@ void domain_print_list_not_progs()
 		if (!res) break;
 		/* does tprogs contain any of the domain names? */
 		if (string_search_line(tprogs, res) == -1){
-			strncat2(list2, res, max_file);
-			strncat2(list2, "\n", max_file);
+			strcat2(&list2, res);
+			strcat2(&list2, "\n");
 			/* add domain to tprogs if not in exceptions */
 			if (string_search_line(tprogs_exc, res) == -1){
-				strncat2(tprogs, res, max_file);
-				strncat2(tprogs, "\n", max_file);
+				strcat2(&tprogs, res);
+				strcat2(&tprogs, "\n");
 			}
 		}
-		free(res);
+		free2(res);
 	}
 	
-	free(list);
+	free2(list);
 	list = list2;
 	
 	/* is any element in the list? */
 	if (list[0]){
 		/* sort list */
 		list2 = string_sort_uniq_lines(list);
-		free(list);
+		free2(list);
 		list = list2;
 		
 		color("* already existing main domains", green); newl();
 
 		/* alloc mem for new sorted list with filenames only */
-		list2 = memory_get(max_file);
+		list2 = memget2(max_char);
 
 		/* get list of filenames only */
 		temp = list;
@@ -3479,16 +3559,16 @@ void domain_print_list_not_progs()
 			if (!res) break;
 			res2 = string_get_filename(res);
 			if (res2){
-				strncat2(list2, res2, max_file);
-				strncat2(list2, "\n", max_file);
-				free(res2);
+				strcat2(&list2, res2);
+				strcat2(&list2, "\n");
+				free2(res2);
 			}
-			free(res);
+			free2(res);
 		}
 		
 		/* sort filename list */
 		list3 = string_sort_uniq_lines(list2);
-		free(list2);
+		free2(list2);
 		list2 = list3;
 		
 		/* print list */
@@ -3498,14 +3578,14 @@ void domain_print_list_not_progs()
 			if (!res) break;
 			color(res, blue);
 			color(" ", blue);
-			free(res);
+			free2(res);
 		}
 		newl();
 		
-		free(list2);
+		free2(list2);
 	}
 	
-	free(list);
+	free2(list);
 }
 
 
@@ -3521,14 +3601,15 @@ void domain_print_mode()
 	/* cycle thorugh progs */
 	temp = tprogs;
 	while(1){
-		char s[max_char] = "";
+		char *s;
 		
 		prog = string_get_next_line(&temp);
 		if(!prog) break;
 		
 		/* does the domain exist for the program? */
-		strncpy2(s, "initialize_domain ", max_char);
-		strncat2(s, prog, max_char);
+		s = memget2(max_char);
+		strcpy2(&s, "initialize_domain ");
+		strcat2(&s, prog);
 		if (string_search_line(texcf, s) > -1){
 			if (flag_firstrun){
 				color(prog, blue);
@@ -3545,9 +3626,10 @@ void domain_print_mode()
 			color("create domain", green);
 			/* if the program is running already, then restart is needed for the rules to take effect */
 			if (process_running(prog)) color(" (restart needed)", red);
-			strncat2(texcf, s, max_file);
-			strncat2(texcf, "\n", max_file);
+			strcat2(&texcf, s);
+			strcat2(&texcf, "\n");
 		}
+		free2(s);
 		
 		/* does the rule exist for it? */
 		pos = domain_exist(prog);
@@ -3556,15 +3638,15 @@ void domain_print_mode()
 			color("create rule with learning mode on", green);
 			if (!flag_firstrun) newl();
 			/* create a rule for it */
-			strncat2(tdomf, "<kernel> ", max_file);
-			strncat2(tdomf, prog, max_file);
-			strncat2(tdomf, "\nuse_profile 1\n", max_file);
+			strcat2(&tdomf, "<kernel> ");
+			strcat2(&tdomf, prog);
+			strcat2(&tdomf, "\nuse_profile 1\n");
 			/* alloc mem for tprogs_learn */
-			if (!tprogs_learn) tprogs_learn = memory_get(max_file);
+			if (!tprogs_learn) tprogs_learn = memget2(max_char);
 			/* store prog name to know not to turn on enforcing mode for these ones on exit */
 			if(string_search_line(tprogs_learn, prog) == -1){
-				strncat2(tprogs_learn, prog, max_file);
-				strncat2(tprogs_learn, "\n", max_file);
+				strcat2(&tprogs_learn, prog);
+				strcat2(&tprogs_learn, "\n");
 			}
 		}
 		else{
@@ -3572,11 +3654,11 @@ void domain_print_mode()
 			if (flag_firstrun) color(", rule exists", clr);
 			/* get profile mode for domain */
 			profile = domain_get_profile(tdomf + pos);
-			if (profile == -1){ color_("error: domain policy is corrupt\n", red); free(prog); myexit(1); }
+			if (profile == -1){ color_("error: domain policy is corrupt\n", red); free2(prog); myexit(1); }
 			/* check which mode is on */
 			
 			/* disabled mode */
-			if (profile == 0){
+			if (!profile){
 				if (!flag_check3){
 					color(prog, blue);
 					flag_check3 = 1;
@@ -3607,7 +3689,7 @@ void domain_print_mode()
 		
 		if (flag_firstrun) newl();
 		
-		free(prog);
+		free2(prog);
 	}
 }
 
@@ -3620,21 +3702,21 @@ int check_policy_change(){
 	if (!tdomf_bak){
 		l = strlen(tdomf) + 1;
 		/* alloc mem for backup policy */
-		tdomf_bak = memory_get(l);
+		tdomf_bak = memget2(l);
 		/* copy policy to backup */
-		strncat2(tdomf_bak, tdomf, l);
+		strcat2(&tdomf_bak, tdomf);
 		return 1;
 	}
 	else{
 		/* policy files match? if not, then store it */
 		if (!strcmp(tdomf_bak, tdomf)) return 0;
 		else{
-			free(tdomf_bak);
+			free2(tdomf_bak);
 			l = strlen(tdomf) + 1;
 			/* alloc mem for backup policy */
-			tdomf_bak = memory_get(l);
+			tdomf_bak = memget2(l);
 			/* copy policy to backup */
-			strncat2(tdomf_bak, tdomf, l);
+			strcat2(&tdomf_bak, tdomf);
 			return 1;
 		}
 	}
@@ -3821,27 +3903,27 @@ int compare_rules(char *r1, char *r2)
 	type2 = string_get_next_word(&temp2);
 	/* fail if types are null */
 	if (!type1 || !type2){
-		if (type1)  free(type1);
-		if (type2)  free(type2);
+		if (type1)  free2(type1);
+		if (type2)  free2(type2);
 		return 0; }
 	/* compare types, fail if no match */
 	if (strcmp(type1, type2)){
-		free(type1); free(type2); return 0; }
+		free2(type1); free2(type2); return 0; }
 	
 	/* get rule paths */
 	rule1a = string_get_next_word(&temp1);
 	rule1b = string_get_next_word(&temp1);
 	/* fail if no first path in param 1 */
 	if (!rule1a){
-		free(type1); free(type2); return 0; }
+		free2(type1); free2(type2); return 0; }
 	
 	/* get second params if any */
 	rule2a = string_get_next_word(&temp2);
 	rule2b = string_get_next_word(&temp2);
 	/* fail if no first path in param 2 */
 	if (!rule2a){
-		free(type1); free(type2); free(rule1a);
-		if (rule1b) free(rule1b);
+		free2(type1); free2(type2); free2(rule1a);
+		if (rule1b) free2(rule1b);
 		return 0;
 	}
 	/* second params exist too */
@@ -3851,27 +3933,27 @@ int compare_rules(char *r1, char *r2)
 
 	/* first params */
 	if (!compare_paths(rule1a, rule2a)){
-		free(type1); free(type2); free(rule1a); free(rule2a);
-		if (rule1b) free(rule1b);
-		if (rule2b) free(rule2b);
+		free2(type1); free2(type2); free2(rule1a); free2(rule2a);
+		if (rule1b) free2(rule1b);
+		if (rule2b) free2(rule2b);
 		return 0;
 	}
 	if (flag_double > 1){
 		/* second params */
 		if (!compare_paths(rule1b, rule2b)){
-			free(type1);  free(type2);  free(rule1a);
-			free(rule2a); free(rule1b); free(rule2b);
+			free2(type1);  free2(type2);  free2(rule1a);
+			free2(rule2a); free2(rule1b); free2(rule2b);
 			return 0;
 		}
 	}
 
 	/* free mem */
-	free(type1);
-	free(type2);
-	free(rule1a);
-	free(rule2a);
-	if (rule1b) free(rule1b);
-	if (rule2b) free(rule2b);
+	free2(type1);
+	free2(type2);
+	free2(rule1a);
+	free2(rule2a);
+	if (rule1b) free2(rule1b);
+	if (rule2b) free2(rule2b);
 
 	return 1;
 }
@@ -3903,8 +3985,8 @@ char *get_rules_with_recursive_dirs(char *rule)
 	/* get path param 2 */
 	path2 = string_get_next_word(&temp);
 
-	path_new1 = memory_get(max_char);
-	path_new2 = memory_get(max_char);
+	path_new1 = memget2(max_char);
+	path_new2 = memget2(max_char);
 	count1 = 0;
 	count2 = 0;
 
@@ -3931,7 +4013,7 @@ char *get_rules_with_recursive_dirs(char *rule)
 		/* compare them */
 		if (compare_paths(res, res2)){
 			/* success, store it on match and exit */
-			strncpy2(path_new1, res, max_char);
+			strcpy2(&path_new1, res);
 
 			/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
 			 * to recursive dirs, so i have to calculate dir depth */
@@ -3947,12 +4029,12 @@ char *get_rules_with_recursive_dirs(char *rule)
 			}
 			else count1 = 1;
 			
-			free(res2);
-			free(res);
+			free2(res2);
+			free2(res);
 			break;
 		}
-		free(res2);
-		free(res);
+		free2(res2);
+		free2(res);
 		i++;
 	}
 
@@ -3980,7 +4062,7 @@ char *get_rules_with_recursive_dirs(char *rule)
 			/* compare them */
 			if (compare_paths(res, res2)){
 				/* success, store it on match and exit */
-				strncpy2(path_new2, res, max_char);
+				strcpy2(&path_new2, res);
 
 				/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
 				 * to recursive dirs, so i have to calculate dir depth */
@@ -3996,28 +4078,28 @@ char *get_rules_with_recursive_dirs(char *rule)
 				}
 				else count2 = 1;
 				
-				free(res2);
-				free(res);
+				free2(res2);
+				free2(res);
 				break;
 			}
-			free(res2);
-			free(res);
+			free2(res2);
+			free2(res);
 			i++;
 		}
 	}
 
 	/* return null if no match */	
 	if (!count1 && !count2){
-		if(type)  free(type);
-		if(path1) free(path1);
-		if(path2) free(path2);
-		free(path_new1);
-		free(path_new2);
+		if(type)  free2(type);
+		if(path1) free2(path1);
+		if(path2) free2(path2);
+		free2(path_new1);
+		free2(path_new2);
 		return 0;
 	}
 	
 	/* alloc mem for temp dir name */
-	rules_new = memory_get(max_file);
+	rules_new = memget2(max_char);
 
 	/* add new rules with recursive wildcard if any match */
 	/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
@@ -4029,19 +4111,19 @@ char *get_rules_with_recursive_dirs(char *rule)
 				while(count1--){
 					int flag = 0;
 					/* add rule type */
-					strncat2(rules_new, type, max_file);
-					strncat2(rules_new, " ", max_file);
+					strcat2(&rules_new, type);
+					strcat2(&rules_new, " ");
 					/* add new first param */
-					strncat2(rules_new, path_new1, max_file);
+					strcat2(&rules_new, path_new1);
 					/* add wildcards */
 					c = count1 + 1;
 					while(c--){
-						if (!flag){ strncat2(rules_new, "\\*", max_file); flag = 1; }
-						else        strncat2(rules_new, "/\\*", max_file);
+						if (!flag){ strcat2(&rules_new, "\\*"); flag = 1; }
+						else        strcat2(&rules_new, "/\\*");
 					}
 					/* add "/" char if path is a dir */
-					if (path_is_dir(path1)) strncat2(rules_new, "/", max_file);
-					strncat2(rules_new, "\n", max_file);
+					if (path_is_dir(path1)) strcat2(&rules_new, "/");
+					strcat2(&rules_new, "\n");
 				}
 			}
 		}
@@ -4051,44 +4133,44 @@ char *get_rules_with_recursive_dirs(char *rule)
 				while(count1--){
 					int flag = 0;
 					/* add rule type */
-					strncat2(rules_new, type, max_file);
-					strncat2(rules_new, " ", max_file);
+					strcat2(&rules_new, type);
+					strcat2(&rules_new, " ");
 					/* add new first param */
-					strncat2(rules_new, path_new1, max_file);
+					strcat2(&rules_new, path_new1);
 					/* add wildcards */
 					c = count1 + 1;
 					while(c--){
-						if (!flag){ strncat2(rules_new, "\\*", max_file); flag = 1; }
-						else        strncat2(rules_new, "/\\*", max_file);
+						if (!flag){ strcat2(&rules_new, "\\*"); flag = 1; }
+						else        strcat2(&rules_new, "/\\*");
 					}
 					/* add "/" char if path is a dir */
-					if (path_is_dir(path1)) strncat2(rules_new, "/", max_file);
-					strncat2(rules_new, " ", max_file);
+					if (path_is_dir(path1)) strcat2(&rules_new, "/");
+					strcat2(&rules_new, " ");
 					/* add old second param */
-					strncat2(rules_new, path2, max_file);
-					strncat2(rules_new, "\n", max_file);
+					strcat2(&rules_new, path2);
+					strcat2(&rules_new, "\n");
 				}
 			}
 			if (!count1 && count2){
 				while(count2--){
 					int flag = 0;
 					/* add rule type */
-					strncat2(rules_new, type, max_file);
-					strncat2(rules_new, " ", max_file);
+					strcat2(&rules_new, type);
+					strcat2(&rules_new, " ");
 					/* add old first param */
-					strncat2(rules_new, path1, max_file);
-					strncat2(rules_new, " ", max_file);
+					strcat2(&rules_new, path1);
+					strcat2(&rules_new, " ");
 					/* add new second param */
-					strncat2(rules_new, path_new2, max_file);
+					strcat2(&rules_new, path_new2);
 					/* add wildcards */
 					c = count2 + 1;
 					while(c--){
-						if (!flag){ strncat2(rules_new, "\\*", max_file); flag = 1; }
-						else        strncat2(rules_new, "/\\*", max_file);
+						if (!flag){ strcat2(&rules_new, "\\*"); flag = 1; }
+						else        strcat2(&rules_new, "/\\*");
 					}
 					/* add "/" char if path is a dir */
-					if (path_is_dir(path2)) strncat2(rules_new, "/", max_file);
-					strncat2(rules_new, "\n", max_file);
+					if (path_is_dir(path2)) strcat2(&rules_new, "/");
+					strcat2(&rules_new, "\n");
 				}
 			}
 		}
@@ -4099,54 +4181,54 @@ char *get_rules_with_recursive_dirs(char *rule)
 		if (!path2){
 			if (count1){
 				/* add rule type */
-				strncat2(rules_new, type, max_file);
-				strncat2(rules_new, " ", max_file);
+				strcat2(&rules_new, type);
+				strcat2(&rules_new, " ");
 				/* add new first param */
-				strncat2(rules_new, path_new1, max_file);
-				strncat2(rules_new, wildcard_recursive_dir, max_file);
+				strcat2(&rules_new, path_new1);
+				strcat2(&rules_new, wildcard_recursive_dir);
 				/* add "/" char if path is a dir */
-				if (path_is_dir(path1)) strncat2(rules_new, "/", max_file);
-				strncat2(rules_new, "\n", max_file);
+				if (path_is_dir(path1)) strcat2(&rules_new, "/");
+				strcat2(&rules_new, "\n");
 			}
 		}
 		/* 2 params */
 		else{
 			if (count1 && !count2){
 				/* add rule type */
-				strncat2(rules_new, type, max_file);
-				strncat2(rules_new, " ", max_file);
+				strcat2(&rules_new, type);
+				strcat2(&rules_new, " ");
 				/* add new first param */
-				strncat2(rules_new, path_new1, max_file);
-				strncat2(rules_new, wildcard_recursive_dir, max_file);
+				strcat2(&rules_new, path_new1);
+				strcat2(&rules_new, wildcard_recursive_dir);
 				/* add "/" char if path is a dir */
-				if (path_is_dir(path1)) strncat2(rules_new, "/", max_file);
+				if (path_is_dir(path1)) strcat2(&rules_new, "/");
 				/* add old second param */
-				strncat2(rules_new, " ", max_file);
-				strncat2(rules_new, path2, max_file);
-				strncat2(rules_new, "\n", max_file);
+				strcat2(&rules_new, " ");
+				strcat2(&rules_new, path2);
+				strcat2(&rules_new, "\n");
 			}
 			if (!count1 && count2){
 				/* add rule type */
-				strncat2(rules_new, type, max_file);
-				strncat2(rules_new, " ", max_file);
+				strcat2(&rules_new, type);
+				strcat2(&rules_new, " ");
 				/* add old first param */
-				strncat2(rules_new, path1, max_file);
+				strcat2(&rules_new, path1);
 				/* add new second param */
-				strncat2(rules_new, " ", max_file);
-				strncat2(rules_new, path_new2, max_file);
-				strncat2(rules_new, wildcard_recursive_dir, max_file);
+				strcat2(&rules_new, " ");
+				strcat2(&rules_new, path_new2);
+				strcat2(&rules_new, wildcard_recursive_dir);
 				/* add "/" char if path is a dir */
-				if (path_is_dir(path2)) strncat2(rules_new, "/", max_file);
-				strncat2(rules_new, "\n", max_file);
+				if (path_is_dir(path2)) strcat2(&rules_new, "/");
+				strcat2(&rules_new, "\n");
 			}
 		}
 	}
 	
-	if(type)  free(type);
-	if(path1) free(path1);
-	if(path2) free(path2);
-	free(path_new1);
-	free(path_new2);
+	if(type)  free2(type);
+	if(path1) free2(path1);
+	if(path2) free2(path2);
+	free2(path_new1);
+	free2(path_new2);
 
 	return rules_new;
 }
@@ -4160,9 +4242,9 @@ char *domain_sort_uniq_rules(char *rules)
 	int i1, i2, l1, l2, lo, ln;
 
 	/* alloc mem for new rules */
-	rules_new = memory_get(max_file);
-	old = memory_get(max_char);
-	new = memory_get(max_char);
+	rules_new = memget2(max_char);
+	old = memget2(max_char);
+	new = memget2(max_char);
 	
 	/* cycle through rules and compare each to themselves */
 	i1 = 0;
@@ -4185,40 +4267,40 @@ char *domain_sort_uniq_rules(char *rules)
 				/* compare rules containing wildcard */
 				if (compare_rules(res, res2)){
 					l2 = strlen(res2);
-					if (l1 < l2){ strncpy2(old, res,  max_char); lo = l1; }
-					else        { strncpy2(old, res2, max_char); lo = l2; }
+					if (l1 < l2){ strcpy2(&old, res); lo = l1; }
+					else        { strcpy2(&old, res2); lo = l2; }
 					/* if match, store only the shortest one from the matching ones */
 					ln = strlen(new);
-					if ((!new[0]) || (ln > lo)) strncpy2(new, old, max_char);
+					if ((!new[0]) || (ln > lo)) strcpy2(&new, old);
 				}
 
-				free(res2);
+				free2(res2);
 			}
 			i2++;
 		}
 
 		/* store the shorter matched rule if there was any match */
 		if (new[0]){
-			strncat2(rules_new, new,  max_file);
-			strncat2(rules_new, "\n", max_file);
+			strcat2(&rules_new, new);
+			strcat2(&rules_new, "\n");
 		}
 		/* store the original rule if there was no match */
 		else{
-			strncat2(rules_new, res,  max_file);
-			strncat2(rules_new, "\n", max_file);
+			strcat2(&rules_new, res);
+			strcat2(&rules_new, "\n");
 		}
 		
-		free(res);
+		free2(res);
 		i1++;
 	}
 
 	/* sort new rule list */
 	rules2 = string_sort_uniq_lines(rules_new);
-	free(rules_new);
+	free2(rules_new);
 	rules_new = rules2;
 	
-	free(old);
-	free(new);
+	free2(old);
+	free2(new);
 	return rules_new;
 }
 
@@ -4232,9 +4314,9 @@ void domain_cleanup()
 	int c;
 	
 	/* alloc mem for new policy */
-	tdomf_new = memory_get(max_file);
+	tdomf_new = memget2(max_char);
 	/* alloc mem for sorted rules */
-	rules = memory_get(max_file);
+	rules = memget2(max_char);
 	
 	/* cycle through domains and sort and make uniq the rules of each */
 	temp = tdomf;
@@ -4248,15 +4330,15 @@ void domain_cleanup()
 		temp2 = res;
 		res2 = string_get_next_line(&temp2);
 		if (res2){
-			strncat2(tdomf_new, res2, max_file);
-			strncat2(tdomf_new, "\n", max_file);
-			free(res2);
+			strcat2(&tdomf_new, res2);
+			strcat2(&tdomf_new, "\n");
+			free2(res2);
 			
 			res2 = string_get_next_line(&temp2);
 			if (res2){
-				strncat2(tdomf_new, res2, max_file);
-				strncat2(tdomf_new, "\n", max_file);
-				free(res2);
+				strcat2(&tdomf_new, res2);
+				strcat2(&tdomf_new, "\n");
+				free2(res2);
 				
 				/* get only rules */
 				rules[0] = 0;
@@ -4265,32 +4347,32 @@ void domain_cleanup()
 					res2 = string_get_next_line(&temp2);
 					if (!res2) break;
 					/* copy rule */
-					strncat2(rules, res2, max_file);
-					strncat2(rules, "\n", max_file);
-					free(res2);
+					strcat2(&rules, res2);
+					strcat2(&rules, "\n");
+					free2(res2);
 				}
 				/* sort rules */
 				res2 = string_sort_uniq_lines(rules);
 				/* add sorted rules to new policy */
-				strncat2(tdomf_new, res2, max_file);
-				strncat2(tdomf_new, "\n", max_file);
-				free(res2);
+				strcat2(&tdomf_new, res2);
+				strcat2(&tdomf_new, "\n");
+				free2(res2);
 			}
 		}
-		free(res);
+		free2(res);
 	}
-	free(rules);
+	free2(rules);
 
 	/* replace old policy with new one */
-	free(tdomf);
+	free2(tdomf);
 	tdomf = tdomf_new;
 
 	/* alloc mem for new policy */
-	tdomf_new = memory_get(max_file);
+	tdomf_new = memget2(max_char);
 	/* alloc mem for sorted rules */
-	rules = memory_get(max_file);
-	rules_temp = memory_get(max_file);
-	rule_type = memory_get(max_char);
+	rules = memget2(max_char);
+	rules_temp = memget2(max_char);
+	rule_type = memget2(max_char);
 
 	/* cycle through domains and sort and make uniq the rules within the same type */
 	temp = tdomf;
@@ -4304,15 +4386,15 @@ void domain_cleanup()
 		temp2 = res;
 		res2 = string_get_next_line(&temp2);
 		if (res2){
-			strncat2(tdomf_new, res2, max_file);
-			strncat2(tdomf_new, "\n", max_file);
-			free(res2);
+			strcat2(&tdomf_new, res2);
+			strcat2(&tdomf_new, "\n");
+			free2(res2);
 			
 			res2 = string_get_next_line(&temp2);
 			if (res2){
-				strncat2(tdomf_new, res2, max_file);
-				strncat2(tdomf_new, "\n", max_file);
-				free(res2);
+				strcat2(&tdomf_new, res2);
+				strcat2(&tdomf_new, "\n");
+				free2(res2);
 				
 				/* get only same type of rules and sort and uniq them in a specific way */
 				c = 0;
@@ -4326,13 +4408,13 @@ void domain_cleanup()
 							/* sort rules if more than 1 is in the list */
 							if (c > 1){
 								rules2 = domain_sort_uniq_rules(rules);
-								free(rules);
-								rules = memory_get(max_file);
-								strncpy2(rules, rules2, max_file);
-								free(rules2);
+								free2(rules);
+								rules = memget2(max_char);
+								strcpy2(&rules, rules2);
+								free2(rules2);
 							}
 							/* add rules to new policy */
-							strncat2(rules_temp, rules, max_file);
+							strcat2(&rules_temp, rules);
 						}
 						break;
 					}
@@ -4342,8 +4424,8 @@ void domain_cleanup()
 						string_search_keyword_first(res2, "allow_read /usr/lib/")){
 
 						/* add rule to new policy */
-						strncat2(rules_temp, res2, max_file);
-						strncat2(rules_temp, "\n", max_file);
+						strcat2(&rules_temp, res2);
+						strcat2(&rules_temp, "\n");
 					}
 					else{
 
@@ -4355,9 +4437,9 @@ void domain_cleanup()
 							/* check if there is any rule type stored yet */
 							if (!c){
 								/* if not, then store first type and store the rule too */
-								strncpy2(rule_type, res3, max_char);
-								strncpy2(rules, res2, max_file);
-								strncat2(rules, "\n", max_file);
+								strcpy2(&rule_type, res3);
+								strcpy2(&rules, res2);
+								strcat2(&rules, "\n");
 								/* counter for number of rules stored in list */
 								c = 1;
 							}
@@ -4365,8 +4447,8 @@ void domain_cleanup()
 							/* and collect the same types for special sorting */
 							else{
 								if (!strcmp(rule_type, res3)){
-									strncat2(rules, res2, max_file);
-									strncat2(rules, "\n", max_file);
+									strcat2(&rules, res2);
+									strcat2(&rules, "\n");
 									/* increase number of rules stored already */
 									c++;
 								}
@@ -4375,42 +4457,42 @@ void domain_cleanup()
 									/* sort rules if more than 1 is in the list */
 									if (c > 1){
 										rules2 = domain_sort_uniq_rules(rules);
-										free(rules);
-										rules = memory_get(max_file);
-										strncpy2(rules, rules2, max_file);
-										free(rules2);
+										free2(rules);
+										rules = memget2(max_char);
+										strcpy2(&rules, rules2);
+										free2(rules2);
 									}
 									/* add rules to new temp policy */
-									strncat2(rules_temp, rules, max_file);
+									strcat2(&rules_temp, rules);
 									/* store new rule type and next rule */
-									strncpy2(rule_type, res3, max_char);
-									strncpy2(rules, res2, max_file);
-									strncat2(rules, "\n", max_file);
+									strcpy2(&rule_type, res3);
+									strcpy2(&rules, res2);
+									strcat2(&rules, "\n");
 									/* reset rule number */
 									c = 1;
 								}
 							}
-							free(res3);
+							free2(res3);
 						}
 					}
-					free(res2);
+					free2(res2);
 				}
 				/* sort temp rules */
 				rules2 = string_sort_uniq_lines(rules_temp);
 				/* add sorted rules to new policy */
-				strncat2(tdomf_new, rules2, max_file);
-				strncat2(tdomf_new, "\n", max_file);
-				free(rules2);
+				strcat2(&tdomf_new, rules2);
+				strcat2(&tdomf_new, "\n");
+				free2(rules2);
 			}
 		}
-		free(res);
+		free2(res);
 	}
-	free(rule_type);
-	free(rules);
-	free(rules_temp);
+	free2(rule_type);
+	free2(rules);
+	free2(rules_temp);
 	
 	/* replace old policy with new one */
-	free(tdomf);
+	free2(tdomf);
 	tdomf = tdomf_new;
 }
 
@@ -4426,10 +4508,10 @@ void domain_reshape_rules_recursive_dirs()
 	if (!dirs_recursive) return;
 	
 	/* alloc mem for new policy */
-	tdomf_new = memory_get(max_file);
+	tdomf_new = memget2(max_char);
 	/* alloc mem for new rule */
-	rules  = memory_get(max_file);
-	rules2 = memory_get(max_file);
+	rules  = memget2(max_char);
+	rules2 = memget2(max_char);
 	
 	/* cycle through domains and change all subdir names of all recursive dirs to fully wildcarded */
 	temp = tdomf;
@@ -4443,15 +4525,15 @@ void domain_reshape_rules_recursive_dirs()
 		temp2 = res;
 		res2 = string_get_next_line(&temp2);
 		if (res2){
-			strncat2(tdomf_new, res2, max_file);
-			strncat2(tdomf_new, "\n", max_file);
-			free(res2);
+			strcat2(&tdomf_new, res2);
+			strcat2(&tdomf_new, "\n");
+			free2(res2);
 			
 			res2 = string_get_next_line(&temp2);
 			if (res2){
-				strncat2(tdomf_new, res2, max_file);
-				strncat2(tdomf_new, "\n", max_file);
-				free(res2);
+				strcat2(&tdomf_new, res2);
+				strcat2(&tdomf_new, "\n");
+				free2(res2);
 				
 				/* cycle through the rules */
 				while(1){
@@ -4460,36 +4542,36 @@ void domain_reshape_rules_recursive_dirs()
 					if (!res2) break;
 					
 					/* store old rules */
-					strncat2(rules, res2, max_file);
-					strncat2(rules, "\n", max_file);
+					strcat2(&rules, res2);
+					strcat2(&rules, "\n");
 					
 					/* get a modified rule by recursive dirs if any */
 					res3 = get_rules_with_recursive_dirs(res2);
 					if (res3){
-						strncat2(rules, res3, max_file);
-						free(res3);
+						strcat2(&rules, res3);
+						free2(res3);
 					}
 
-					free(res2);
+					free2(res2);
 				}
 				/* insert rule only if the former rule was not the same */
 				/* this is to avoid massive multiplication of the rules because of the recursive check */
 				if (strcmp(rules, rules2)){
 					/* add if no match */
-					strncat2(tdomf_new, rules, max_file);
-					strncat2(tdomf_new, "\n", max_file);
+					strcat2(&tdomf_new, rules);
+					strcat2(&tdomf_new, "\n");
 					/* store new rule as old for next check */
-					strncpy2(rules2, rules, max_file);
+					strcpy2(&rules2, rules);
 				}
 			}
 		}
-		free(res);
+		free2(res);
 	}
-	free(rules);
-	free(rules2);
+	free2(rules);
+	free2(rules2);
 	
 	/* replace old policy with new one */
-	free(tdomf);
+	free2(tdomf);
 	tdomf = tdomf_new;
 }
 
@@ -4556,17 +4638,17 @@ void check_exceptions()
 	/* if not, get shell names from defined list */
 	else{
 		int i = 0;
-		tshellf = memory_get(max_file);
+		tshellf = memget2(max_char);
 		while(1){
 			char *res = tshellf2[i++];
 			if (!res) break;
-			strncpy2(tshellf, res, max_file);
-			strncat2(tshellf, "\n", max_file);
+			strcpy2(&tshellf, res);
+			strcat2(&tshellf, "\n");
 		}
 	}
 	
 	/* alloc mem for program exceptions */
-	if (!tprogs_exc) tprogs_exc = memory_get(max_file);
+	if (!tprogs_exc) tprogs_exc = memget2(max_char);
 	
 	/* add shells to exceptions */
 	temp = tshellf;
@@ -4577,11 +4659,11 @@ void check_exceptions()
 		if (res[0] != '#'){
 			/* add it only if it exists */
 			if (file_exist(res)){
-				strncat2(tprogs_exc, res, max_file);
-				strncat2(tprogs_exc, "\n", max_file);
+				strcat2(&tprogs_exc, res);
+				strcat2(&tprogs_exc, "\n");
 			}
 		}
-		free(res);
+		free2(res);
 	}
 
 	/* add manual programs to exceptions */
@@ -4589,39 +4671,39 @@ void check_exceptions()
 	while(1){
 		res = tprogs_exc_manual[i++];
 		if (!res) break;
-		strncat2(tprogs_exc, res, max_file);
-		strncat2(tprogs_exc, "\n", max_file);
+		strcat2(&tprogs_exc, res);
+		strcat2(&tprogs_exc, "\n");
 	}
 
 	/* add my executable too to the list */
 	if (my_exe_path){
-		strncat2(tprogs_exc, my_exe_path, max_file);
-		strncat2(tprogs_exc, "\n", max_file);
+		strcat2(&tprogs_exc, my_exe_path);
+		strcat2(&tprogs_exc, "\n");
 	}
 
 	/* sort exception list */
 	if (tprogs_exc){
 		res = string_sort_uniq_lines(tprogs_exc);
-		free(tprogs_exc);
+		free2(tprogs_exc);
 		tprogs_exc = res;
 	}
 
 	/* sort program list */
 	if (tprogs){
 		res = string_sort_uniq_lines(tprogs);
-		free(tprogs);
+		free2(tprogs);
 		/* realloc more mem above the sorted list to expand it later */
-		tprogs = memory_get(max_file);
-		strncpy2(tprogs, res, max_file);
-		free(res);
+		tprogs = memget2(max_char);
+		strcpy2(&tprogs, res);
+		free2(res);
 	}
 
 	/* initialize recursive dirs' depth and sub values */
 	if (dirs_recursive){
 		i = string_count_lines(dirs_recursive);
 		if (i > 0){
-			if (!dirs_recursive_depth) dirs_recursive_depth = memory_get_long(i+1);
-			if (!dirs_recursive_sub)   dirs_recursive_sub   = memory_get_long(i+1);
+			if (!dirs_recursive_depth) dirs_recursive_depth = memget_long(i+1);
+			if (!dirs_recursive_sub)   dirs_recursive_sub   = memget_long(i+1);
 			while(i--){
 				dirs_recursive_depth[i] = -1;
 				dirs_recursive_sub[i]   = -1;
@@ -4657,7 +4739,7 @@ void check_processes()
 				if (!res) break;
 				color(res, purple);
 				color(" ", purple);
-				free(res);
+				free2(res);
 			}
 			newl();
 		}
@@ -4682,7 +4764,7 @@ void check_processes()
 		
 		/* read up all net stat files and create a list of inode numbers (column 10)
 		   of all processes using network */
-		netf2 = memory_get(max_file);
+		netf2 = memget2(max_char);
 		i = 0;
 		while (1){
 			char *res, *res2, *res3, *temp, *temp2;
@@ -4692,7 +4774,7 @@ void check_processes()
 			temp = res;
 			/* skip one line */
 			res2 = string_get_next_line(&temp);
-			free(res2);
+			free2(res2);
 			/* get all column 10 (uid) */
 			while(1){
 				/* get next line */
@@ -4701,19 +4783,19 @@ void check_processes()
 				temp2 = res2;
 				res3 = string_get_next_wordn(&temp2, 9);
 				if(res3){
-					strncat2(netf2, "socket:[", max_file);
-					strncat2(netf2, res3, max_file);
-					strncat2(netf2, "]\n", max_file);
-					free(res3);
+					strcat2(&netf2, "socket:[");
+					strcat2(&netf2, res3);
+					strcat2(&netf2, "]\n");
+					free2(res3);
 				}
-				free(res2);
+				free2(res2);
 			}
-			free(res);
+			free2(res);
 		}
 
 		/* sort pid list */
 		netf3 = string_sort_uniq_lines(netf2);
-		free(netf2);
+		free2(netf2);
 		
 
 		/* find all processes with the matching inode numbers in netf3's list */	
@@ -4721,73 +4803,80 @@ void check_processes()
 		mydir = opendir("/proc/");
 		if (!mydir){
 			color_("error: cannot open /proc/ directory\n", red);
-			free(netf3);
+			free2(netf3);
 			myexit(1);
 		}
 		/* cycle through dirs in /proc */
 		while((mydir_entry = readdir(mydir))) {
-			char mypid[max_num] = "";
+			char *myprog, *mypid;
 			/* get my pid number from dir name in /proc */
-			strncpy2(mypid, mydir_entry->d_name, max_num);
+			mypid = memget2(max_num);
+			strcpy2(&mypid, mydir_entry->d_name);
 			/* does it contain numbers only meaning they are pids? */
 			if (strspn(mypid, "0123456789") == strlen(mypid)) {
-				int res;
-				char mydir_name[max_char] = "";
-				char myprog[max_char] = "";
+				char *mydir_name;
 				/* create dirname like /proc/pid/exe */
-				strncpy2(mydir_name, "/proc/", max_char);
-				strncat2(mydir_name, mypid, max_char);
-				strncat2(mydir_name, "/exe", max_char);
+				mydir_name = memget2(max_char);
+				strcpy2(&mydir_name, "/proc/");
+				strcat2(&mydir_name, mypid);
+				strcat2(&mydir_name, "/exe");
 				/* resolv the link pointing from the exe name */
-				res = readlink(mydir_name, myprog, max_char);
-				if (res > 0){
+				myprog = link_read(mydir_name);
+				if (myprog){
 					DIR *mydir2;
 					struct dirent *mydir_entry2;
-					char myfd[max_char] = "";
+					char *myfd;
 					/* create dir name like /proc/pid/fd/ */
-					strncpy2(myfd, "/proc/", max_char);
-					strncat2(myfd, mypid, max_char);
-					strncat2(myfd, "/fd/", max_char);
+					myfd = memget2(max_char);
+					strcpy2(&myfd, "/proc/");
+					strcat2(&myfd, mypid);
+					strcat2(&myfd, "/fd/");
 					mydir2 = opendir(myfd);
 					
 					if (mydir2){
 						/* cycle through files in /proc/pid/fd/ */
 						while((mydir_entry2 = readdir(mydir2))) {
-							char mydir_name2[max_char] = "";
-							char mysock[max_char] = "";
-							int resfd;
+							char *mysock;
+							char *mydir_name2;
 							/* create dirname like /proc/pid/fd/4 */
-							strncpy2(mydir_name2, myfd, max_char);
-							strncat2(mydir_name2, mydir_entry2->d_name, max_char);
+							mydir_name2 = memget2(max_char);
+							strcpy2(&mydir_name2, myfd);
+							strcat2(&mydir_name2, mydir_entry2->d_name);
 							/* resolv the links from the /proc/pid/fd/ dir */
-							resfd = readlink(mydir_name2, mysock, max_char);
-							if (resfd > 0){
+							mysock = link_read(mydir_name2);
+							if (mysock){
 								/* does it contain a name like "socket:"? */
 								if (string_search_keyword(mysock, "socket:") > -1){
 									/* is the inode number in netf3's list? */
 									if (string_search_line(netf3, mysock) > -1){
 										/* alloc mem for list if not created yet */
-										if (!tprogs) tprogs = memory_get(max_file);
+										if (!tprogs) tprogs = memget2(max_char);
 										/* is it in my progs list yet? */
 										if (string_search_line(tprogs, myprog) == -1 && string_search_line(tprogs_exc, myprog) == -1){
-											strncat2(tprogs, myprog, max_file);
-											strncat2(tprogs, "\n", max_file);
+											strcat2(&tprogs, myprog);
+											strcat2(&tprogs, "\n");
 											color(myprog, blue); newl();
 										}
 									}
 								}
+								free2(mysock);
 							}
+							free2(mydir_name2);
 						}
 						closedir(mydir2);
 					}
+					free2(myfd);
+					free2(myprog);
 				}
+				free2(mydir_name);
 			}
+			free2(mypid);
 		}
 		closedir(mydir);
 
 
 
-		free(netf3);
+		free2(netf3);
 		break;
 	}
 }
@@ -4806,7 +4895,7 @@ void statistics()
 		res = domain_get_next(&temp);
 		if (!res) break;
 		d++;
-		free(res);
+		free2(res);
 	}
 
 	/* count rules */
@@ -4815,7 +4904,7 @@ void statistics()
 		res = string_get_next_line(&temp);
 		if (!res) break;
 		if (string_search_keyword_first(res, "allow_")) r++;
-		free(res);
+		free2(res);
 	}
 	
 	/* print stat */
@@ -4825,8 +4914,8 @@ void statistics()
 	color(" active domains, ", clr);
 	color(sr, clr);
 	color(" rules\n", clr);
-	free(sd);
-	free(sr);
+	free2(sd);
+	free2(sr);
 }
 
 
@@ -4837,7 +4926,7 @@ void statistics()
 int main(int argc, char **argv){
 
 	float t, t_start;
-
+	
 	/* store start time */
 	t_start = mytime();
 
