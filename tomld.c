@@ -676,16 +676,24 @@ unsigned long strlen2(char **s1)
 
 
 /* my setting length for dynamic strings */
-void setlen2(char **s1)
+void strlenset2(char **s1)
 {
 	*((unsigned long*)(*s1) - 1) = strlen((*s1));
 }
 
 
 /* my setting length for dynamic strings */
-void setlen3(char **s1, unsigned long l)
+void strlenset3(char **s1, unsigned long l)
 {
 	*((unsigned long*)(*s1) - 1) = l;
+}
+
+
+/* zero my dynamic string and its length too */
+void strnull2(char **s1)
+{
+	*((unsigned long*)(*s1) - 1) = 0;
+	*(*s1) = 0;
 }
 
 
@@ -802,7 +810,7 @@ char *string_itos(int num)
 {
 	char *res = memget2(max_num);
 	sprintf(res, "%d", num);
-	setlen2(&res);
+	strlenset2(&res);
 	return res;
 }
 
@@ -813,7 +821,7 @@ char *string_ltos(unsigned long num)
 {
 	char *res = memget2(max_num);
 	sprintf(res, "%ld", num);
-	setlen2(&res);
+	strlenset2(&res);
 	return res;
 }
 
@@ -828,7 +836,7 @@ char *link_read(const char *name)
 	int i = readlink(name, buff, max_char);
 	if (i > -1){
 		buff[i] = 0;
-		setlen2(&buff);
+		strlenset2(&buff);
 		return buff;
 	}
 	free2(buff);
@@ -863,7 +871,7 @@ char *string_get_filename(const char *text)
 			while(i <= l){
 				res[i2++] = text[i++];
 			}
-			setlen2(&res);
+			strlenset2(&res);
 			return res;
 		}
 	}
@@ -910,7 +918,7 @@ char *string_get_number(const char *text)
 		res[i] = text[start + i];
 	}
 	res[l] = 0;
-	setlen2(&res);
+	strlenset2(&res);
 
 	return res;
 }
@@ -944,7 +952,7 @@ char *string_get_next_line(char **text)
 	/* move pointer to the next line, or leave it on null end */
 	if (c) i++;
 	(*text) += i;
-	setlen3(&res, i);
+	strlenset3(&res, i);
 
 	return res;
 }
@@ -988,7 +996,7 @@ char *string_get_last_line(char **text)
 	strcpy2(&res, (*text));
 	(*text)[l] = c;
 	res[l] = 0;
-	setlen3(&res, l);
+	strlenset3(&res, l);
 
 	return res;
 }
@@ -1081,7 +1089,7 @@ char *string_get_next_word(char **text)
 		res[i] = (*text)[start + i];
 	}
 	res[l] = 0;
-	setlen3(&res, l);
+	strlenset3(&res, l);
 	/* skip more white spaces and move pointer to the next line */
 	i = start + l;
 	while (1){
@@ -1146,7 +1154,7 @@ char *string_get_next_wordn(char **text, int num)
 		res[i] = (*text)[start + i];
 	}
 	res[l] = 0;
-	setlen3(&res, l);
+	strlenset3(&res, l);
 	/* skip more white spaces and move pointer to the next line */
 	i = start + l;
 	while (1){
@@ -1208,7 +1216,7 @@ char *string_get_last_word(char **text)
 		res[i] = (*text)[start + i];
 	}
 	res[l] = 0;
-	setlen3(&res, l);
+	strlenset3(&res, l);
 	/* set pointer to the beginning of the last word */
 	(*text) += start;
 
@@ -1506,7 +1514,7 @@ char *path_get_subdirs_name(const char *path, int num)
 	}
 	/* give back only subdir names */
 	path_new[i2] = 0;
-	setlen3(&path_new, i2);
+	strlenset3(&path_new, i2);
 	
 	return path_new;
 }
@@ -1557,7 +1565,7 @@ char *path_get_parent_dir(char *path)
 		l--;
 	}
 	path_new[i] = 0;
-	setlen3(&path_new, i);
+	strlenset3(&path_new, i);
 
 	return path_new;
 }
@@ -1663,7 +1671,7 @@ char *domain_get_next(char **text)
 		res[i] = (*text)[start + i];
 	}
 	res[l] = 0;
-	setlen3(&res, l);
+	strlenset3(&res, l);
 	
 	/* move pointer to the next line */
 	(*text) += start + l;
@@ -2020,7 +2028,7 @@ char *pipe_read(const char *comm, long length)
 	fread(buff, length, 1, p);
 	pclose(p);
 	/* set dynamic string length */
-	setlen2(&buff);
+	strlenset2(&buff);
 	
 	return buff;
 }
@@ -2101,7 +2109,7 @@ char *file_read(const char *name, long length)
 	/* write null to the end of file */
 	buff[len] = 0;
 	/* set dynamic string length */
-	setlen3(&buff, len);
+	strlenset3(&buff, len);
 
 	return buff;
 }
@@ -2515,7 +2523,7 @@ void reload()
 	while(1){
 	
 		/* create another append list with deleting exception policy lines */
-		myappend[0] = 0;
+		strnull2(&myappend);
 		temp = texcf_old;
 		while(1){
 			/* get next line of exception policy */
@@ -2690,7 +2698,7 @@ char *which(const char *name){
 			free2(full);
 			return res;
 		}
-		full[0] = 0;
+		strnull2(&full);
 	}
 
 	free2(full);
@@ -3258,7 +3266,7 @@ void domain_get_log()
 		/* clear tmarkf if no previous log mark found */
 		/* it might mean the log has been rotated already */
 		else{
-			if (tmarkf) tmarkf[0] = 0;
+			if (tmarkf) strnull2(&tmarkf);
 			start = tlogf;
 		}
 	}
@@ -3337,12 +3345,12 @@ void domain_get_log()
 			tmarkf = memget2(max_char);
 			*(temp2 + i + i2 + 1) = 0;
 			strcpy2(&tmarkf, temp2 + i);
-			setlen3(&tmarkf, i2 + 1);
+			strlenset3(&tmarkf, i2 + 1);
 		}
 	}
 	/* clear tmarkf if no kernel messages */
 	else{
-		if (tmarkf) tmarkf[0] = 0;
+		if (tmarkf) strnull2(&tmarkf);
 	}
 
 
@@ -4294,7 +4302,7 @@ char *domain_sort_uniq_rules(char *rules)
 		/* compare rule to all rules */
 		i2 = 0;
 		temp2 = rules;
-		new[0] = 0;
+		strnull2(&new);
 		while(1){
 			/* skip comparing the same entry in the list */
 			if (i1 != i2){
@@ -4378,14 +4386,16 @@ void domain_cleanup()
 				free2(res2);
 				
 				/* get only rules */
-				rules[0] = 0;
+				strnull2(&rules);
 				while(1){
 					/* get next rule */
 					res2 = string_get_next_line(&temp2);
 					if (!res2) break;
-					/* copy rule */
-					strcat2(&rules, res2);
-					strcat2(&rules, "\n");
+					/* add none-empty rule line */
+					if (res2[0]){
+						strcat2(&rules, res2);
+						strcat2(&rules, "\n");
+					}
 					free2(res2);
 				}
 				/* sort rules */
@@ -4403,6 +4413,7 @@ void domain_cleanup()
 	/* replace old policy with new one */
 	free2(tdomf);
 	tdomf = tdomf_new;
+
 
 	/* alloc mem for new policy */
 	tdomf_new = memget2(max_char);
@@ -4435,7 +4446,7 @@ void domain_cleanup()
 				
 				/* get only same type of rules and sort and uniq them in a specific way */
 				c = 0;
-				rules_temp[0] = 0;
+				strnull2(&rules_temp);
 				while(1){
 					/* get next rule */
 					res2 = string_get_next_line(&temp2);
