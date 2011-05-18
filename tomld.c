@@ -671,7 +671,8 @@ long *memget_long(unsigned long num)
 /* my strlen for dynamic strings */
 unsigned long strlen2(char **s1)
 {
-	return *((unsigned long*)(*s1) - 1);
+	if ((*s1)) return *((unsigned long*)(*s1) - 1);
+	else return 0;
 }
 
 
@@ -700,12 +701,17 @@ void strnull2(char **s1)
 /* my strcpy for dynamic strings */
 void strcpy2(char **s1, const char *s2)
 {
-	/* get long pointer for extra datas */
-	unsigned long *p2 = (unsigned long*)(*s1);
+	unsigned long *p2, l2, size;
+	/* safety check for null pointers */
+	if (!s2) return;
 	/* length of source string */
-	unsigned long l2 = strlen(s2) + 1;
+	l2 = strlen(s2) + 1;
+	/* alloc mem and initialize it if destination string is a null pointer */
+	if (!(*s1)) *s1 = memget2(l2 * 2);
+	/* get long pointer for extra datas */
+	p2 = (unsigned long*)(*s1);
 	/* maximum size of string memory */
-	unsigned long size = *(p2 - 2);
+	size = *(p2 - 2);
 	/* allocate new bigger one if space is smaller than needed */
 	if (size < l2){
 		/* new mem */
@@ -724,16 +730,21 @@ void strcpy2(char **s1, const char *s2)
 /* my strcat for dynamic strings */
 void strcat2(char **s1, const char *s2)
 {
-	/* get long pointer for extra datas */
-	unsigned long *p2 = (unsigned long*)(*s1);
-	/* length of destination string */
-	unsigned long l1 = *(p2 - 1);
+	unsigned long *p2, l1, l2, l3, size;
+	/* safety check for null pointers */
+	if (!s2) return;
 	/* length of source string */
-	unsigned long l2 = strlen(s2) + 1;
+	l2 = strlen(s2) + 1;
+	/* alloc mem and initialize it if destination string is a null pointer */
+	if (!(*s1)) *s1 = memget2(l2 * 2);
+	/* get long pointer for extra datas */
+	p2 = (unsigned long*)(*s1);
+	/* length of destination string */
+	l1 = *(p2 - 1);
 	/* total length needed to store result */
-	unsigned long l3 = l1 + l2;
+	l3 = l1 + l2;
 	/* maximum size of string memory */
-	unsigned long size = *(p2 - 2);
+	size = *(p2 - 2);
 	/* allocate new bigger one if space is smaller than needed */
 	if (size < l3){
 		/* new mem */
