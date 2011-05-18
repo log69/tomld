@@ -827,6 +827,7 @@ char *link_read(const char *name)
 	/* read link path */
 	int i = readlink(name, buff, max_char);
 	if (i > -1){
+		buff[i] = 0;
 		setlen2(&buff);
 		return buff;
 	}
@@ -1323,7 +1324,7 @@ char *string_sort_uniq_lines(const char *text)
 {
 	char c, *res, *text_temp, **ptr;
 	char *text_new, *text_final, *text_sort;
-	char *res2 = "";
+	char *res2 = 0;
 	int flag_first = 0;
 	int flag_newl = 0;
 	int flag_diff = 0;
@@ -2061,7 +2062,7 @@ char *file_read(const char *name, long length)
 	if (!length){
 		/* get file length from file descriptor */
 		fseek(f, 0, SEEK_END);
-		len = ftell(f) + 1;
+		len = ftell(f);
 		fseek(f, 0, SEEK_SET);
 	}
 	/* length will be unknown (like with /proc files)
@@ -3225,7 +3226,7 @@ void domain_get_log()
 	char *start, *tlogf2, *tlogf3;
 	char *rules, *prog_rules = 0;
 	char *key;
-	char *key2 = "denied for ";
+	char key2[] = "denied for ";
 	int i, i2, l;
 	int key2_len = strlen(key2);
 
@@ -3332,10 +3333,11 @@ void domain_get_log()
 		i2 = string_search_keyword(temp2 + i, "]");
 		if (i > 1 && i2 > -1){
 			/* set tmarkf to the last kernel messages time stamp */
-			l = i2 + 2;
 			if (tmarkf) free2(tmarkf);
-			tmarkf = memget2(l);
+			tmarkf = memget2(max_char);
+			*(temp2 + i + i2 + 1) = 0;
 			strcpy2(&tmarkf, temp2 + i);
+			setlen3(&tmarkf, i2 + 1);
 		}
 	}
 	/* clear tmarkf if no kernel messages */
@@ -4831,7 +4833,7 @@ void check_processes()
 		/* sort pid list */
 		netf3 = string_sort_uniq_lines(netf2);
 		free2(netf2);
-		
+
 
 		/* find all processes with the matching inode numbers in netf3's list */	
 		/* open /proc dir */
@@ -4961,7 +4963,7 @@ void statistics()
 int main(int argc, char **argv){
 
 	float t, t_start;
-
+	
 	/* store start time */
 	t_start = mytime();
 
