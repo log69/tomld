@@ -826,7 +826,10 @@ char *link_read(const char *name)
 	char *buff = memget2(max_char);
 	/* read link path */
 	int i = readlink(name, buff, max_char);
-	if (i > -1) return buff;
+	if (i > -1){
+		setlen2(&buff);
+		return buff;
+	}
 	free2(buff);
 	return 0;
 }
@@ -859,6 +862,7 @@ char *string_get_filename(const char *text)
 			while(i <= l){
 				res[i2++] = text[i++];
 			}
+			setlen2(&res);
 			return res;
 		}
 	}
@@ -905,6 +909,7 @@ char *string_get_number(const char *text)
 		res[i] = text[start + i];
 	}
 	res[l] = 0;
+	setlen2(&res);
 
 	return res;
 }
@@ -938,6 +943,7 @@ char *string_get_next_line(char **text)
 	/* move pointer to the next line, or leave it on null end */
 	if (c) i++;
 	(*text) += i;
+	setlen3(&res, i);
 
 	return res;
 }
@@ -974,12 +980,14 @@ char *string_get_last_line(char **text)
 	res = memget2(l);
 	/* move pointer to the next line */
 	(*text) += i;
+	l--;
 	/* copy onyl "l" chars */
 	c = (*text)[l];
 	(*text)[l] = 0;
 	strcpy2(&res, (*text));
 	(*text)[l] = c;
-	res[l - 1] = 0;
+	res[l] = 0;
+	setlen3(&res, l);
 
 	return res;
 }
@@ -1072,6 +1080,7 @@ char *string_get_next_word(char **text)
 		res[i] = (*text)[start + i];
 	}
 	res[l] = 0;
+	setlen3(&res, l);
 	/* skip more white spaces and move pointer to the next line */
 	i = start + l;
 	while (1){
@@ -1136,6 +1145,7 @@ char *string_get_next_wordn(char **text, int num)
 		res[i] = (*text)[start + i];
 	}
 	res[l] = 0;
+	setlen3(&res, l);
 	/* skip more white spaces and move pointer to the next line */
 	i = start + l;
 	while (1){
@@ -1197,6 +1207,7 @@ char *string_get_last_word(char **text)
 		res[i] = (*text)[start + i];
 	}
 	res[l] = 0;
+	setlen3(&res, l);
 	/* set pointer to the beginning of the last word */
 	(*text) += start;
 
@@ -1494,6 +1505,7 @@ char *path_get_subdirs_name(const char *path, int num)
 	}
 	/* give back only subdir names */
 	path_new[i2] = 0;
+	setlen3(&path_new, i2);
 	
 	return path_new;
 }
@@ -1544,6 +1556,8 @@ char *path_get_parent_dir(char *path)
 		l--;
 	}
 	path_new[i] = 0;
+	setlen3(&path_new, i);
+
 	return path_new;
 }
 
@@ -1648,6 +1662,7 @@ char *domain_get_next(char **text)
 		res[i] = (*text)[start + i];
 	}
 	res[l] = 0;
+	setlen3(&res, l);
 	
 	/* move pointer to the next line */
 	(*text) += start + l;
@@ -2003,6 +2018,8 @@ char *pipe_read(const char *comm, long length)
 	/* read pipe */
 	fread(buff, length, 1, p);
 	pclose(p);
+	/* set dynamic string length */
+	setlen2(&buff);
 	
 	return buff;
 }
@@ -4944,7 +4961,7 @@ void statistics()
 int main(int argc, char **argv){
 
 	float t, t_start;
-	
+
 	/* store start time */
 	t_start = mytime();
 
