@@ -196,7 +196,7 @@ char *my_exe_path = 0;
 char *tkern = "security=tomoyo";
 
 /* pattern string for the recursive wildcard "\{\*\}" for compares */
-char wildcard_recursive_dir[] = "\\{\\*\\}";
+char *wildcard_recursive_dir = "\\{\\*\\}";
 
 /* tomoyo vars and files */
 char *tdomf	= 0;
@@ -328,7 +328,7 @@ char *tprogs_learn = 0;
 
 char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6", 0};
 
-char tshell[] = "/etc/shells";
+char *tshell = "/etc/shells";
 char *tshellf = 0;
 char *tshellf2[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbash", "/bin/sh",
 "/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish", "/usr/bin/ksh", "/usr/bin/rc",
@@ -462,28 +462,28 @@ void help() {
 /* free my allocated dynamic string space */
 void free2(char *ptr)
 {
-	free((unsigned long*)(ptr) - 2);
+	if (ptr) free((unsigned long*)(ptr) - 2);
 }
 
 
 /* free my pointers */
 void myfree()
 {
-	if (my_exe_path)			free2(my_exe_path);
-	if (tdomf)					free2(tdomf);
-	if (texcf)					free2(texcf);
-	if (tshellf)				free2(tshellf);
-	if (tprogs)					free2(tprogs);
-	if (tprogs_exc)				free2(tprogs_exc);
-	if (tprogs_learn)			free2(tprogs_learn);
-	if (dirs_recursive)			free2(dirs_recursive);
+	free2(my_exe_path);
+	free2(tdomf);
+	free2(texcf);
+	free2(tshellf);
+	free2(tprogs);
+	free2(tprogs_exc);
+	free2(tprogs_learn);
+	free2(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 	if (dirs_recursive_sub)		free(dirs_recursive_sub);
-	if (opt_info2)				free2(opt_info2);
-	if (opt_remove2)			free2(opt_remove2);
-	if (tmarkf)					free2(tmarkf);
-	if (tlogf)					free2(tlogf);
-	if (tdomf_bak)				free2(tdomf_bak);
+	free2(opt_info2);
+	free2(opt_remove2);
+	free2(tmarkf);
+	free2(tlogf);
+	free2(tdomf_bak);
 }
 
 
@@ -668,10 +668,24 @@ long *memget_long(unsigned long num)
 }
 
 
+/* my strlen for dynamic strings */
+unsigned long strlen2(char **s1)
+{
+	return *((unsigned long*)(*s1) - 1);
+}
+
+
 /* my setting length for dynamic strings */
 void setlen2(char **s1)
 {
-	*((*s1) - sizeof(unsigned long)) = strlen((*s1));
+	*((unsigned long*)(*s1) - 1) = strlen((*s1));
+}
+
+
+/* my setting length for dynamic strings */
+void setlen3(char **s1, unsigned long l)
+{
+	*((unsigned long*)(*s1) - 1) = l;
 }
 
 
@@ -2017,7 +2031,7 @@ void pipe_write(const char *comm, const char *buff)
 char *file_read(const char *name, long length)
 {
 	char *buff;
-	long len = 0;
+	unsigned long len = 0;
 	
 	/* open file for reading */
 	FILE *f = fopen(name, "r");
@@ -2041,7 +2055,7 @@ char *file_read(const char *name, long length)
 	 * so i have to trick with filling the buffer with zero
 	 * and check the string length at the end */
 	else{
-		int c = 0;
+		unsigned long c = 0;
 		len = max_char;
 		buff = memget2(len);
 		while(1){
@@ -2049,7 +2063,7 @@ char *file_read(const char *name, long length)
 			if (!fread(buff, len, 1, f)) break;
 			c++;
 		}
-		len = strlen(buff) + 1 + c * len;
+		len = strlen(buff) + c * len;
 		free2(buff);
 		fclose(f);
 		f = fopen(name, "r");
@@ -2068,6 +2082,8 @@ char *file_read(const char *name, long length)
 	fclose(f);
 	/* write null to the end of file */
 	buff[len] = 0;
+	/* set dynamic string length */
+	setlen3(&buff, len);
 
 	return buff;
 }
@@ -2457,6 +2473,9 @@ void reload()
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
 		tdomf_old2 = file_read(tdomk, 1);
+		/* sometimes the read tomoyo policy differs in the number
+		 * of new lines at the end of text, therefore i remove
+		 * empty lines from the end before compare */
 		if (!strcmp(tdomf_old, tdomf_old2)){
 			free2(tdomf_old2);
 			/* write changes to kernel */
@@ -3189,7 +3208,7 @@ void domain_get_log()
 	char *start, *tlogf2, *tlogf3;
 	char *rules, *prog_rules = 0;
 	char *key;
-	char key2[] = "denied for ";
+	char *key2 = "denied for ";
 	int i, i2, l;
 	int key2_len = strlen(key2);
 
@@ -3515,7 +3534,7 @@ void domain_print_list_not_progs()
 	
 	/* get list of all domain names */
 	list = domain_get_list();
-	
+
 	/* alloc mem for new list */
 	list2 = memget2(max_char);
 
@@ -3530,6 +3549,7 @@ void domain_print_list_not_progs()
 			strcat2(&list2, "\n");
 			/* add domain to tprogs if not in exceptions */
 			if (string_search_line(tprogs_exc, res) == -1){
+				if (!tprogs) tprogs = memget2(max_char);
 				strcat2(&tprogs, res);
 				strcat2(&tprogs, "\n");
 			}
@@ -3732,8 +3752,6 @@ int compare_paths(char *path1, char *path2)
 	/* vars */
 	char c1, c2, c1_old, c2_old, c1_new, c2_new;
 	int i1, i2, wlen;
-/*	char p1[max_char] = "";
-	char p2[max_char] = "";*/
 	
 	c1 = path1[0];
 	c2 = path2[0];
