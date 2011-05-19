@@ -864,6 +864,7 @@ char *link_read(const char *name)
 			/* if no link could be resolved at all,
 			 * then return original file name */
 			if (!flag) strcpy2(&buff, name);
+			free2(temp);
 			return buff;
 		}
 	}
