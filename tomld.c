@@ -693,8 +693,10 @@ void strlenset3(char **s1, unsigned long l)
 /* zero my dynamic string and its length too */
 void strnull2(char **s1)
 {
-	*((unsigned long*)(*s1) - 1) = 0;
-	*(*s1) = 0;
+	if (*s1){
+		*((unsigned long*)(*s1) - 1) = 0;
+		*(*s1) = 0;
+	}
 }
 
 
@@ -842,16 +844,29 @@ char *string_ltos(unsigned long num)
 /* returned value must be freed by caller */
 char *link_read(const char *name)
 {
+	int flag = 0;
+	char *temp = 0;
 	char *buff = memget2(max_char);
-	/* read link path */
-	int i = readlink(name, buff, max_char);
-	if (i > -1){
-		buff[i] = 0;
-		strlenset2(&buff);
-		return buff;
+	
+	/* resolve links until no more link */
+	strcpy2(&temp, name);
+	while (1){
+		/* read link path */
+		int i = readlink(temp, buff, max_char);
+		/* copy link if any */
+		if (i > 0){
+			flag = 1;
+			buff[i] = 0;
+			strlenset2(&buff);
+			strcpy2(&temp, buff);
+		}
+		else{
+			/* if no link could be resolved at all,
+			 * then return original file name */
+			if (!flag) strcpy2(&buff, name);
+			return buff;
+		}
 	}
-	free2(buff);
-	return 0;
 }
 
 
@@ -939,7 +954,7 @@ char *string_get_number(const char *text)
 /* returned value must be freed by caller */
 char *string_get_next_line(char **text)
 {
-	char *res, c;
+	char *res = 0, c;
 	int i = 0;
 	
 	if (!(*text)) return 0;
@@ -952,8 +967,6 @@ char *string_get_next_line(char **text)
 		i++;
 	}
 
-	/* allocate mem for the new string */
-	res = memget2(i + 1);
 	/* copy only "i" chars */
 	c = (*text)[i];
 	(*text)[i] = 0;
@@ -973,7 +986,7 @@ char *string_get_next_line(char **text)
 /* returned value must be freed by caller */
 char *string_get_last_line(char **text)
 {
-	char *res, c;
+	char *res = 0, c;
 	int i, l;
 
 	/* get string length */	
@@ -996,8 +1009,6 @@ char *string_get_last_line(char **text)
 	if (i < 0) i = 0;
 	l = l - i + 1;
 
-	/* allocate mem for the new string */
-	res = memget2(l);
 	/* move pointer to the next line */
 	(*text) += i;
 	l--;
@@ -1421,20 +1432,20 @@ char *string_sort_uniq_lines(const char *text)
 		res = string_get_next_line(&text_temp);
 		/* exit on end */
 		if (!res){
-			if (flag_first) free2(res2);
+			free2(res2);
 			break;
 		}
 
 		/* first run */		
 		if (!flag_first){
-			l1 = strlen(res);
+			l1 = strlen2(&res);
 			strcat2(&text_final, res);
 			strcat2(&text_final, "\n");
 		}
 		else{
 			/* compare 2 lines */
-			l1 = strlen(res);
-			l2 = strlen(res2);
+			l1 = strlen2(&res);
+			l2 = strlen2(&res2);
 			flag_diff = 0;
 			if (l1 != l2) flag_diff = 1;
 			else if (strcmp(res, res2)) flag_diff = 1;
@@ -1536,9 +1547,7 @@ char *path_get_subdirs_name(const char *path, int num)
 char *path_join(char *path1, char *path2)
 {
 	long l1 = strlen(path1);
-	long l2 = strlen(path2);
-	long maxl = l1 + l2 + 3;
-	char *res = memget2(maxl);
+	char *res = 0;
 	
 	/* create new joined path */
 	strcpy2(&res, path1);
@@ -1559,7 +1568,7 @@ char *path_get_parent_dir(char *path)
 	long l;
 	
 	/* alloc mem for new path */
-	char *path_new = memget2(max_char);
+	char *path_new = 0;
 	/* copy old path */
 	strcpy2(&path_new, path);
 	
@@ -1605,8 +1614,7 @@ int path_count_dir_depth_r(char *path)
 			/* join paths */
 			char *res = path_join(path, md->d_name);
 			/* add "/" char to the end of path */
-			long l = strlen(res) + 2;
-			char *res2 = memget2(l);
+			char *res2 = 0;
 			strcpy2(&res2, res);
 			strcat2(&res2, "/");
 			free2(res);
@@ -1648,7 +1656,7 @@ int path_count_dir_depth(char *path)
 char *domain_get_next(char **text)
 {
 	char *key = "<kernel>";
-	long keyl = strlen(key);
+	long keyl = 8;
 	long l;
 	char *text2, *res;
 	int i, start, end;
@@ -1781,7 +1789,7 @@ char *domain_get_list()
 	}
 	
 	/* sort and uniq list because there many same entries because of subdomains */
-	if (list[0]){
+	if (strlen2(&list)){
 		list2 = string_sort_uniq_lines(list);
 		free2(list);
 		list = list2;
@@ -1814,6 +1822,7 @@ int domain_get_profile(char *text)
 {
 	int i, p;
 	char *key = "use_profile ";
+	int keyl = 12;
 	char *res, *orig;
 	
 	while(1){
@@ -1829,7 +1838,7 @@ int domain_get_profile(char *text)
 
 		/* if match */
 		if (i > -1){
-			i += strlen(key);
+			i += keyl;
 			p = string_ctoi(orig[i]);
 			return p;
 		}
@@ -1844,6 +1853,7 @@ void domain_set_profile(char *text, int profile)
 {
 	int i, p;
 	char *key = "use_profile ";
+	int keyl = 12;
 	char *res, *orig;
 	
 	while(1){
@@ -1859,7 +1869,7 @@ void domain_set_profile(char *text, int profile)
 
 		/* if match */
 		if (i > -1){
-			i += strlen(key);
+			i += keyl;
 			p = string_itoc(profile);
 			orig[i] = p;
 			break;
@@ -2249,7 +2259,7 @@ int process_running(const char *name){
 		strcpy2(&mypid, mydir_entry->d_name);
 
 		/* does it contain numbers only meaning they are pids? */
-		if (strspn(mypid, "0123456789") == strlen(mypid)) {
+		if (strspn(mypid, "0123456789") == strlen2(&mypid)) {
 			char *res;
 			/* create dirname like /proc/pid/exe */
 			strcpy2(&mydir_name, "/proc/");
@@ -2341,11 +2351,11 @@ void load()
 	char *tdomf_new, *res, *res2, *temp, *temp2;
 	
 	/* load domain config */
-	if (tdomf) free2(tdomf);
+	free2(tdomf);
 	tdomf = file_read(tdomk, 1);
 
 	/* load exception config */
-	if (texcf) free2(texcf);
+	free2(texcf);
 	texcf = file_read(texck, 1);
 	
 	/* alloc memory for new policy */
@@ -2392,7 +2402,7 @@ void load()
 				if (!res2) break;
 
 				/* don't add empty lines */
-				if (res2[0]){
+				if (strlen2(&res2)){
 					/* remove (deleted) and quota_exceeded entries */
 					if((string_search_keyword(res2, "(deleted)") == -1) && (string_search_keyword(res2, "(deleted)") == -1)){
 						/* add entry if ok */
@@ -2457,7 +2467,7 @@ void reload()
 					rule = string_get_next_line(&temp2);
 					if (!rule) break;
 					/* add only if not an empty line */
-					if (rule[0]){
+					if (strlen2(&rule)){
 						/* add delete keyword and rule to append list */
 						strcat2(&myappend, "delete ");
 						strcat2(&myappend, rule);
@@ -2495,7 +2505,7 @@ void reload()
 					rule = string_get_next_line(&temp2);
 					if (!rule) break;
 					/* add only if not an empty line */
-					if (rule[0]){
+					if (strlen2(&rule)){
 						/* add rule to append list */
 						strcat2(&myappend, rule);
 						strcat2(&myappend, "\n");
@@ -2593,12 +2603,9 @@ void save()
 /* create backup and save config files from variables to disk with new names */
 void backup()
 {
-	char *tdom2, *texc2, *num;
+	char *tdom2 = 0, *texc2 = 0, *num;
 	struct timeval t;
 	
-	tdom2 = memget2(max_char);
-	texc2 = memget2(max_char);
-
 	/* get elapsed seconds since 1970 */
 	gettimeofday(&t, 0);
 	/* convert long integer to string */
@@ -2642,7 +2649,7 @@ int check_instance(){
 		else{
 			/* is the process with the foreign pid still running? */
 			char *path;
-			path = memget2(max_char);
+			path = memget2(max_num);
 			strcpy2(&path, "/proc/");
 			strcat2(&path, pid2);
 			/* if running, then return false */
@@ -2720,7 +2727,7 @@ char *which(const char *name){
 /* create profile.conf and manager.conf files and load them to kernel if they are different */
 void create_prof()
 {
-	char *tmanf_old, *tmanf, *tmanf2, *tprof_old, *tprof, *tprof2, *res;
+	char *tmanf_old, *tmanf, *tmanf2 = 0, *tprof_old, *tprof, *tprof2, *res;
 	
 	/* check tomoyo version */
 	if (tomoyo_version() <= 2299){ tmanf = tmanf22; tprof = tprof22; }
@@ -2729,7 +2736,6 @@ void create_prof()
 	/* load manager.conf from kernel and check if it's the same what i have */
 	/* if identical, then no reload is needed */
 	tmanf_old = file_read(tmank, 1);
-	tmanf2 = memget2(max_char);
 	strcpy2(&tmanf2, tmanf);
 
 	/* add my executable too to the binary list in manager.conf */
@@ -2745,7 +2751,7 @@ void create_prof()
 	/* compare kernel manager config and mine */
 	/* reload it to kernel if they are not identical */
 	if (strcmp(tmanf2, tmanf_old)){
-		char *comm = memget2(max_char);
+		char *comm = 0;
 		/* write config to disk */
 		file_write(tman, tmanf2);
 		/* load config from disk to kernel */
@@ -2796,9 +2802,7 @@ void check_options(int argc, char **argv){
 		int flag_type = 0;
 		int flag_last = 0;
 		int c = 1;
-		char *myarg = memget2(max_char);
-		opt_info2   = memget2(max_char);
-		opt_remove2 = memget2(max_char);
+		char *myarg = 0;
 		
 		/* cycle through the arguments */
 		while (argc2--){
@@ -2857,10 +2861,8 @@ void check_options(int argc, char **argv){
 					if (!dir_exist(myarg)){
 						color_("error: no such directory: ", red); color_(myarg, red); newl(); free2(myarg); myexit(1); }
 					/* expand recursive dir names with "/" char if missing */
-					l = strlen(myarg);
+					l = strlen2(&myarg);
 					if (myarg[l-1] != '/'){ myarg[l] = '/'; myarg[l+1] = 0; }
-					/* alloc mem for dirs_recursive */
-					if (!dirs_recursive) dirs_recursive = memget2(max_char);
 					/* if so, store it in recursive dir array */
 					strcat2(&dirs_recursive, myarg);
 					strcat2(&dirs_recursive, "\n");
@@ -2871,8 +2873,6 @@ void check_options(int argc, char **argv){
 					char *res = which(myarg);
 					if(!res){
 						color_("error: no such file: ", red); color_(myarg, red); newl(); free2(myarg); myexit(1); }
-					/* alloc mem for tprogs */
-					if (!tprogs) tprogs = memget2(max_char);
 					/* if file exists, store it as extra executables */
 					strcat2(&tprogs, res);
 					strcat2(&tprogs, "\n");
@@ -2896,7 +2896,7 @@ void check_options(int argc, char **argv){
 		}
 
 		/* fail if no arguments for --remove option */
-		if (opt_remove && !opt_remove2[0]){ color_("error: bad argument\n", red); myexit(1); }
+		if (opt_remove && !strlen2(&opt_remove2)){ color_("error: bad argument\n", red); myexit(1); }
 		/* fail if no arguments for --recursive option */
 		if (opt_recursive && !dirs_recursive){ color_("error: bad argument\n", red); myexit(1); }
 
@@ -2971,12 +2971,9 @@ void check_tomoyo()
 /* clear config files */
 void clear()
 {
-	/* free up memory of configs */
-	if (tdomf) free2(tdomf);
-	if (texcf) free2(texcf);
 	/* create new configs */
-	tdomf = memget2(max_char);
-	texcf = memget2(max_char);
+	strnull2(&tdomf);
+	strnull2(&texcf);
 	strcpy2(&tdomf, "<kernel>\nuse_profile 0\n\n");
 	strcpy2(&texcf, "initialize_domain /sbin/init\n");
 	/* write config files */
@@ -3044,8 +3041,8 @@ void domain_info(const char *pattern)
 					/* exit on end of domain block */
 					if (!res2) break;
 					/* print non empty lines */
-					if (res2[0]){
-						char *h = memget2(max_char);
+					if (strlen2(&res2)){
+						char *h = 0;
 						strcpy2(&h, home);
 						strcat2(&h, "/");
 					
@@ -3086,13 +3083,7 @@ void domain_info(const char *pattern)
 	/* list domain names only */	
 	else{
 		char *tdomf2, *res, *res2, *res_temp;
-		char *texcf_new;
-		long maxl;
-		
-		/* get policy size to use it for allocating memory as a maximum value */
-		maxl = strlen(tdomf) + 1;
-
-		texcf_new = memget2(maxl);
+		char *texcf_new = 0;
 		
 		tdomf2 = tdomf;
 		while(1){
@@ -3242,12 +3233,12 @@ void domain_get_log()
 {
 	/* vars */
 	char *res, *res2, *temp, *temp2, *orig;
-	char *start, *tlogf2, *tlogf3;
-	char *rules, *prog_rules = 0;
-	char *key;
+	char *start, *tlogf2 = 0, *tlogf3 = 0;
+	char *rules = 0, *prog_rules = 0;
+	char *key = 0;
 	char key2[] = "denied for ";
 	int i, i2, l;
-	int key2_len = strlen(key2);
+	int key2_len = 11;
 
 
 	/* ------------------- */
@@ -3261,7 +3252,7 @@ void domain_get_log()
 		}
 	}
 	/* delete former log */
-	if (tlogf) free2(tlogf);
+	free2(tlogf);
 	/* read in new log */
 	tlogf = file_read(tlog, 0);
 	
@@ -3281,11 +3272,6 @@ void domain_get_log()
 			start = tlogf;
 		}
 	}
-	
-	/* alloc mem for collected log */
-	tlogf2 = memget2(max_char);
-	tlogf3 = memget2(max_char);
-	key = memget2(max_char);
 	
 	/* search for tomoyo error messages from mark */
 	/* collect access deny messages */
@@ -3330,7 +3316,9 @@ void domain_get_log()
 	free2(key);
 	
 	/* debug part to print domain deny messages if any */
-	if (tlogf3[0]) debug(tlogf3);
+	if (strlen2(&tlogf3)){
+		debug(tlogf3);
+	}
 
 	/* set mark to the last log line */
 	temp = tlogf;
@@ -3352,8 +3340,6 @@ void domain_get_log()
 		i2 = string_search_keyword(temp2 + i, "]");
 		if (i > 1 && i2 > -1){
 			/* set tmarkf to the last kernel messages time stamp */
-			if (tmarkf) free2(tmarkf);
-			tmarkf = memget2(max_char);
 			*(temp2 + i + i2 + 1) = 0;
 			strcpy2(&tmarkf, temp2 + i);
 			strlenset3(&tmarkf, i2 + 1);
@@ -3368,10 +3354,6 @@ void domain_get_log()
 	/* --------------------------------- */
 	/* ----- convert logs to rules ----- */
 	/* --------------------------------- */
-
-	/* alloc mem for prog names with rules */
-	prog_rules = memget2(max_char);
-	rules = memget2(max_char);
 
 	l = strlen("TOMOYO-ERROR: Access '");
 	temp = tlogf2;
@@ -3415,7 +3397,7 @@ void domain_get_log()
 			free2(rules);
 			myexit(1);
 		}
-		i = strlen(res2);
+		i = strlen2(&res2);
 		if (i > 0) res2[i - 1] = 0;
 		/* add all together, and rule is complete */
 		strcat2(&rules, res2);
@@ -3463,17 +3445,14 @@ void domain_get_log()
 	/* ------------------------------- */
 
 	if (prog_rules){
-		char *tdomf_new, *prog, *rule, *orig, *prog_rules_new;
+		char *tdomf_new, *prog, *rule, *orig, *prog_rules_new = 0;
 
 		/* sort and uniq rules */
 		res = string_sort_uniq_lines(prog_rules);
 		free2(prog_rules);
 		prog_rules = res;
 
-		/* alloc mem for new list of rules after confirmation */
-		prog_rules_new = memget2(max_char);
-
-		if (prog_rules[0]) color("* adding log messages to policy\n", yellow);
+		if (strlen2(&prog_rules)) color("* adding log messages to policy\n", yellow);
 
 		/* cycle through new rules and ask for confirmation to add it to domain policy */
 		temp = prog_rules;
@@ -3502,7 +3481,7 @@ void domain_get_log()
 		prog_rules = prog_rules_new;
 		
 		/* are there any new rules after confirmation? */
-		if (prog_rules[0]){
+		if (strlen2(&prog_rules)){
 
 			/* alloc mem for new domain policy */
 			tdomf_new = memget2(max_char);
@@ -3568,13 +3547,10 @@ void domain_get_log()
 void domain_print_list_not_progs()
 {
 	/* vars */
-	char *res, *res2, *list, *list2, *list3, *temp;
+	char *res, *res2, *list, *list2 = 0, *list3, *temp;
 	
 	/* get list of all domain names */
 	list = domain_get_list();
-
-	/* alloc mem for new list */
-	list2 = memget2(max_char);
 
 	/* remove entries from the list that are in tprogs too */
 	temp = list;
@@ -3587,7 +3563,6 @@ void domain_print_list_not_progs()
 			strcat2(&list2, "\n");
 			/* add domain to tprogs if not in exceptions */
 			if (string_search_line(tprogs_exc, res) == -1){
-				if (!tprogs) tprogs = memget2(max_char);
 				strcat2(&tprogs, res);
 				strcat2(&tprogs, "\n");
 			}
@@ -3599,16 +3574,15 @@ void domain_print_list_not_progs()
 	list = list2;
 	
 	/* is any element in the list? */
-	if (list[0]){
+	if (strlen2(&list)){
 		/* sort list */
 		list2 = string_sort_uniq_lines(list);
 		free2(list);
 		list = list2;
+		strnull2(&list2);
 		
 		color("* already existing main domains", green); newl();
 
-		/* alloc mem for new sorted list with filenames only */
-		list2 = memget2(max_char);
 
 		/* get list of filenames only */
 		temp = list;
@@ -3659,13 +3633,12 @@ void domain_print_mode()
 	/* cycle thorugh progs */
 	temp = tprogs;
 	while(1){
-		char *s;
+		char *s = 0;
 		
 		prog = string_get_next_line(&temp);
 		if(!prog) break;
 		
 		/* does the domain exist for the program? */
-		s = memget2(max_char);
 		strcpy2(&s, "initialize_domain ");
 		strcat2(&s, prog);
 		if (string_search_line(texcf, s) > -1){
@@ -3699,8 +3672,6 @@ void domain_print_mode()
 			strcat2(&tdomf, "<kernel> ");
 			strcat2(&tdomf, prog);
 			strcat2(&tdomf, "\nuse_profile 1\n");
-			/* alloc mem for tprogs_learn */
-			if (!tprogs_learn) tprogs_learn = memget2(max_char);
 			/* store prog name to know not to turn on enforcing mode for these ones on exit */
 			if(string_search_line(tprogs_learn, prog) == -1){
 				strcat2(&tprogs_learn, prog);
@@ -3754,27 +3725,18 @@ void domain_print_mode()
 
 /* check change of policy, and return true if changed */
 int check_policy_change(){
-	long l;
-
 	/* backup policy exists yet? if not, then copy policy */
 	if (!tdomf_bak){
-		l = strlen(tdomf) + 1;
-		/* alloc mem for backup policy */
-		tdomf_bak = memget2(l);
 		/* copy policy to backup */
-		strcat2(&tdomf_bak, tdomf);
+		strcpy2(&tdomf_bak, tdomf);
 		return 1;
 	}
 	else{
 		/* policy files match? if not, then store it */
 		if (!strcmp(tdomf_bak, tdomf)) return 0;
 		else{
-			free2(tdomf_bak);
-			l = strlen(tdomf) + 1;
-			/* alloc mem for backup policy */
-			tdomf_bak = memget2(l);
 			/* copy policy to backup */
-			strcat2(&tdomf_bak, tdomf);
+			strcpy2(&tdomf_bak, tdomf);
 			return 1;
 		}
 	}
@@ -3959,9 +3921,7 @@ int compare_rules(char *r1, char *r2)
 	type2 = string_get_next_word(&temp2);
 	/* fail if types are null */
 	if (!type1 || !type2){
-		if (type1)  free2(type1);
-		if (type2)  free2(type2);
-		return 0; }
+		free2(type1); free2(type2); return 0; }
 	/* compare types, fail if no match */
 	if (strcmp(type1, type2)){
 		free2(type1); free2(type2); return 0; }
@@ -3978,8 +3938,7 @@ int compare_rules(char *r1, char *r2)
 	rule2b = string_get_next_word(&temp2);
 	/* fail if no first path in param 2 */
 	if (!rule2a){
-		free2(type1); free2(type2); free2(rule1a);
-		if (rule1b) free2(rule1b);
+		free2(type1); free2(type2); free2(rule1a); free2(rule1b);
 		return 0;
 	}
 	/* second params exist too */
@@ -3990,8 +3949,7 @@ int compare_rules(char *r1, char *r2)
 	/* first params */
 	if (!compare_paths(rule1a, rule2a)){
 		free2(type1); free2(type2); free2(rule1a); free2(rule2a);
-		if (rule1b) free2(rule1b);
-		if (rule2b) free2(rule2b);
+		free2(rule1b); free2(rule2b);
 		return 0;
 	}
 	if (flag_double > 1){
@@ -4008,8 +3966,8 @@ int compare_rules(char *r1, char *r2)
 	free2(type2);
 	free2(rule1a);
 	free2(rule2a);
-	if (rule1b) free2(rule1b);
-	if (rule2b) free2(rule2b);
+	free2(rule1b);
+	free2(rule2b);
 
 	return 1;
 }
@@ -4146,9 +4104,9 @@ char *get_rules_with_recursive_dirs(char *rule)
 
 	/* return null if no match */	
 	if (!count1 && !count2){
-		if(type)  free2(type);
-		if(path1) free2(path1);
-		if(path2) free2(path2);
+		free2(type);
+		free2(path1);
+		free2(path2);
 		free2(path_new1);
 		free2(path_new2);
 		return 0;
@@ -4280,9 +4238,9 @@ char *get_rules_with_recursive_dirs(char *rule)
 		}
 	}
 	
-	if(type)  free2(type);
-	if(path1) free2(path1);
-	if(path2) free2(path2);
+	free2(type);
+	free2(path1);
+	free2(path2);
 	free2(path_new1);
 	free2(path_new2);
 
@@ -4308,7 +4266,7 @@ char *domain_sort_uniq_rules(char *rules)
 	while(1){
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		l1 = strlen(res);
+		l1 = strlen2(&res);
 		
 		/* compare rule to all rules */
 		i2 = 0;
@@ -4322,12 +4280,12 @@ char *domain_sort_uniq_rules(char *rules)
 				
 				/* compare rules containing wildcard */
 				if (compare_rules(res, res2)){
-					l2 = strlen(res2);
+					l2 = strlen2(&res2);
 					if (l1 < l2){ strcpy2(&old, res); lo = l1; }
 					else        { strcpy2(&old, res2); lo = l2; }
 					/* if match, store only the shortest one from the matching ones */
-					ln = strlen(new);
-					if ((!new[0]) || (ln > lo)) strcpy2(&new, old);
+					ln = strlen2(&new);
+					if ((!ln) || (ln > lo)) strcpy2(&new, old);
 				}
 
 				free2(res2);
@@ -4336,7 +4294,7 @@ char *domain_sort_uniq_rules(char *rules)
 		}
 
 		/* store the shorter matched rule if there was any match */
-		if (new[0]){
+		if (strlen2(&new)){
 			strcat2(&rules_new, new);
 			strcat2(&rules_new, "\n");
 		}
@@ -4403,7 +4361,7 @@ void domain_cleanup()
 					res2 = string_get_next_line(&temp2);
 					if (!res2) break;
 					/* add none-empty rule line */
-					if (res2[0]){
+					if (strlen2(&res2)){
 						strcat2(&rules, res2);
 						strcat2(&rules, "\n");
 					}
@@ -4468,9 +4426,7 @@ void domain_cleanup()
 							if (c > 1){
 								rules2 = domain_sort_uniq_rules(rules);
 								free2(rules);
-								rules = memget2(max_char);
-								strcpy2(&rules, rules2);
-								free2(rules2);
+								rules = rules2;
 							}
 							/* add rules to new policy */
 							strcat2(&rules_temp, rules);
@@ -4517,9 +4473,7 @@ void domain_cleanup()
 									if (c > 1){
 										rules2 = domain_sort_uniq_rules(rules);
 										free2(rules);
-										rules = memget2(max_char);
-										strcpy2(&rules, rules2);
-										free2(rules2);
+										rules = rules2;
 									}
 									/* add rules to new temp policy */
 									strcat2(&rules_temp, rules);
@@ -4697,7 +4651,6 @@ void check_exceptions()
 	/* if not, get shell names from defined list */
 	else{
 		int i = 0;
-		tshellf = memget2(max_char);
 		while(1){
 			char *res = tshellf2[i++];
 			if (!res) break;
@@ -4706,23 +4659,22 @@ void check_exceptions()
 		}
 	}
 	
-	/* alloc mem for program exceptions */
-	if (!tprogs_exc) tprogs_exc = memget2(max_char);
-	
 	/* add shells to exceptions */
-	temp = tshellf;
-	while(1){
-		res = string_get_next_line(&temp);
-		if (!res) break;
-		/* if line doesn't start with "#" char meaning a remark */
-		if (res[0] != '#'){
-			/* add it only if it exists */
-			if (file_exist(res)){
-				strcat2(&tprogs_exc, res);
-				strcat2(&tprogs_exc, "\n");
+	if (strlen2(&tshellf)){
+		temp = tshellf;
+		while(1){
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			/* if line doesn't start with "#" char meaning a remark */
+			if (res[0] != '#'){
+				/* add it only if it exists */
+				if (file_exist(res)){
+					strcat2(&tprogs_exc, res);
+					strcat2(&tprogs_exc, "\n");
+				}
 			}
+			free2(res);
 		}
-		free2(res);
 	}
 
 	/* add manual programs to exceptions */
@@ -4748,13 +4700,11 @@ void check_exceptions()
 	}
 
 	/* sort program list */
-	if (tprogs){
+	if (strlen2(&tprogs)){
 		res = string_sort_uniq_lines(tprogs);
-		free2(tprogs);
 		/* realloc more mem above the sorted list to expand it later */
-		tprogs = memget2(max_char);
-		strcpy2(&tprogs, res);
-		free2(res);
+		free2(tprogs);
+		tprogs = res;
 	}
 
 	/* initialize recursive dirs' depth and sub values */
@@ -4872,7 +4822,7 @@ void check_processes()
 			mypid = memget2(max_num);
 			strcpy2(&mypid, mydir_entry->d_name);
 			/* does it contain numbers only meaning they are pids? */
-			if (strspn(mypid, "0123456789") == strlen(mypid)) {
+			if (strspn(mypid, "0123456789") == strlen2(&mypid)) {
 				char *mydir_name;
 				/* create dirname like /proc/pid/exe */
 				mydir_name = memget2(max_char);
@@ -4908,8 +4858,6 @@ void check_processes()
 								if (string_search_keyword(mysock, "socket:") > -1){
 									/* is the inode number in netf3's list? */
 									if (string_search_line(netf3, mysock) > -1){
-										/* alloc mem for list if not created yet */
-										if (!tprogs) tprogs = memget2(max_char);
 										/* is it in my progs list yet? */
 										if (string_search_line(tprogs, myprog) == -1 && string_search_line(tprogs_exc, myprog) == -1){
 											strcat2(&tprogs, myprog);
