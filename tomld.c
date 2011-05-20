@@ -2654,7 +2654,7 @@ int check_instance(){
 			strcpy2(&path, "/proc/");
 			strcat2(&path, pid2);
 			/* if running, then return false */
-			if (dir_exist(path)){ free2(mypid); free2(pid2); free2(path); return 1; }
+			if (dir_exist(path)){ free2(mypid); free2(pid2); free2(path); return 0; }
 			/* if not running, then overwrite pid number in pid file */
 			else{
 				file_write(tpid, mypid);
@@ -4863,7 +4863,7 @@ void check_processes()
 										if (string_search_line(tprogs, myprog) == -1 && string_search_line(tprogs_exc, myprog) == -1){
 											strcat2(&tprogs, myprog);
 											strcat2(&tprogs, "\n");
-											color(myprog, blue); newl();
+											if (flag_firstrun){ color(myprog, blue); newl(); }
 										}
 									}
 								}
