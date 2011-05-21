@@ -4550,6 +4550,7 @@ void domain_reshape_rules_recursive_dirs()
 				free2(res2);
 				
 				/* cycle through the rules */
+				strnull2(&rules);
 				while(1){
 					/* get next rule */
 					res2 = string_get_next_line(&temp2);
