@@ -2013,8 +2013,7 @@ int choice(const char *text)
 	char c = 0, c2;
 	if (opt_yes){
 		printf(text);
-		printf(" (y)");
-		newl();
+		printf(" (y)\n");
 	}
 	else{
 		printf(text);
@@ -2039,7 +2038,7 @@ char *pipe_read(const char *comm, long length)
 	FILE *p = popen(comm, "r");
 	if (!p){
 		color_("error: cannot open pipe for command: ", red);
-		color_(comm, red); newl();
+		color_(comm, red); newl_();
 		myexit(1);
 	}
 	
@@ -2064,7 +2063,7 @@ void pipe_write(const char *comm, const char *buff)
 	FILE *p = popen(comm, "w");
 	if (!p){
 		color_("error: cannot open pipe for command: ", red);
-		color_(comm, red); newl();
+		color_(comm, red); newl_();
 		myexit(1);
 	}
 	
@@ -2085,7 +2084,7 @@ char *file_read(const char *name, long length)
 	FILE *f = fopen(name, "r");
 	if (!f){
 		color_("error: cannot read file ", red);
-		color_(name, red); newl();
+		color_(name, red); newl_();
 		myexit(1);
 	}
 	/* check file length */
@@ -2119,7 +2118,7 @@ char *file_read(const char *name, long length)
 	
 	if (len < 1){
 		color_("error: cannot read file ", red);
-		color_(name, red); newl();
+		color_(name, red); newl_();
 		myexit(1);
 	}
 
@@ -2143,7 +2142,7 @@ void file_write(const char *name, const char *buff)
 	FILE *f = fopen(name, "w");
 	if (!f){
 		color_("error: cannot write file ", red);
-		color_(name, red); newl();
+		color_(name, red); newl_();
 		myexit(1);
 	}
 	/* write contents if not null */
@@ -2950,7 +2949,7 @@ void check_tomoyo()
 	}
 	free2(cmd);
 
-	color_("tomoyo kernel mode is active\n", clr);
+	color("tomoyo kernel mode is active\n", clr);
 	
 	/* check tomoyo version */
 	tver = tomoyo_version();
@@ -3073,9 +3072,9 @@ void domain_info(const char *pattern)
 		if (count){
 			char *res = string_itos(count);
 			newl();
-			color_("(found ", clr); color_(res, clr);
-			if (count == 1) color_(" domain)\n", clr);
-			else            color_(" domains)\n", clr);
+			color("(found ", clr); color(res, clr);
+			if (count == 1) color(" domain)\n", clr);
+			else            color(" domains)\n", clr);
 			free2(res);
 		}
 		else color_("error: no domains found\n", red);
@@ -3107,7 +3106,7 @@ void domain_info(const char *pattern)
 		}
 		
 		res = string_sort_uniq_lines(texcf_new);
-		newl_(); color(res, blue); newl();
+		newl(); color(res, blue); newl();
 		free2(res);
 		free2(texcf_new);
 	}
@@ -3153,9 +3152,9 @@ void domain_remove(const char *pattern)
 		if (count){
 			char *res = string_itos(count);
 			newl();
-			color_("(found ", clr); color_(res, clr);
-			if (count == 1) color_(" domain)\n", clr);
-			else            color_(" domains)\n", clr);
+			color("(found ", clr); color(res, clr);
+			if (count == 1) color(" domain)\n", clr);
+			else            color(" domains)\n", clr);
 			free2(res);
 			
 			/* alloc mem for new domain policy */
@@ -3683,7 +3682,7 @@ void domain_print_list_not_progs()
 		list = list2;
 		strnull2(&list2);
 		
-		color("* already existing main domains", green); newl();
+		color("* already existing main domains\n", green);
 
 
 		/* get list of filenames only */
@@ -4863,7 +4862,7 @@ void check_processes()
 		}
 		
 		/* check processes using network */
-		color("* new processes using network", green); newl();
+		color("* new processes using network\n", green);
 	}
 
 	count2 = 0;
@@ -5058,7 +5057,7 @@ int main(int argc, char **argv){
 	/* ---------------- */
 
 	/* print version info */
-	color_("tomld (tomoyo learning daemon) ", clr); color_(ver, clr); newl_();
+	color("tomld (tomoyo learning daemon) ", clr); color(ver, clr); newl();
 	
 	/* store kernel version */
 	flag_kernel_version = kernel_version();
@@ -5139,7 +5138,7 @@ int main(int argc, char **argv){
 				color("* whole running cycle took ", green);
 				printf("%.2fs\n", mytime());
 				if (!opt_once){
-					color("(press q to quit)", red); newl();
+					color("(press q to quit)\n", red);
 				}
 			}
 
