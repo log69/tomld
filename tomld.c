@@ -3713,19 +3713,18 @@ void domain_print_list_not_progs()
 	
 	free2(list);
 	list = list2;
-	
+
 	/* is any element in the list? */
 	if (strlen2(&list)){
 		/* sort list */
 		list2 = string_sort_uniq_lines(list);
 		free2(list);
 		list = list2;
-		strnull2(&list2);
-		
+
 		color("* already existing main domains\n", green);
 
-
 		/* get list of filenames only */
+		list2 = 0;
 		temp = list;
 		while(1){
 			res = string_get_next_line(&temp);
@@ -4011,6 +4010,8 @@ int compare_paths(char *path1, char *path2)
 						color("error: unexpected wildcard usage in domain rules\n", red);
 						myexit(1);
 					}
+					/* fail if null */
+					if (!c2) return 0;
 					/* if already standing on a "/" char, then ok and continue */
 					if (c2 != '/'){
 						/* else jump to next "/" */
@@ -4027,6 +4028,8 @@ int compare_paths(char *path1, char *path2)
 						color("error: unexpected wildcard usage in domain rules\n", red);
 						myexit(1);
 					}
+					/* fail if null */
+					if (!c1) return 0;
 					/* if already standing on a "/" char, then ok and continue */
 					if (c1 != '/'){
 						/* else jump to next "/" */
