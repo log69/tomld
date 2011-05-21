@@ -3115,9 +3115,110 @@ void domain_info(const char *pattern)
 
 
 /* remove domains by a pattern */
-void domain_remove(const char *text)
+void domain_remove(const char *pattern)
 {
-	debug(text);
+	/* load config files from kernel memory */
+	load();
+
+	/* is there any pattern? */
+	if (pattern[0]){
+		char *res, *res2, *temp, *temp2;
+		char *tdomf_new;
+		int i;
+		int count = 0;
+		int count2 = 0;
+
+		/* count matching domains */
+		temp = tdomf;
+		while(1){
+			/* get next domain */
+			res = domain_get_next(&temp);
+			/* exit on end */
+			if (!res) break;
+
+			/* get full domain name */
+			temp2 = res;
+			res2 = string_get_next_line(&temp2);
+			if (res2){
+				/* search for a keyword */
+				i = string_search_keyword(res2, pattern);
+				/* count domain if match */
+				if (i > -1) count++;
+				free2(res2);
+			}
+			free2(res);
+		}
+		
+		/* print summary */
+		if (count){
+			char *res = string_itos(count);
+			newl();
+			color_("(found ", clr); color_(res, clr);
+			if (count == 1) color_(" domain)\n", clr);
+			else            color_(" domains)\n", clr);
+			free2(res);
+			
+			/* alloc mem for new domain policy */
+			tdomf_new = memget2(max_char);
+			
+			temp = tdomf;
+			while(1){
+				/* get next domain */
+				res = domain_get_next(&temp);
+				/* exit on end */
+				if (!res) break;
+
+				/* get full domain name */
+				temp2 = res;
+				res2 = string_get_next_line(&temp2);
+				if (res2){
+					/* search for a keyword */
+					i = string_search_keyword(res2, pattern);
+					/* remove domain if match */
+					if (i > -1){
+						/* print info */
+						color(res2, blue);
+						color("  ", clr);
+						if (!choice("remove domain?")){
+							/* add domain if answer is no */
+							strcat2(&tdomf_new, res);
+							strcat2(&tdomf_new, "\n");
+						}
+						/* count for remove */
+						else count2++;
+					}
+					/* add domain to new policy if no match */
+					else{
+						strcat2(&tdomf_new, res);
+						strcat2(&tdomf_new, "\n");
+					}
+					free2(res2);
+				}
+				free2(res);
+			}
+			
+			/* replace old policy with new one */
+			free2(tdomf);
+			tdomf = tdomf_new;
+
+			/* print info */			
+			if (count2 > 0){
+				if (count2 == 1) color("1 domain removed\n\n", red);
+				else{
+					char *s = string_itos(count2);
+					color(s, red);
+					color(" domains removed\n\n", red);
+					free2(s);
+				}
+
+				/* reload and save new policy */
+				reload();
+				save();
+			}
+			else color("no domain was removed\n\n", green);
+		}
+		else color_("error: no domains found\n", red);
+	}
 }
 
 
