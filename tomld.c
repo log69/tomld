@@ -1340,6 +1340,31 @@ int string_search_line(const char *text, const char *line)
 }
 
 
+/* remove a whole line from a string and return the result */
+/* returned value must be freed by caller */
+char *string_remove_line(char *text, const char *line)
+{
+	char *res, *temp;
+	char *text_new = memget2(strlen(text));
+	
+	temp = text;
+	while(1){
+		/* get next line */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		/* compare it */
+		if (strcmp(res, line)){
+			/* add line to new string if no match */
+			strcat2(&text_new, res);
+			strcat2(&text_new, "\n");
+		}
+	}
+
+	/* return result */
+	return text_new;
+}
+
+
 /* compare strings for qsort */ 
 int string_cmp(const void *a, const void *b) 
 { 
@@ -3121,8 +3146,8 @@ void domain_remove(const char *pattern)
 
 	/* is there any pattern? */
 	if (pattern[0]){
-		char *res, *res2, *temp, *temp2;
-		char *tdomf_new;
+		char *res, *res2, *res3, *temp, *temp2, *temp3;
+		char *tdomf_new, *texcf_new;
 		int i;
 		int count = 0;
 		int count2 = 0;
@@ -3183,8 +3208,23 @@ void domain_remove(const char *pattern)
 							strcat2(&tdomf_new, res);
 							strcat2(&tdomf_new, "\n");
 						}
-						/* count for remove */
-						else count2++;
+						else{
+							char *s = 0;
+							/* count for remove */
+							count2++;
+							/* remove domain from exception policy too */
+							/* get main domain name */
+							temp3 = res2;
+							res3 = string_get_next_wordn(&temp3, 1);
+							/* create domain entry */
+							strcpy2(&s, "initialize_domain ");
+							strcat2(&s, res3);
+							/* remove domain entry from exception policy */
+							texcf_new = string_remove_line(texcf, s);
+							free2(texcf); texcf = texcf_new;
+							free2(res3);
+							free2(s);
+						}
 					}
 					/* add domain to new policy if no match */
 					else{
