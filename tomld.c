@@ -336,6 +336,8 @@ char *tshellf2[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbas
 
 char *path_bin[] = {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin", 0};
 
+char *spec_exception[] = {"/etc/", "/home/\\*/", "/root/", 0};
+
 /* other vars */
 struct termio terminal_backup;
 
@@ -718,7 +720,7 @@ void strcpy2(char **s1, const char *s2)
 	if (size < l2){
 		/* new mem */
 		char *s3 = memget2(l2 * 2);
-		free2((*s1));
+		free2(*s1);
 		*s1 = s3;
 		p2 = (unsigned long*)(*s1);
 	}
@@ -754,7 +756,7 @@ void strcat2(char **s1, const char *s2)
 		unsigned long l4 = l1 + 1;
 		/* copy old string */
 		while(l4--) s3[l4] = (*s1)[l4];
-		free2((*s1));
+		free2(*s1);
 		*s1 = s3;
 		p2 = (unsigned long*)(*s1);
 	}
@@ -1262,6 +1264,20 @@ int string_search_keyword_first(const char *text, const char *key)
 		if (!c2) return 1;
 		if (!c1 || c1 != c2) return 0;
 		i++;
+	}
+}
+
+
+/* search for a keyword in an array and return pointer to it */
+/* return 0 on fail */
+char *array_search_keyword(char **array, const char *key)
+{
+	char *ptr;
+	
+	while(1){
+		ptr = *(array++);
+		if (!ptr) return 0;
+		if (!strcmp(ptr, key)) return ptr;
 	}
 }
 
@@ -3373,7 +3389,7 @@ void domain_set_enforce_old()
 void domain_get_log()
 {
 	/* vars */
-	char *res, *res2, *temp, *temp2, *orig;
+	char *res, *res2, *temp, *temp2, *orig, *dlist;
 	char *start, *tlogf2 = 0, *tlogf3 = 0;
 	char *rules = 0, *prog_rules = 0;
 	char *key = 0;
@@ -3496,6 +3512,9 @@ void domain_get_log()
 	/* ----- convert logs to rules ----- */
 	/* --------------------------------- */
 
+	/* get list of all subdomains, so later i add those rules only whose domains exist */
+	dlist = domain_get_list();
+
 	l = strlen("TOMOYO-ERROR: Access '");
 	temp = tlogf2;
 	while(1){
@@ -3539,6 +3558,7 @@ void domain_get_log()
 			myexit(1);
 		}
 		i = strlen2(&res2);
+		/* remove single quote from the end of param text */
 		if (i > 0) res2[i - 1] = 0;
 		/* add all together, and rule is complete */
 		strcat2(&rules, res2);
@@ -3569,17 +3589,21 @@ void domain_get_log()
 			free2(rules);
 			myexit(1);
 		}
-		/* create text for sorting in a format like "binary allow_ rule" */
-		strcat2(&prog_rules, res2);
-		strcat2(&prog_rules, " ");
-		strcat2(&prog_rules, rules);
-		strcat2(&prog_rules, "\n");
-		free2(res2);
-
+		/* add rule to list only if binary name belongs to an existing domain */
+		if (string_search_line(dlist, res2) > -1){
+			/* create text for sorting in a format like "binary allow_ rule" */
+			strcat2(&prog_rules, res2);
+			strcat2(&prog_rules, " ");
+			strcat2(&prog_rules, rules);
+			strcat2(&prog_rules, "\n");
+			free2(res2);
+		}
 		
 		free2(res);
 	}
 
+	free2(dlist);
+	
 
 	/* ------------------------------- */
 	/* ----- add rules to policy ----- */
@@ -4114,6 +4138,34 @@ int compare_rules(char *r1, char *r2)
 	free2(rule2b);
 
 	return 1;
+}
+
+
+/* add dir to a list of dirs if it doesn't contain it yet and return new list */
+/* returned value must be freed by caller */
+char *path_add_dir_to_list_uniq(char *list, char *dir)
+{
+	char *res, *temp, *new = 0;
+	int flag = 0;
+
+	/* copy old list */
+	strcpy2(&new, list);
+
+	/* search for the dir in the list by wildcarded compare */
+	temp = new;
+	while(1){
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		if (compare_paths(res, dir)){ flag = 1; free2(res); break; }
+		free2(res);
+	}
+	/* add dir to list if it doesn't contain it yet*/
+	if (!flag){
+		strcat2(&new, dir);
+		strcat2(&new, "\n");
+	}
+	
+	return new;
 }
 
 
@@ -4734,12 +4786,123 @@ void domain_reshape_rules_recursive_dirs()
 }
 
 
+/* the spec predefined dirs and those dirs that have files
+ * newly created in them will be wildcarded */
+void domain_reshape_rules_wildcard_spec()
+{
+	/* vars */
+	char *res, *res2, *temp, *temp2;
+	char *rule_type, *param1, *param2;
+
+	/* there are 2 runs: first is to collect all the dir names that have create entries
+	 * second run is to make all entries containing the former ones wildcarded
+	 * and do this overall because it cannot be known if one non-unique filname will be reused
+	 * by other processes */
+	char *spec2 = 0;
+	char *spec3 = 0;
+
+	/* these are the special create entries, where the place of the file will be wildcarded
+	 * because it cannot be determined fully yet if the file being created has a unique filename
+	 * or a constantly changing one (temporary name) */
+	char *cre[] = {"allow_create", "allow_mksock", "allow_rename", "allow_unlink",
+	               "allow_mkdir", "allow_link", 0};
+
+	/* allow_mkdir will also have a special handling, cause usually files are created in the
+	 * new dir too, and it cannot be surely told if the dir itself has a unique name too,
+	 * so this exact dir should be wildcarded too with the files in it */
+	char *cre2[] = {"allow_mkdir", 0};
+	
+	/* cycle through rules of all domains and collect more special dirs (that will be wildcarded) */
+	temp = tdomf;
+	while(1){
+		/* get next rule */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		/* is it a rule starting with "allow_" tag? */
+		if (string_search_keyword_first(res, "allow_")){
+
+			/* get rule type */
+			temp2 = res;
+			rule_type = string_get_next_word(&temp2);
+			if (rule_type){
+
+				char *pdir1 = 0, *pdir2 = 0;
+
+				/* get params and their parent dirs */
+				param1 = string_get_next_word(&temp2);
+				param2 = string_get_next_word(&temp2);
+				if (param1) pdir1 = path_get_parent_dir(param1);
+				if (param2) pdir2 = path_get_parent_dir(param2);
+
+				/* ************************************** */
+				/* check if rule is a special create rule */
+				/* ************************************** */
+				if(array_search_keyword(cre, rule_type)){
+
+					/* are there any parameters (more words)? */
+					if (param1){
+						/* get the dir name only (cannot be root dir /) */
+						res2 = path_add_dir_to_list_uniq(spec2, pdir1);
+						free2(spec2); spec2 = res2;
+					}
+
+					/* are there any parameters (more words)? */
+					if (param2){
+						/* get the dir name only (cannot be root dir /) */
+						res2 = path_add_dir_to_list_uniq(spec2, pdir2);
+						free2(spec2); spec2 = res2;
+					}
+				}
+				
+				/* ************************************** */
+				/* check if rule is a special create rule */
+				/* ************************************** */
+				if(array_search_keyword(cre2, rule_type)){
+
+					/* are there any parameters (more words)? */
+					if (param1){
+						/* get the dir name only (cannot be root dir /) */
+						res2 = path_add_dir_to_list_uniq(spec3, pdir1);
+						free2(spec2); spec3 = res2;
+					}
+
+					/* are there any parameters (more words)? */
+					if (param2){
+						/* get the dir name only (cannot be root dir /) */
+						res2 = path_add_dir_to_list_uniq(spec3, pdir2);
+						free2(spec2); spec3 = res2;
+					}
+				}
+				
+				free2(pdir1);
+				free2(pdir2);
+				free2(param1);
+				free2(param2);
+				free2(rule_type);
+			}
+		}
+		free2(res);
+	}
+
+
+debug(spec2);
+debug(spec3);
+	free2(spec2);
+	free2(spec3);
+}
+
+
 /* rehsape rules */
 void domain_reshape_rules()
 {
 	domain_cleanup();
 	
 	domain_reshape_rules_recursive_dirs();
+
+	domain_cleanup();
+	
+	domain_reshape_rules_wildcard_spec();
 
 	domain_cleanup();
 }
@@ -5078,7 +5241,7 @@ void statistics()
 int main(int argc, char **argv){
 
 	float t, t_start;
-	
+
 	/* store start time */
 	t_start = mytime();
 
