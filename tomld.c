@@ -337,6 +337,9 @@ char *tshellf2[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbas
 char *path_bin[] = {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin", 0};
 
 char *spec_exception[] = {"/etc/", "/home/\\*/", "/root/", 0};
+char *spec[] = {"/home/\\{\\*\\}", "/usr/share/\\{\\*\\}", "/etc/fonts/\\{\\*\\}", "/var/cache/\\{\\*\\}", 0};
+char *spec_ex = 0;
+char *spec1 = 0;
 
 /* other vars */
 struct termio terminal_backup;
@@ -486,6 +489,8 @@ void myfree()
 	free2(tmarkf);
 	free2(tlogf);
 	free2(tdomf_bak);
+	free2(spec_ex);
+	free2(spec1);
 }
 
 
@@ -1268,6 +1273,24 @@ int string_search_keyword_first(const char *text, const char *key)
 }
 
 
+/* copy the elements of the array to a string list and return the string */
+/* returned value must be freed by caller */
+char *array_copy_to_string_list(char **array)
+{
+	char *new = 0;
+	char *ptr;
+	
+	while(1){
+		ptr = *(array++);
+		if (!ptr) break;
+		strcat2(&new, ptr);
+		strcat2(&new, "\n");
+	}
+	
+	return new;
+}
+
+
 /* search for a keyword in an array and return pointer to it */
 /* return 0 on fail */
 char *array_search_keyword(char **array, const char *key)
@@ -1515,6 +1538,27 @@ int path_is_dir(const char *path)
 	long l = strlen(path);
 	if (!l) return 0;
 	if (path[l - 1] == '/') return 1;
+	return 0;
+}
+
+
+/* return true if path of dir ends with recursive wildcard */
+int path_is_dir_recursive_wildcard(const char *path)
+{
+	char *s = 0;
+	long l1 = strlen(path);
+	long l2;
+
+	/* create full wildcard path */
+	strcpy2(&s, "/");
+	strcat2(&s, wildcard_recursive_dir);
+	l2 = strlen2(&s);
+	
+	/* compare only the end of path */
+	if (l2 > l1) return 0;
+	if (!strcmp(s, path + l1 - l2)){ free2(s); return 1; }
+
+	free2(s);
 	return 0;
 }
 
@@ -3917,6 +3961,8 @@ int compare_paths(char *path1, char *path2)
 	char c1, c2, c1_old, c2_old, c1_new, c2_new;
 	int i1, i2, wlen;
 	
+	if (!path1 || !path2) return 0;
+	
 	c1 = path1[0];
 	c2 = path2[0];
 	
@@ -4166,6 +4212,22 @@ char *path_add_dir_to_list_uniq(char *list, char *dir)
 	}
 	
 	return new;
+}
+
+
+/* search for dir in a list of dirs and return true on match */
+int path_search_dir_in_list(char *list, char *dir)
+{
+	char *res, *temp;
+
+	/* search for the dir in the list by wildcarded compare */
+	temp = list;
+	while(1){
+		res = string_get_next_line(&temp);
+		if (!res) return 0;
+		if (compare_paths(res, dir)){ free2(res); return 1; }
+		free2(res);
+	}
 }
 
 
@@ -4793,6 +4855,7 @@ void domain_reshape_rules_wildcard_spec()
 	/* vars */
 	char *res, *res2, *temp, *temp2;
 	char *rule_type, *param1, *param2;
+	char *tdomf_new;
 
 	/* there are 2 runs: first is to collect all the dir names that have create entries
 	 * second run is to make all entries containing the former ones wildcarded
@@ -4812,7 +4875,88 @@ void domain_reshape_rules_wildcard_spec()
 	 * so this exact dir should be wildcarded too with the files in it */
 	char *cre2[] = {"allow_mkdir", 0};
 	
+	/* initialize special dir lists */
+	if (!spec_ex) spec_ex = array_copy_to_string_list(spec_exception);
+	if (!spec1)   spec1   = array_copy_to_string_list(spec);
+
 	/* cycle through rules of all domains and collect more special dirs (that will be wildcarded) */
+	temp = tdomf;
+	while(1){
+		/* get next rule */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		/* is it a rule starting with "allow_" tag? */
+		if (string_search_keyword_first(res, "allow_")){
+
+			/* get rule type */
+			temp2 = res;
+			rule_type = string_get_next_word(&temp2);
+			if (rule_type){
+
+				char *pdir1 = 0, *pdir2 = 0;
+
+				/* get params */
+				param1 = string_get_next_word(&temp2);
+				param2 = string_get_next_word(&temp2);
+				/* get their parent dirs only (cannot be root dir /) */
+				if (param1) pdir1 = path_get_parent_dir(param1);
+				if (param2) pdir2 = path_get_parent_dir(param2);
+
+				/* ************************************** */
+				/* check if rule is a special create rule */
+				/* ************************************** */
+				if(array_search_keyword(cre, rule_type)){
+
+					/* are there any parameters (more words)? */
+					if (param1){
+						/* add dir to the list if not there yet */
+						res2 = path_add_dir_to_list_uniq(spec2, pdir1);
+						free2(spec2); spec2 = res2;
+					}
+
+					/* are there any parameters (more words)? */
+					if (param2){
+						/* add dir to the list if not there yet */
+						res2 = path_add_dir_to_list_uniq(spec2, pdir2);
+						free2(spec2); spec2 = res2;
+					}
+				}
+				
+				/* ************************************* */
+				/* check if rule is a special mkdir rule */
+				/* ************************************* */
+				if(array_search_keyword(cre2, rule_type)){
+
+					/* are there any parameters (more words)? */
+					if (param1){
+						/* add dir to the list if not there yet */
+						res2 = path_add_dir_to_list_uniq(spec3, pdir1);
+						free2(spec2); spec3 = res2;
+					}
+
+					/* are there any parameters (more words)? */
+					if (param2){
+						/* add dir to the list if not there yet */
+						res2 = path_add_dir_to_list_uniq(spec3, pdir2);
+						free2(spec2); spec3 = res2;
+					}
+				}
+				
+				free2(pdir1);
+				free2(pdir2);
+				free2(param1);
+				free2(param2);
+				free2(rule_type);
+			}
+		}
+		free2(res);
+	}
+
+	/* alloc mem for new policy */
+	tdomf_new = memget2(max_char);
+
+	/* cycle through rules of all domains and reshape them */
 	temp = tdomf;
 	while(1){
 		/* get next rule */
@@ -4835,45 +4979,91 @@ void domain_reshape_rules_wildcard_spec()
 				if (param1) pdir1 = path_get_parent_dir(param1);
 				if (param2) pdir2 = path_get_parent_dir(param2);
 
+				/* handle some of the special allow_ entries differently whose parameters are not dirs */
 				/* ************************************** */
-				/* check if rule is a special create rule */
+				/* check if rule is an "allow_ioctl" rule */
 				/* ************************************** */
-				if(array_search_keyword(cre, rule_type)){
+				if(string_search_keyword_first(rule_type, "allow_ioctl")){
 
-					/* are there any parameters (more words)? */
+					/* add rule to new policy */
+					strcat2(&tdomf_new, rule_type);
+
+					/* param1 */
 					if (param1){
-						/* get the dir name only (cannot be root dir /) */
-						res2 = path_add_dir_to_list_uniq(spec2, pdir1);
-						free2(spec2); spec2 = res2;
+						/* check for socket param */
+						if (string_search_keyword_first(param1, "socket:[")){
+							/* wildcard socket param */
+							strcpy2(&param1, "socket:[\\*]");
+						}
+						
+						/* add param1 to new policy */
+						strcat2(&tdomf_new, " ");
+						strcat2(&tdomf_new, param1);
 					}
 
-					/* are there any parameters (more words)? */
+					/* param2 */
 					if (param2){
-						/* get the dir name only (cannot be root dir /) */
-						res2 = path_add_dir_to_list_uniq(spec2, pdir2);
-						free2(spec2); spec2 = res2;
+						/* wildcard socket param */
+						strcpy2(&param2, "0x0000-0xFFFF");
+
+						/* add param2 to new policy */
+						strcat2(&tdomf_new, " ");
+						strcat2(&tdomf_new, param2);
+					}
+
+					/* new lin in new policy */
+					strcat2(&tdomf_new, "\n");
+				}
+
+				/* *************************** */
+				/* handle params that are dirs */
+				/* *************************** */
+				else{
+					/* cycle through the 2 params */
+					int c = 0;
+					while(++c <= 2){
+						int flag    = 0;
+						int flag3   = 0;
+						int flag_ex = 0;
+						
+						char *param = 0;
+						char *rule2 = 0;
+						/* set param to 1 and after 2 */
+						if (c == 1) param = param1;
+						if (c == 2) param = param2;
+						if (param){
+
+							/* check dir in exception */
+							if (path_search_dir_in_list(spec_ex, param)) flag_ex = 1;
+							
+							/* is it in spec? */
+							if (!flag_ex){
+								if (path_search_dir_in_list(spec1, param)) flag = 1;
+							}
+
+							/* is it in spec2? */
+							if (!flag_ex){
+								if (!flag){
+									if (path_search_dir_in_list(spec2, param)) flag = 1;
+								}
+							}
+
+							/* is it in spec3? */
+							if (!flag_ex){
+								if (path_search_dir_in_list(spec3, param)) flag3 = 1;
+							}
+							
+							/* path is in spec or spec2 */
+							if (flag){
+								if (!path_is_dir_recursive_wildcard(param)){
+									
+								}
+							}
+							
+						}
 					}
 				}
 				
-				/* ************************************** */
-				/* check if rule is a special create rule */
-				/* ************************************** */
-				if(array_search_keyword(cre2, rule_type)){
-
-					/* are there any parameters (more words)? */
-					if (param1){
-						/* get the dir name only (cannot be root dir /) */
-						res2 = path_add_dir_to_list_uniq(spec3, pdir1);
-						free2(spec2); spec3 = res2;
-					}
-
-					/* are there any parameters (more words)? */
-					if (param2){
-						/* get the dir name only (cannot be root dir /) */
-						res2 = path_add_dir_to_list_uniq(spec3, pdir2);
-						free2(spec2); spec3 = res2;
-					}
-				}
 				
 				free2(pdir1);
 				free2(pdir2);
@@ -4882,6 +5072,13 @@ void domain_reshape_rules_wildcard_spec()
 				free2(rule_type);
 			}
 		}
+		
+		/* add line to new policy if not a rule */
+		else{
+			strcat2(&tdomf_new, res);
+			strcat2(&tdomf_new, "\n");
+		}
+		
 		free2(res);
 	}
 
@@ -4890,6 +5087,9 @@ debug(spec2);
 debug(spec3);
 	free2(spec2);
 	free2(spec3);
+	
+/*	free2(tdomf);
+	tdomf = tdomf_new;*/
 }
 
 
