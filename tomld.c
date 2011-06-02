@@ -1273,6 +1273,32 @@ int string_search_keyword_first(const char *text, const char *key)
 }
 
 
+/* search for a keyword from the end of a string */
+/* returns true if success */
+int string_search_keyword_last(const char *text, const char *key)
+{
+	char c1, c2;
+	int i1, i2;
+	long l1, l2;
+	
+	if (!text) return 0;
+
+	l1 = strlen(text);
+	l2 = strlen(key);
+	if (l2 > l1) return 0;
+
+	i1 = l1 - l2;
+	i2 = 0;
+	while(1){
+		c1 = text[i1];
+		c2 = key[i2];
+		if (!c1) return 1;
+		if (c1 != c2) return 0;
+		i1++; i2++;
+	}
+}
+
+
 /* copy the elements of the array to a string list and return the string */
 /* returned value must be freed by caller */
 char *array_copy_to_string_list(char **array)
@@ -1845,6 +1871,34 @@ char *path_wildcard_dir_plus_parent(char *path)
 		}
 		else{
 			strcat2(&new, "\\*/\\*");
+		}
+	}
+	
+	return new;
+}
+
+
+/* wildcard library files version numbers */
+/* returned value must be freed by caller */
+char *path_wildcard_lib(char *path)
+{
+	char *new = 0;
+	int i;
+	long l;
+	char c;
+	
+	strcpy2(&new, path);
+
+	/* search for ".so" extension */
+	i = string_search_keyword(path, ".so");
+	
+	/* found anything? */
+	if (i > -1){
+		/* is EOF or "." after ".so"? */
+		c = path[i + 3];
+		if (c == 0 || c == '.'){
+
+			l = strlen2(&new);
 		}
 	}
 	
@@ -4066,15 +4120,218 @@ int check_policy_change(){
 }
 
 
+/* compare names conatining wildcards of "\\*" char */
+/* i check only the left most and right most parts of the "*" chars at the edge,
+ * no matter how many "*" chars are in the name,
+ * cause more than 1 means the middle tags may be combined any way */
+int compare_names(char *name1, char *name2)
+{
+	char *s1, *s2;
+	char *left1 = 0, *left2 = 0, *right1 = 0, *right2 = 0;
+	char c, c_old;
+	int i1, i2;
+	int flag1 = 0;
+	int flag2 = 0;
+	long l1, l2;
+	long left1l = 0, left2l = 0, right1l = 0, right2l = 0;
+
+	/* get name lengths */
+	l1 = strlen(name1);
+	l2 = strlen(name2);
+	s1 = memget2(l1);
+	s2 = memget2(l2);
+	
+	/* *********************************************** */
+	/* simplify names by replacing "\\*" with "*" char */
+	/* *********************************************** */
+	c = 0;
+	i1 = 0;
+	i2 = 0;
+	while(1){
+		c_old = c;
+		c = name1[i1];
+		if (!c) break;
+		if (c == '*'){
+			if (c_old == '\\') i2--;
+			flag1 = 1;
+		}
+		s1[i2] = c;
+		i1++; i2++;
+	}
+	s1[i2] = 0;
+	strlenset3(&s1, i2);
+	l1 = i2;
+	
+	c = 0;
+	i1 = 0;
+	i2 = 0;
+	while(1){
+		c_old = c;
+		c = name2[i1];
+		if (!c) break;
+		if (c == '*'){
+			if (c_old == '\\') i2--;
+			flag2 = 1;
+		}
+		s2[i2] = c;
+		i1++; i2++;
+	}
+	s2[i2] = 0;
+	strlenset3(&s2, i2);
+	l2 = i2;
+	
+	/* ************************************************************* */
+	/* get left most and right most parts of strings beside "*" char */
+	/* ************************************************************* */
+	if (flag1){
+		
+		/* get left 1 */
+		left1 = memget2(l1);
+		i1 = 0;
+		i2 = 0;
+		while(1){
+			c = s1[i1];
+			if (c == '*') break;
+			left1[i2] = c;
+			i1++; i2++;
+		}
+		left1[i2] = 0;
+		strlenset3(&left1, i2);
+		left1l = i2;
+
+		/* get right 1 */
+		right1 = memget2(l1);
+		i1 = l1;
+		while(1){
+			if (s1[i1] == '*') break;
+			i1--;
+		}
+		i1++;
+		i2 = 0;
+		while(1){
+			c = s1[i1];
+			if (!c) break;
+			right1[i2] = c;
+			i1++; i2++;
+		}
+		right1[i2] = 0;
+		strlenset3(&right1, i2);
+		right1l = i2;
+	}
+
+	if (flag2){
+		
+		/* get left 1 */
+		left2 = memget2(l2);
+		i1 = 0;
+		i2 = 0;
+		while(1){
+			c = s2[i1];
+			if (c == '*') break;
+			left2[i2] = c;
+			i1++; i2++;
+		}
+		left2[i2] = 0;
+		strlenset3(&left2, i2);
+		left2l = i2;
+
+		/* get right 1 */
+		right2 = memget2(l2);
+		i1 = l1;
+		while(1){
+			if (s2[i1] == '*') break;
+			i1--;
+		}
+		i1++;
+		i2 = 0;
+		while(1){
+			c = s2[i1];
+			if (!c) break;
+			right2[i2] = c;
+			i1++; i2++;
+		}
+		right2[i2] = 0;
+		strlenset3(&right2, i2);
+		right2l = i2;
+	}
+	
+	/* **************************************************************** */
+	/* check the four cases by comparing left most and right most parts */
+	/* **************************************************************** */
+	if (!flag1 && !flag2){
+		if (l1 == l2){
+			if (!strcmp(s1, s2)){
+				free2(s1);
+				free2(s2);
+				return 1;
+			}
+		}
+	}
+	else if (!flag1 && flag2){
+		if (l1 >= left2l + right2l){
+			if (string_search_keyword_first(s1, left2)
+			 && string_search_keyword_last(s1, right2)){
+				free2(left2);
+				free2(right2);
+				free2(s1);
+				free2(s2);
+				return 1;
+			}
+		}
+		free2(left2);
+		free2(right2);
+	}
+	else if (flag1 && !flag2){
+		if (l2 >= left1l + right1l){
+			if (string_search_keyword_first(s2, left1)
+			 && string_search_keyword_last(s2, right1)){
+				free2(left1);
+				free2(right1);
+				free2(s1);
+				free2(s2);
+				return 1;
+			}
+		}
+		free2(left1);
+		free2(right1);
+	}
+	else if (flag1 && flag2){
+		if (left1l > left2l) i1 = string_search_keyword_first(left1, left2);
+		else                 i1 = string_search_keyword_first(left2, left1);
+		if (right1l > right2l) i2 = string_search_keyword_last(right1, right2);
+		else                   i2 = string_search_keyword_last(right2, right1);
+		if (i1 && i2){
+			free2(left1);
+			free2(left2);
+			free2(right1);
+			free2(right2);
+			free2(s1);
+			free2(s2);
+			return 1;
+		}
+		free2(left1);
+		free2(left2);
+		free2(right1);
+		free2(right2);
+	}
+	
+	free2(s1);
+	free2(s2);
+	return 0;
+}
+
+
 /* compare paths with wildcards */
-/* a "/" or a null char must follow every wildcard in the path name */
-/* with other words, only one '*' wildcard can be used per path tag */
+/* wildcard can be "\\*" or recursive wildcard */
+/* only standalone recursive wildcard is supported */
 /* return true if they match, even if both are null */
 int compare_paths(char *path1, char *path2)
 {
 	/* vars */
-	char c1, c2, c1_old, c2_old, c1_new, c2_new;
-	int i1, i2, wlen;
+	char c1, c2;
+	int flag;
+	int i, i1, i2;
+	char *s1, *s2;
 	
 	if (!path1 || !path2) return 0;
 	
@@ -4088,147 +4345,88 @@ int compare_paths(char *path1, char *path2)
 	/* fail if they don't start with "/" char */
 	if (c1 != '/' || c2 != '/') return 0;
 	
+	/* alloc mem for subdir names */
+	s1 = memget2(max_char);
+	s2 = memget2(max_char);
+	
 	/* compare paths only */
-	wlen = strlen(wildcard_recursive_dir);
-	i1 = 0; i2 = 0;
-	c1 = 0; c2 = 0;
+	i1 = 1;
+	i2 = 1;
 	while(1){
-		/* get next chars */
-		c1_old = c1; c2_old = c2;
-		c1 = path1[i1];
-		c2 = path2[i2];
-		
-		/* store next coming chars too for later compare if not out of bound yet */
-		if (c1) c1_new = path1[i1 + 1]; else c1_new = 0;
-		if (c2) c2_new = path2[i2 + 1]; else c2_new = 0;
-		
-		/* if both chars are null then success */
-		if (!c1 && !c2) return 1;
-		
-		/* if both chars match then continue, even if chars are "/" or "\\" */
-		if (c1 == c2){
-			i1++;
-			i2++;
-		}
-		else{
-
-			/* ---------------------------------------- */
-			/* ----- check for recursive wildcard ----- */
-			/* ---------------------------------------- */
-			if (string_search_keyword_first(path1 + i1, wildcard_recursive_dir)){
-				/* move this after wildcard */
-				i1 += wlen;
-				c1 = path1[i1];
-				/* null or "/" should come after wildcard
-				 * cause i don't insert recursive wildcard if it's not the last one */
-				if (c1 && c1 != '/'){
-					color("error: unexpected wildcard usage in domain rules\n", red);
-					myexit(1);
+		/* get first subdir name */
+		strnull2(&s1);
+		i = 0;
+		flag = 0;
+		while(1){
+			c1 = path1[i1++];
+			if (!c1) break;
+			/* skip multiple "/" chars next to each other */
+			if (!flag){
+				if (c1 != '/'){
+					flag = 1;
+					s1[i++] = c1;
 				}
-				/* move the other path poiter too to its last char (before null)
-				 * so their last char should be "/" or nothing (null following) */
-				while(1){
-					c2 = path2[++i2];
-					/* exit on end, and move char back one */
-					if (!c2){
-						c2 = path2[--i2];
-						break; }
-				}
-				/* if both last chars are "/", then success */
-				if (c1 == '/' && c2 == '/') return 1;
-				else if (c1 == '/' && c2 != '/') return 0;
-				else if (c1 != '/' && c2 == '/') return 0;
-				/* or if not, then if both of them are null, it's success too
-				 * (c2 would be null anyway, cause i moved it to the last char before */
-				else if (!c1) return 1;
-				return 0;
 			}
-			else if (string_search_keyword_first(path2 + i2, wildcard_recursive_dir)){
-				/* move this after wildcard */
-				i2 += wlen;
-				c2 = path2[i2];
-				/* null or "/" should come after wildcard
-				 * cause i don't insert recursive wildcard if it's not the last one */
-				if (c2 && c2 != '/'){
-					color("error: unexpected wildcard usage in domain rules\n", red);
-					myexit(1);
-				}
-				/* move the other path poiter too to its last char (before null)
-				 * so their last char should be "/" or nothing (null following) */
-				while(1){
-					c1 = path1[++i1];
-					/* exit on end, and move char back one */
-					if (!c1){
-						c1 = path1[--i1];
-						break; }
-				}
-				/* if both last chars are "/", then success */
-				if (c2 == '/' && c1 == '/') return 1;
-				else if (c2 == '/' && c1 != '/') return 0;
-				else if (c2 != '/' && c1 == '/') return 0;
-				/* or if not, then if both of them are null, it's success too
-				 * (c1 would be null anyway, cause i moved it to the last char before */
-				else if (!c2) return 1;
-				return 0;
-			}
-
-			/* ------------------------------------- */
-			/* ----- check for normal wildcard ----- */
-			/* ------------------------------------- */
 			else{
-
-				/* step 1 char forward if wildcard is coming */
-				if (c1 == '\\' && c1_new == '*'){
-					c1_old = c1; c1 = c1_new; ++i1; }
-				if (c2 == '\\' && c2_new == '*'){
-					c2_old = c2; c2 = c2_new; ++i2; }
-				
-				/* if any of the char is a wildcard "*", then check if before char is "\"
-				 * and make the other jump to the next "/"
-				 * this one is needed because it can happen that the "\" char matches
-				 * but not "*" comes after one of them */
-				if (c1 == '*' && c1_old == '\\'){
-					/* null or "/" should come after wildcard
-					 * cause i'm not using wildcard withing words, only by itself */
-					c1 = path1[++i1];
-					if (c1 && c1 != '/'){
-						color("error: unexpected wildcard usage in domain rules\n", red);
-						myexit(1);
-					}
-					/* fail if null */
-					if (!c2) return 0;
-					/* if already standing on a "/" char, then ok and continue */
-					if (c2 != '/'){
-						/* else jump to next "/" */
-						while(1){
-							c2 = path2[++i2];
-							if (c2 == '/' || !c2) break;
-						}
-					}
-				}
-				else if (c2 == '*' && c2_old == '\\'){
-					/* null or "/" should come after wildcard */
-					c2 = path2[++i2];
-					if (c2 && c2 != '/'){
-						color("error: unexpected wildcard usage in domain rules\n", red);
-						myexit(1);
-					}
-					/* fail if null */
-					if (!c1) return 0;
-					/* if already standing on a "/" char, then ok and continue */
-					if (c1 != '/'){
-						/* else jump to next "/" */
-						while(1){
-							c1 = path1[++i1];
-							if (c1 == '/' || !c1) break;
-						}
-					}
-				}
-				/* no match, fail */
-				else return 0;
+				if (c1 == '/') break;
+				s1[i++] = c1;
 			}
 		}
+		s1[i] = 0;
+		strlenset3(&s1, i);
+
+		/* get second subdir name */
+		strnull2(&s2);
+		i = 0;
+		flag = 0;
+		while(1){
+			c2 = path2[i2++];
+			if (!c2) break;
+			/* skip multiple "/" chars next to each other */
+			if (!flag){
+				if (c2 != '/'){
+					flag = 1;
+					s2[i++] = c2;
+				}
+			}
+			else{
+				if (c2 == '/') break;
+				s2[i++] = c2;
+			}
+		}
+		s2[i] = 0;
+		strlenset3(&s2, i);
+
+		/* if any of the subdir name contains recursive wildcard, then success */
+		/* i check only for full name of recursive wildcards */
+		/* recursive wildcard somewhere in the name is not supported */
+		if (!strcmp(s1, wildcard_recursive_dir) || !strcmp(s2, wildcard_recursive_dir)){
+			free2(s1);
+			free2(s2);
+			return 1;
+		}
+
+		/* compare names simple way */
+		if (strcmp(s1, s2)){
+			/* compare wildcard names if no simple match and fail if no match either this way */
+			if (!compare_names(s1, s2)) break;
+		}
+
+		/* return success if match and both reached end */
+		if (!c1 && !c2){
+			free2(s1);
+			free2(s2);
+			return 1;
+		}
+		
+		/* fail and exit if only one of the subdir name reached end */
+		if (!c1 || !c2) break;
 	}
+	
+	free2(s1);
+	free2(s2);
+	
+	return 0;
 }
 
 
@@ -5188,13 +5386,26 @@ void domain_reshape_rules_wildcard_spec()
 								res2 = path_wildcard_dir_plus_parent(param);
 								free2(param); param = res2;
 							}
+
+							/* wildcard library files version numbers */
+							res2 = path_wildcard_lib(param);
+							free2(param); param = res2;
+							
+							/* wildcard /proc/$PID/ if it's in "/proc/[0-9]+/" form */
+/*							res2 = path_wildcard_lib(param);
+							free2(param); param = res2;
+*/							
+							/* wildcard /home/$USER/ dir to support multiple users */
+/*							res2 = path_wildcard_home(param);
+							free2(param); param = res2;
+*/
 							
 							/* add param2 to new policy */
 							strcat2(&tdomf_new, " ");
 							strcat2(&tdomf_new, param);
-
-							free2(param);
 						}
+						free2(pdir);
+						free2(param);
 					}
 
 					/* new lin in new policy */
@@ -5219,12 +5430,12 @@ void domain_reshape_rules_wildcard_spec()
 		free2(res);
 	}
 
-debug(spec2); debug(spec3); debug(tdomf_new); free2(tdomf_new);
+debug(spec2); debug(spec3);
 
 	free2(spec2);
 	free2(spec3);
-/*	free2(tdomf);
-	tdomf = tdomf_new;*/
+	free2(tdomf);
+	tdomf = tdomf_new;
 }
 
 
@@ -5234,12 +5445,14 @@ void domain_reshape_rules()
 	domain_cleanup();
 	
 	domain_reshape_rules_recursive_dirs();
-
+	
 	domain_cleanup();
 	
 	domain_reshape_rules_wildcard_spec();
-
+	
 	domain_cleanup();
+
+debug(tdomf); myexit(0);
 }
 
 
@@ -5576,6 +5789,16 @@ void statistics()
 int main(int argc, char **argv){
 
 	float t, t_start;
+
+
+	char *res = path_wildcard_lib("/tmp/libhello.so.16");
+	debug(res); free2(res); myexit(0);
+/*	char s1[] = "/tmp/hello////szi\\*ka";
+	char s2[] = "///tmp//hello/szihioookaka";
+	printf("%s\n%s\n", s1, s2);
+	if (compare_paths(s1, s2)) debug("SUCCESS");
+	myexit(0);*/
+
 
 	/* store start time */
 	t_start = mytime();
