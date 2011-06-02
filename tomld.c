@@ -1542,7 +1542,7 @@ int path_is_dir(const char *path)
 }
 
 
-/* return true if path of dir ends with recursive wildcard */
+/* return true if path ends with recursive wildcard */
 int path_is_dir_recursive_wildcard(const char *path)
 {
 	char *s = 0;
@@ -1556,6 +1556,11 @@ int path_is_dir_recursive_wildcard(const char *path)
 	
 	/* compare only the end of path */
 	if (l2 > l1) return 0;
+	/* without ending "/" char */
+	if (!strcmp(s, path + l1 - l2)){ free2(s); return 1; }
+	/* with ending "/" char */
+	strcat2(&s, "/");
+	l2++;
 	if (!strcmp(s, path + l1 - l2)){ free2(s); return 1; }
 
 	free2(s);
@@ -1658,15 +1663,55 @@ char *path_get_parent_dir(char *path)
 	/* copy old path */
 	strcpy2(&path_new, path);
 	
-	/* if path is a dir, then return it */
-	if (path_is_dir(path)) return path_new;
+	l = strlen2(&path_new) - 1;
+
+	/* if path is a dir, then remove "/" chars from the end */
+	if (path_is_dir(path_new)){
+		while(1){
+			if (l < 0) break;
+			c = path_new[l];
+			if (c != '/') break;
+			l--;
+		}
+	}
 	
-	/* if it's a file, then get dir part */
-	l = strlen(path) - 1;
+	/* get the dir part */
 	i = 0;
 	while(1){
 		if (l < 0) break;
-		c = path[l];
+		c = path_new[l];
+		if (c == '/'){ i = l + 1; break; }
+		l--;
+	}
+	path_new[i] = 0;
+	strlenset3(&path_new, i);
+
+	return path_new;
+}
+
+
+/* return the dir part of the path (result is the same if path is a dir) */
+/* returned value must be freed by caller */
+char *path_get_dir(char *path)
+{
+	char c;
+	int i;
+	long l;
+	
+	/* alloc mem for new path */
+	char *path_new = 0;
+	/* copy old path */
+	strcpy2(&path_new, path);
+	
+	/* if path is a dir, then return it */
+	if (path_is_dir(path_new)) return path_new;
+	
+	/* if it's a file, then get dir part */
+	l = strlen2(&path_new) - 1;
+	i = 0;
+	while(1){
+		if (l < 0) break;
+		c = path_new[l];
 		if (c == '/'){ i = l + 1; break; }
 		l--;
 	}
@@ -1726,7 +1771,7 @@ int path_count_dir_depth(char *path)
 	int c;
 	
 	/* get parent dir */
-	res = path_get_parent_dir(path);
+	res = path_get_dir(path);
 
 	/* get dir depth */	
 	c = path_count_dir_depth_r(res);
@@ -1734,6 +1779,76 @@ int path_count_dir_depth(char *path)
 	free2(res);
 	
 	return c;
+}
+
+
+/* wildcard the leaf dir or file of a path and return the result */
+/* returned value must be freed by caller */
+char *path_wildcard_dir(char *path)
+{
+	char *new = 0;
+
+	/* if dir conatins recursive wildcard at the end, then return it as a result */	
+	if (path_is_dir_recursive_wildcard(path)){
+		strcpy2(&new, path);
+		return new;
+	}
+
+	/* create wildcarded path */
+	new = path_get_parent_dir(path);
+	if (path_is_dir(path)) strcat2(&new, "\\*/");
+	else                   strcat2(&new, "\\*");
+	
+	return new;
+}
+
+
+/* wildcard the leaf dir or file of a path and its parent too and return the result */
+/* returned value must be freed by caller */
+char *path_wildcard_dir_plus_parent(char *path)
+{
+	char *new, *new2;
+	
+	int flag_dir = path_is_dir(path);
+	int flag_rec = path_is_dir_recursive_wildcard(path);
+
+	/* create wildcarded path */	
+	new  = path_get_parent_dir(path);
+	new2 = path_get_parent_dir(new);
+	free2(new); new = new2;
+	/* check if reult is null, if so, then add "/" char */
+	if (!strlen2(&new)){
+		strcat2(&new, "/");
+
+		if (flag_rec){
+			strcat2(&new, wildcard_recursive_dir);
+			if (flag_dir) strcat2(&new, "/");
+			return new;
+		}
+
+		if (flag_dir){
+			strcat2(&new, "\\*/");
+		}
+		else{
+			strcat2(&new, "\\*");
+		}
+	}
+	else{
+		if (flag_rec){
+			strcat2(&new, wildcard_recursive_dir);
+			if (flag_dir) strcat2(&new, "/");
+			return new;
+		}
+
+		if (flag_dir){
+			strcat2(&new, "\\*/\\*/");
+		}
+		else{
+			strcat2(&new, "\\*/\\*");
+		}
+	}
+	
+	return new;
 }
 
 
@@ -4853,7 +4968,7 @@ void domain_reshape_rules_recursive_dirs()
 void domain_reshape_rules_wildcard_spec()
 {
 	/* vars */
-	char *res, *res2, *temp, *temp2;
+	char *res, *res2, *res3, *temp, *temp2;
 	char *rule_type, *param1, *param2;
 	char *tdomf_new;
 
@@ -4867,6 +4982,7 @@ void domain_reshape_rules_wildcard_spec()
 	/* these are the special create entries, where the place of the file will be wildcarded
 	 * because it cannot be determined fully yet if the file being created has a unique filename
 	 * or a constantly changing one (temporary name) */
+	/* allow_mkdir is necessary in this create list too to wildcard dirs of those files too */
 	char *cre[] = {"allow_create", "allow_mksock", "allow_rename", "allow_unlink",
 	               "allow_mkdir", "allow_link", 0};
 
@@ -4931,15 +5047,19 @@ void domain_reshape_rules_wildcard_spec()
 					/* are there any parameters (more words)? */
 					if (param1){
 						/* add dir to the list if not there yet */
-						res2 = path_add_dir_to_list_uniq(spec3, pdir1);
-						free2(spec2); spec3 = res2;
+						res3 = path_wildcard_dir(param1);
+						res2 = path_add_dir_to_list_uniq(spec3, res3);
+						free2(spec3); spec3 = res2;
+						free2(res3);
 					}
 
 					/* are there any parameters (more words)? */
 					if (param2){
 						/* add dir to the list if not there yet */
-						res2 = path_add_dir_to_list_uniq(spec3, pdir2);
-						free2(spec2); spec3 = res2;
+						res3 = path_wildcard_dir(param2);
+						res2 = path_add_dir_to_list_uniq(spec3, res3);
+						free2(spec3); spec3 = res2;
+						free2(res3);
 					}
 				}
 				
@@ -5019,49 +5139,66 @@ void domain_reshape_rules_wildcard_spec()
 				/* handle params that are dirs */
 				/* *************************** */
 				else{
+					int c;
+
+					/* add rule to new policy */
+					strcat2(&tdomf_new, rule_type);
+
 					/* cycle through the 2 params */
-					int c = 0;
+					c = 0;
 					while(++c <= 2){
 						int flag    = 0;
 						int flag3   = 0;
 						int flag_ex = 0;
-						
-						char *param = 0;
-						char *rule2 = 0;
+						char *param = 0, *pdir = 0;
+
 						/* set param to 1 and after 2 */
-						if (c == 1) param = param1;
-						if (c == 2) param = param2;
+						if (c == 1){ strcpy2(&param, param1); strcpy2(&pdir, pdir1); }
+						if (c == 2){ strcpy2(&param, param2); strcpy2(&pdir, pdir2); }
 						if (param){
 
 							/* check dir in exception */
-							if (path_search_dir_in_list(spec_ex, param)) flag_ex = 1;
+							if (path_search_dir_in_list(spec_ex, pdir)) flag_ex = 1;
 							
 							/* is it in spec? */
 							if (!flag_ex){
-								if (path_search_dir_in_list(spec1, param)) flag = 1;
+								if (path_search_dir_in_list(spec1, pdir)) flag = 1;
 							}
 
 							/* is it in spec2? */
 							if (!flag_ex){
 								if (!flag){
-									if (path_search_dir_in_list(spec2, param)) flag = 1;
+									if (path_search_dir_in_list(spec2, pdir)) flag = 1;
 								}
 							}
 
 							/* is it in spec3? */
 							if (!flag_ex){
-								if (path_search_dir_in_list(spec3, param)) flag3 = 1;
+								if (path_search_dir_in_list(spec3, pdir)) flag3 = 1;
 							}
 							
 							/* path is in spec or spec2 */
 							if (flag){
-								if (!path_is_dir_recursive_wildcard(param)){
-									
-								}
+								res2 = path_wildcard_dir(param);
+								free2(param); param = res2;
 							}
 							
+							/* path is in spec3 */
+							if (flag3){
+								res2 = path_wildcard_dir_plus_parent(param);
+								free2(param); param = res2;
+							}
+							
+							/* add param2 to new policy */
+							strcat2(&tdomf_new, " ");
+							strcat2(&tdomf_new, param);
+
+							free2(param);
 						}
 					}
+
+					/* new lin in new policy */
+					strcat2(&tdomf_new, "\n");
 				}
 				
 				
@@ -5082,12 +5219,10 @@ void domain_reshape_rules_wildcard_spec()
 		free2(res);
 	}
 
+debug(spec2); debug(spec3); debug(tdomf_new); free2(tdomf_new);
 
-debug(spec2);
-debug(spec3);
 	free2(spec2);
 	free2(spec3);
-	
 /*	free2(tdomf);
 	tdomf = tdomf_new;*/
 }
