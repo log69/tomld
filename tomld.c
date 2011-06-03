@@ -880,7 +880,7 @@ char *link_read(const char *name)
 
 /* return the filename part of a path string */
 /* returned value must be freed by caller */
-char *string_get_filename(const char *text)
+char *path_get_filename(const char *text)
 {
 	char *res;
 	char c;
@@ -1878,30 +1878,74 @@ char *path_wildcard_dir_plus_parent(char *path)
 }
 
 
-/* wildcard library files version numbers */
+/* wildcard library files' version numbers */
 /* returned value must be freed by caller */
 char *path_wildcard_lib(char *path)
 {
-	char *new = 0;
+	char *name, *new = 0;
+	char c, c2;
 	int i;
-	long l;
-	char c;
 	
-	strcpy2(&new, path);
-
-	/* search for ".so" extension */
-	i = string_search_keyword(path, ".so");
-	
-	/* found anything? */
-	if (i > -1){
-		/* is EOF or "." after ".so"? */
-		c = path[i + 3];
-		if (c == 0 || c == '.'){
-
-			l = strlen2(&new);
+	name = path_get_filename(path);
+	/* does the filename start with "lib"? */
+	if (string_search_keyword_first(name, "lib")){
+		/* search for ".so" extension */
+		i = string_search_keyword(name, ".so");
+		/* found anything? */
+		if (i > -1){
+			/* is EOF or "." after ".so"? */
+			c = name[i + 3];
+			if (c == 0 || c == '.'){
+				char *end = 0;
+				int flag = 0;
+				/* is there a dot after ".so"? if so, then store the end part */
+				if (c) strcpy2(&end, name + i + 3);
+				while(i > 0){
+					c2 = name[--i];
+					if ((c2 > '9' || c2 < '0') && (c2 != '.')) break;
+					if (c2 != '.') flag = 1;
+				}
+				i++;
+				/* are there any numbers too between lib name and ".so"? */
+				if (flag){
+					/* add wildcard and ".so" too */
+					name[i] = 0;
+					strlenset2(&name);
+					strcat2(&name, "\\*.so");
+				}
+				else{
+					name[i + 3] = 0;
+					strlenset2(&name);
+				}
+				/* were there a dot after ".so"? */
+				if (end){
+					/* search for numbers in the end part */
+					flag = 0;
+					i = 0;
+					while(1){
+						c2 = end[i++];
+						if (!c2) break;
+						if (c2 >= '0' && c2 <= '9'){ flag = 1; break; }
+					}
+					/* does the end part contain any numbers? */
+					/* if so, then add wildcard to the end part too */
+					if (flag) strcat2(&name, ".\\*");
+					/* if not, then add original end part */
+					else      strcat2(&name, end);
+					free2(end);
+				}
+				/* add filename to base dir for result */
+				new = path_get_parent_dir(path);
+				strcat2(&new, "/");
+				strcat2(&new, name);
+			}
 		}
 	}
-	
+
+	/* give back original path if no wildcard is added */
+	if (!new) strcpy2(&new, path);
+
+	free2(name);
 	return new;
 }
 
@@ -3966,7 +4010,7 @@ void domain_print_list_not_progs()
 		while(1){
 			res = string_get_next_line(&temp);
 			if (!res) break;
-			res2 = string_get_filename(res);
+			res2 = path_get_filename(res);
 			if (res2){
 				strcat2(&list2, res2);
 				strcat2(&list2, "\n");
@@ -5791,8 +5835,8 @@ int main(int argc, char **argv){
 	float t, t_start;
 
 
-	char *res = path_wildcard_lib("/tmp/libhello.so.16");
-	debug(res); free2(res); myexit(0);
+/*	char *res = path_wildcard_lib("/tmp/libhello-UU.so.--TTz$6");
+	debug(res); free2(res); myexit(0);*/
 /*	char s1[] = "/tmp/hello////szi\\*ka";
 	char s2[] = "///tmp//hello/szihioookaka";
 	printf("%s\n%s\n", s1, s2);
