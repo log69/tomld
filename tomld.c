@@ -1950,6 +1950,78 @@ char *path_wildcard_lib(char *path)
 }
 
 
+/* wildcard /proc/$PID/ numbers */
+/* returned value must be freed by caller */
+char *path_wildcard_proc(char *path)
+{
+	char *new = 0;
+	char c;
+	int i, flag;
+	
+	/* does the path start with "/proc/"? */
+	if (string_search_keyword_first(path, "/proc/")){
+		/* does the second subdir contain only nums? */
+		flag = 1;
+		i = 6;
+		while(1){
+			c = path[i];
+			if (!c || c == '/') break;
+			if (c < '0' || c > '9'){ flag = 0; break; }
+			i++;
+		}
+
+		/* replace second subdir with numeric wildcard */
+		if (flag){
+			strcpy2(&new, "/proc/\\$");
+			strcat2(&new, path + i);
+		}
+	}
+	
+	/* give back original path if no wildcard is added */
+	if (!new) strcpy2(&new, path);
+
+	return new;
+}
+
+
+/* wildcard /home/user/ names */
+/* returned value must be freed by caller */
+char *path_wildcard_home(char *path)
+{
+	char *h = 0, *new = 0;
+	char c;
+	int i;
+	
+	/* copy home dir */
+	strcpy2(&h, home);
+	strcat2(&h, "/");
+	
+	/* does the path start with "/home/"? */
+	if (string_search_keyword_first(path, h)){
+		i = strlen2(&h);
+		/* is there a second subdir? (if next char isn't null) */
+		if (path[i]){
+			/* jump to end of second subdir */
+			while(1){
+				c = path[i];
+				if (!c || c == '/') break;
+				i++;
+			}
+
+			/* replace second subdir with numeric wildcard */
+			strcpy2(&new, h);
+			strcat2(&new, "\\*");
+			strcat2(&new, path + i);
+		}
+	}
+	
+	/* give back original path if no wildcard is added */
+	if (!new) strcpy2(&new, path);
+
+	return new;
+}
+
+
 /* return a new string containing the next domain entry and move the pointer to the beginning of the next domain */
 /* returned value must be freed by caller */
 char *domain_get_next(char **text)
@@ -5436,13 +5508,13 @@ void domain_reshape_rules_wildcard_spec()
 							free2(param); param = res2;
 							
 							/* wildcard /proc/$PID/ if it's in "/proc/[0-9]+/" form */
-/*							res2 = path_wildcard_lib(param);
+							res2 = path_wildcard_proc(param);
 							free2(param); param = res2;
-*/							
+
 							/* wildcard /home/$USER/ dir to support multiple users */
-/*							res2 = path_wildcard_home(param);
+							res2 = path_wildcard_home(param);
 							free2(param); param = res2;
-*/
+
 							
 							/* add param2 to new policy */
 							strcat2(&tdomf_new, " ");
@@ -5474,8 +5546,6 @@ void domain_reshape_rules_wildcard_spec()
 		free2(res);
 	}
 
-debug(spec2); debug(spec3);
-
 	free2(spec2);
 	free2(spec3);
 	free2(tdomf);
@@ -5496,7 +5566,7 @@ void domain_reshape_rules()
 	
 	domain_cleanup();
 
-debug(tdomf); myexit(0);
+/*debug(tdomf); myexit(0);*/
 }
 
 
@@ -5833,16 +5903,6 @@ void statistics()
 int main(int argc, char **argv){
 
 	float t, t_start;
-
-
-/*	char *res = path_wildcard_lib("/tmp/libhello-UU.so.--TTz$6");
-	debug(res); free2(res); myexit(0);*/
-/*	char s1[] = "/tmp/hello////szi\\*ka";
-	char s2[] = "///tmp//hello/szihioookaka";
-	printf("%s\n%s\n", s1, s2);
-	if (compare_paths(s1, s2)) debug("SUCCESS");
-	myexit(0);*/
-
 
 	/* store start time */
 	t_start = mytime();
