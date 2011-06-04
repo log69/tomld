@@ -2485,16 +2485,12 @@ char *file_read(const char *name, long length)
 		f = fopen(name, "r");
 	}
 	
-	if (len < 1){
-		color_("error: cannot read file ", red);
-		color_(name, red); newl_();
-		myexit(1);
-	}
-
 	/* alloc mem */
 	buff = memget2(len);
 	/* read file */
-	fread(buff, len, 1, f);
+	if (len > 0){
+		fread(buff, len, 1, f);
+	}
 	fclose(f);
 	/* write null to the end of file */
 	buff[len] = 0;
