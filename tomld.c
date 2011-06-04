@@ -1936,7 +1936,6 @@ char *path_wildcard_lib(char *path)
 				}
 				/* add filename to base dir for result */
 				new = path_get_parent_dir(path);
-				strcat2(&new, "/");
 				strcat2(&new, name);
 			}
 		}
