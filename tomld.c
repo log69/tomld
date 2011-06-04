@@ -2885,9 +2885,6 @@ void reload()
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
 		tdomf_old2 = file_read(tdomk, 1);
-		/* sometimes the read tomoyo policy differs in the number
-		 * of new lines at the end of text, therefore i remove
-		 * empty lines from the end before compare */
 		if (!strcmp(tdomf_old, tdomf_old2)){
 			free2(tdomf_old2);
 			/* write changes to kernel */
@@ -2960,6 +2957,12 @@ void save()
 	/* save configs to disk */
 	file_write(tdom, tdomf);
 	file_write(texc, texcf);
+}
+
+
+/* save config files from variables to disk */
+void save_logmark()
+{
 	/* save log mark to disk */
 	file_write(tmark, tmarkf);
 }
@@ -6031,6 +6034,7 @@ int main(int argc, char **argv){
 
 	/* save configs to disk */
 	save();
+	save_logmark();
 
 	/* free all my pointers */
 	myfree();
