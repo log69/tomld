@@ -1,4 +1,3 @@
-- rewrite all python code to C
 - run security checks on the final code
 - lots of tests
 - create more functions to make the code more readable
