@@ -980,11 +980,9 @@ char *string_get_next_line(char **text)
 	(*text)[i] = 0;
 	strcpy2(&res, (*text));
 	(*text)[i] = c;
-	res[i] = 0;
 	/* move pointer to the next line, or leave it on null end */
 	if (c) i++;
 	(*text) += i;
-	strlenset3(&res, i);
 
 	return res;
 }
@@ -1025,8 +1023,6 @@ char *string_get_last_line(char **text)
 	(*text)[l] = 0;
 	strcpy2(&res, (*text));
 	(*text)[l] = c;
-	res[l] = 0;
-	strlenset3(&res, l);
 
 	return res;
 }
@@ -2803,12 +2799,63 @@ void reload()
 	
 	/* alloc mem for transitions */
 	myappend = memget2(max_char);
+
+	/* load old policy from kernel */
+	texcf_old = file_read(texck, 1);
+	
+	/* load exception policy to kernel too */
+	while(1){
+		strnull2(&myappend);
+
+		/* create another append list with deleting exception policy lines */
+		temp = texcf_old;
+		while(1){
+			/* get next line of exception policy */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			/* append lines with delete keyword */
+			strcat2(&myappend, "delete ");
+			strcat2(&myappend, res);
+			strcat2(&myappend, "\n");
+			free2(res);
+		}
+
+		/* add new rules to append list */
+		temp = texcf;
+		while(1){
+			/* get next line of exception policy */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			/* append lines with delete keyword */
+			strcat2(&myappend, res);
+			strcat2(&myappend, "\n");
+			free2(res);
+		}
+		
+		/* safety code: load old policy again to check if it hasn't changed
+		 * since i started creating the new one */
+		texcf_old2 = file_read(texck, 1);
+		if (!strcmp(texcf_old, texcf_old2)){
+			free2(texcf_old2);
+			/* write changes to kernel */
+			file_write(texck, myappend);
+			break;
+		}
+		else{
+			free2(texcf_old);
+			texcf_old = texcf_old2;
+		}
+	}
+
+	free2(texcf_old);
 	
 	/* load old policy from kernel */
 	tdomf_old = file_read(tdomk, 1);
 
 	/* load domain policy to the kernel */
 	while(1){	
+		strnull2(&myappend);
+
 		/* create append list with deleting old policy from kernel
 		 * using "select" and "delete" keywords */
 		temp = tdomf_old;
@@ -2826,6 +2873,11 @@ void reload()
 				strcat2(&myappend, res2);
 				strcat2(&myappend, "\n");
 
+				/* skip "use_profile" part and set it to fix 0 */
+				rule = string_get_next_line(&temp2);
+				/* add "use_profile 0" tag to set domain's profile back to zero too */
+				strcat2(&myappend, "use_profile 0\n");
+
 				/* append list with delete rules */
 				while(1){
 					/* get next rule */
@@ -2841,9 +2893,6 @@ void reload()
 					free2(rule);
 				}
 				free2(res2);
-
-				/* add "use_profile 0" tag to set domain's profile back to zero too */
-				strcat2(&myappend, "use_profile 0\n");
 			}
 			free2(res);
 		}
@@ -2881,7 +2930,8 @@ void reload()
 			}
 			free2(res);
 		}
-		
+
+debug(myappend);		
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
 		tdomf_old2 = file_read(tdomk, 1);
@@ -2899,54 +2949,6 @@ void reload()
 	
 	free2(tdomf_old);
 
-	/* load old policy from kernel */
-	texcf_old = file_read(texck, 1);
-	
-	/* load exception policy to kernel too */
-	while(1){
-	
-		/* create another append list with deleting exception policy lines */
-		strnull2(&myappend);
-		temp = texcf_old;
-		while(1){
-			/* get next line of exception policy */
-			res = string_get_next_line(&temp);
-			if (!res) break;
-			/* append lines with delete keyword */
-			strcat2(&myappend, "delete ");
-			strcat2(&myappend, res);
-			strcat2(&myappend, "\n");
-			free2(res);
-		}
-
-		/* cadd new rules to append list */
-		temp = texcf;
-		while(1){
-			/* get next line of exception policy */
-			res = string_get_next_line(&temp);
-			if (!res) break;
-			/* append lines with delete keyword */
-			strcat2(&myappend, res);
-			strcat2(&myappend, "\n");
-			free2(res);
-		}
-		
-		/* safety code: load old policy again to check if it hasn't changed
-		 * since i started creating the new one */
-		texcf_old2 = file_read(texck, 1);
-		if (!strcmp(texcf_old, texcf_old2)){
-			free2(texcf_old2);
-			/* write changes to kernel */
-			file_write(texck, myappend);
-			break;
-		}
-		else{
-			free2(texcf_old);
-			texcf_old = texcf_old2;
-		}
-	}
-
-	free2(texcf_old);
 	free2(myappend);
 }
 
@@ -3823,9 +3825,9 @@ void domain_get_log()
 		i = string_search_keyword(temp2, "kernel: [");
 		i2 = string_search_keyword(temp2 + i, "]");
 		if (i > 1 && i2 > -1){
-			/* set tmarkf to the last kernel messages time stamp */
-			*(temp2 + i + i2 + 1) = 0;
+			/* set tmarkf to the last kernel messages' time stamp */
 			strcpy2(&tmarkf, temp2 + i);
+			tmarkf[i2 + 1] = 0;
 			strlenset3(&tmarkf, i2 + 1);
 		}
 	}
@@ -6035,6 +6037,7 @@ int main(int argc, char **argv){
 	/* save configs to disk */
 	save();
 	save_logmark();
+	reload();
 
 	/* free all my pointers */
 	myfree();
