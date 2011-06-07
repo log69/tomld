@@ -2909,7 +2909,6 @@ void reload()
 			res2 = string_get_next_line(&temp2);
 			if (res2){
 				/* append list with select <kernel> /bin/... */
-				strcat2(&myappend, "select ");
 				strcat2(&myappend, res2);
 				strcat2(&myappend, "\n");
 
@@ -2931,7 +2930,6 @@ void reload()
 			free2(res);
 		}
 
-debug(myappend);		
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
 		tdomf_old2 = file_read(tdomk, 1);
