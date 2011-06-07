@@ -5,6 +5,7 @@
 - make it fast
 - make it a boot service
 - entirely automatize all setup regarding Tomoyo
+- create an easily readable flow chart
 - create debian package
 - create manual and expand docs
 - no interactivity with --daemon option
