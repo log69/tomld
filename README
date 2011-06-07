@@ -1,4 +1,4 @@
-tomld (tomoyo learning daemon) 0.31
+tomld (tomoyo learning daemon) 0.32
 Copyright (C) 2011 Andras Horvath
 E-mail: mail@log69.com - suggestions & feedbacks are welcome
 URL: http://log69.com - the official site
@@ -11,7 +11,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 DESCRIPTION:
-tomld (tomoyo learning daemon) is an extension to the Tomoyo security module to ease and automate the setup process of a MAC (Mandatory Access Control) aware system to increase security of the system by closing applications and services into a domain with their rules. It helps the user harden his system easily. Starts domains in learning mode, collects rules, then later changes these rules and enforces the policy.
+tomld (tomoyo learning daemon) is an extension to the Tomoyo security module to ease and automate the setup process of a MAC (Mandatory Access Control) aware system to increase security by closing applications and services into a domain with their rules. It helps the user harden his system easily. Starts domains in learning mode, collects rules, then later changes these rules and enforces the policy.
 
 Tomoyo module contains already the learning ability to automatically setup rules while the processes are running in learning mode. Only, there are continously changing files and directory names that the processes use, so those have to be replaced with wildcarded rules. This needs a rather advanced knowledge of the system.
 
@@ -50,6 +50,7 @@ The following options are supported:
 
 *executables are additonal programs to create domains for
 
+requirements: Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)
 
 REMARKS:
 - it is written in python, tested with version 2.6
