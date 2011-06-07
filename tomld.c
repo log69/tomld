@@ -430,7 +430,7 @@ void help() {
 	printf ("requirements: Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)\n");
 	printf ("\n");
 	printf ("REMARKS:\n");
-	printf ("- it is written in python, tested with version 2.6\n");
+	printf ("- user space tool for Tomoyo developed in C\n");
 	printf ("- the program assumes to be run in a fully trusted environment\n");
 	printf ("- it is advised to start with new rules instead of keeping any manually created ones\n");
 	printf ("- processes in the domains should run in learning mode for quite some time to collect ");
