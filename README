@@ -53,7 +53,7 @@ The following options are supported:
 requirements: Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)
 
 REMARKS:
-- it is written in python, tested with version 2.6
+- user space tool for Tomoyo developed in C
 - the program assumes to be run in a fully trusted environment
 - it is advised to start with new rules instead of keeping any manually created ones
 - processes in the domains should run in learning mode for quite some time to collect all the necessary rules to avoid malfunctioning by access deny later
