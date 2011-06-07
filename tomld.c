@@ -179,7 +179,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.31";
+char *ver = "0.32";
 
 /* home dir */
 char *home = "/home";
@@ -381,7 +381,7 @@ void help() {
 	printf ("DESCRIPTION:\n");
 	printf ("tomld (tomoyo learning daemon) is an extension to the Tomoyo security module ");
 	printf ("to ease and automate the setup process of a MAC (Mandatory Access Control) aware system ");
-	printf ("to increase security of the system by closing applications and services into a domain with their rules. ");
+	printf ("to increase security by closing applications and services into a domain with their rules. ");
 	printf ("It helps the user harden his system easily. ");
 	printf ("Starts domains in learning mode, collects rules, then later changes these rules and enforces the policy.\n");
 	printf ("\n");
