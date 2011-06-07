@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # delete old binary
 rm -f tomld
