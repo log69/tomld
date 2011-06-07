@@ -2875,6 +2875,7 @@ void reload()
 
 				/* skip "use_profile" part and set it to fix 0 */
 				rule = string_get_next_line(&temp2);
+				free2(rule);
 				/* add "use_profile 0" tag to set domain's profile back to zero too */
 				strcat2(&myappend, "use_profile 0\n");
 
@@ -5551,20 +5552,88 @@ void domain_reshape_rules_wildcard_spec()
 }
 
 
+/* all entries with allow_create will be recreated with allow_unlink, allow_truncate
+ * and allow_read/write entries too because there are deny logs frequently
+ * coming back for the created files trying to be written, unlinked or truncated.
+ * what is created should be allowed to be written or unlinked or truncated too */
+void domain_reshape_rules_create_double()
+{
+	/* vars */
+	char *res, *temp, *temp2;
+	char *rule_type, *param;
+	char *tdomf_new;
+	
+	/* alloc mem for new policy */
+	tdomf_new = memget2(max_char);
+	
+	/* cycle through rules of all domains and on create rule, add read/write, unlink and truncate too */
+	temp = tdomf;
+	while(1){
+		/* get next rule */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		/* is it a rule starting with "allow_" tag? */
+		if (string_search_keyword_first(res, "allow_create ")){
+
+			/* get rule type */
+			temp2 = res;
+			rule_type = string_get_next_word(&temp2);
+			param = string_get_next_line(&temp2);
+
+			strcat2(&tdomf_new, res);
+			strcat2(&tdomf_new, "\n");
+
+			strcat2(&tdomf_new, "allow_read/write ");
+			strcat2(&tdomf_new, param);
+			strcat2(&tdomf_new, "\n");
+
+			strcat2(&tdomf_new, "allow_unlink ");
+			strcat2(&tdomf_new, param);
+			strcat2(&tdomf_new, "\n");
+
+			strcat2(&tdomf_new, "allow_truncate ");
+			strcat2(&tdomf_new, param);
+			strcat2(&tdomf_new, "\n");
+			
+			free2(param);
+			free2(rule_type);
+		}
+		else{
+			strcat2(&tdomf_new, res);
+			strcat2(&tdomf_new, "\n");
+		}
+		
+		free2(res);
+	}
+	
+	/* replace old policy with new one */
+	free2(tdomf);
+	tdomf = tdomf_new;
+}
+
+
 /* rehsape rules */
 void domain_reshape_rules()
 {
+	sand_clock(0);
 	domain_cleanup();
 	
 	domain_reshape_rules_recursive_dirs();
 	
+	sand_clock(0);
 	domain_cleanup();
 	
 	domain_reshape_rules_wildcard_spec();
 	
+	sand_clock(0);
+	domain_cleanup();
+	
+	domain_reshape_rules_create_double();
+
+	sand_clock(0);
 	domain_cleanup();
 
-/*debug(tdomf); myexit(0);*/
 }
 
 
@@ -5591,7 +5660,6 @@ void check()
 	if(check_policy_change()){
 
 		/* reshape rules */
-		sand_clock(0);
 		domain_reshape_rules();
 		
 		/* reload config files into memory */
