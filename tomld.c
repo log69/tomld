@@ -404,7 +404,7 @@ void help() {
 	printf ("http://tomoyo.sourceforge.jp/2.2/index.html.en\n");
 	printf ("http://en.wikipedia.org/wiki/Mandatory_access_control\n");
 	printf ("\n");
-	printf ("USAGE: tomld.py [options] [executables]\n");
+	printf ("USAGE: tomld [options] [executables]\n");
 	printf ("\n");
 	printf ("The following options are supported:\n");
 	printf ("    -h   --help             print this help\n");
