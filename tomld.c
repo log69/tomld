@@ -23,6 +23,7 @@
 changelog:
 -----------
 08/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
+                         - fix to view options without root privilege
 07/06/2011 - tomld v0.32 - first working c version of tomld
 25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
