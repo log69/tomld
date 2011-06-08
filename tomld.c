@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+08/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
 07/06/2011 - tomld v0.32 - first working c version of tomld
 25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
@@ -168,6 +169,7 @@ flow chart:
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/mount.h>
+#include <signal.h>
 
 
 #define max_char	4096
@@ -186,6 +188,8 @@ char *home = "/home";
 
 /* interval of policy check to run in seconds */
 float time_check = 10;
+/* interval of saving configs to disk in seconds */
+float time_save = 300;
 
 /* path to my executable */
 char *my_exe_path = 0;
@@ -2601,19 +2605,17 @@ void sand_clock(int dot)
 }
 
 
-/* check if process is running currently */
-/* full path name required */
-int process_running(const char *name){
+/* return an integer containing the pid of the path of executable that is running */
+/* return null if no process is running like that */
+int process_get_pid(const char *name){
 	DIR *mydir;
 	struct dirent *mydir_entry;
-	char *mydir_name, *mypid;
+	char *mydir_name = 0, *mypid = 0;
+	int p = 0;
 	
 	/* open /proc dir */
 	mydir = opendir("/proc/");
 	if (!mydir){ color_("error: cannot open /proc/ directory\n", red); return 0; }
-
-	mydir_name = memget2(max_char);
-	mypid = memget2(max_num);
 
 	/* cycle through dirs in /proc */
 	while((mydir_entry = readdir(mydir))) {
@@ -2636,8 +2638,9 @@ int process_running(const char *name){
 					closedir(mydir);
 					free2(res);
 					free2(mydir_name);
+					p = atoi(mypid);
 					free2(mypid);
-					return 1;
+					return p;
 				}
 				free2(res);
 			}
@@ -4149,7 +4152,7 @@ void domain_print_mode()
 			/* create a domain for the program */
 			color("create domain", green);
 			/* if the program is running already, then restart is needed for the rules to take effect */
-			if (process_running(prog)) color(" (restart needed)", red);
+			if (process_get_pid(prog)) color(" (restart needed)", red);
 			strcat2(&texcf, s);
 			strcat2(&texcf, "\n");
 		}
@@ -5963,13 +5966,37 @@ void statistics()
 }
 
 
+/* save configs and finish program */
+void finish()
+{
+	newl();
+
+	if (flag_safe){
+		/* turn on enforcing mode for all old domains before exiting */
+		domain_set_enforce_old();
+
+		/* save configs to disk */
+		save();
+		save_logmark();
+		reload();
+	}
+	else if (flag_firstrun) color("* haven't finished to run at least once\n", red);
+	
+	/* print statistics */
+	statistics();
+
+	/* exit and free all my pointers */
+	myexit(0);
+}
+
+
 /* ----------------------------------- */
 /* ------------ MAIN PART ------------ */
 /* ----------------------------------- */
 
 int main(int argc, char **argv){
 
-	float t, t_start;
+	float t, t2, t_start;
 
 	/* store start time */
 	t_start = mytime();
@@ -6053,7 +6080,8 @@ int main(int argc, char **argv){
 	check_exceptions();
 
 	/* store negatív reference time for check() function to make check() run at least once */	
-	t = -time_check;
+	t  = -time_check;
+	t2 = 0;
 
 	while(1){
 
@@ -6067,7 +6095,7 @@ int main(int argc, char **argv){
 			/* manage policy and rules */
 			check();
 			
-			/* print only once */
+			/* run only once */
 			if (flag_firstrun){
 				flag_firstrun = 0;
 				color("* whole running cycle took ", green);
@@ -6075,6 +6103,9 @@ int main(int argc, char **argv){
 				if (!opt_once){
 					color("(press q to quit)\n", red);
 				}
+				/* setup signal handler here and exit on a SIGINT interrupt */
+				signal (SIGINT,  finish);
+				signal (SIGTERM, finish);
 			}
 
 			/* now it's safe to enforce mode and save config on interrupt, cause check() finished running */
@@ -6089,25 +6120,21 @@ int main(int argc, char **argv){
 		
 		/* sleep some */
 		usleep(500000);
-		if (key_get() == 'q'){ newl(); break; }
+		/* exit if 'q' key is pressed */
+		if (key_get() == 'q') break;
+
+		/* save configs to disk from time to time */
+		if ((mytime() - t2) >= time_save){
+			/* save configs */
+			save();
+			save_logmark();
+
+			/* reset time */
+			t2 = mytime();
+		}
 	}
 
-	if (flag_safe){
-		/* turn on enforcing mode for all old domains before exiting */
-		domain_set_enforce_old();
-	}
-	else if (flag_firstrun) color("* haven't finished to run at least once\n", red);
-	
-	/* print statistics */
-	statistics();
-
-	/* save configs to disk */
-	save();
-	save_logmark();
-	reload();
-
-	/* free all my pointers */
-	myfree();
+	finish();
 	
 	return 0;
 }
