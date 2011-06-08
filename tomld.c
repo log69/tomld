@@ -181,7 +181,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.32";
+char *ver = "0.33";
 
 /* home dir */
 char *home = "/home";
@@ -3277,21 +3277,6 @@ void check_options(int argc, char **argv){
 }
 
 
-/* is output colored? */
-void check_options_colored(int argc, char **argv)
-{
-	int argc2 = argc - 1;
-	int c = 1;
-	if (argc2 > 0) {
-		char *myarg;
-		while (argc2--){
-			myarg = argv[c];
-			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color  = 1; }
-		}
-	}
-}
-
-
 /* check status of tomoyo (kernel mode and tools) */
 void check_tomoyo()
 {
@@ -6001,17 +5986,14 @@ int main(int argc, char **argv){
 	/* store start time */
 	t_start = mytime();
 
-	/* is output colored? set only color option here before anything else */
-	check_options_colored(argc, argv);
+	/* check command line options */
+	check_options(argc, argv);
 
 	/* check if i am root */
-	if (getuid()) { color_("error: root privileges needed\n", red); myexit(1); }
+	if (getuid()) { color_("error: root privilege needed\n", red); myexit(1); }
 
 	/* check already running instance of the program */
 	if (!check_instance()) { color_("error: tomld is running already\n", red); myexit(1); }
-
-	/* check command line options */
-	check_options(argc, argv);
 
 
 	/* ---------------- */
