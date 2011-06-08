@@ -44,7 +44,7 @@ http://tomoyo.sourceforge.jp/documentation.html.en
 http://tomoyo.sourceforge.jp/2.2/index.html.en
 http://en.wikipedia.org/wiki/Mandatory_access_control
 
-USAGE: tomld.py [options] [executables]
+USAGE: tomld [options] [executables]
 
 The following options are supported:
     -h   --help             print this help
