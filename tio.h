@@ -25,7 +25,6 @@
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <termios.h>
-#include "tstring.h"
 #include "tpath.h"
 
 #define max_char	4096
