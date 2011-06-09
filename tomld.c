@@ -22,8 +22,9 @@
 
 changelog:
 -----------
-08/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
+09/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
+                         - apply rules on the active domains of the running processes too
 07/06/2011 - tomld v0.32 - first working c version of tomld
 25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
@@ -326,7 +327,7 @@ char *clr		= "\033[0m";
 /* arrays */
 char *tprogs = 0;
 char *tprogs_exc = 0;
-char *tprogs_exc_manual[] = {"/usr/sbin/sshd", 0};
+char *tprogs_exc_manual[] = {"/sbin/init", "/usr/sbin/sshd", 0};
 char *tprogs_learn = 0;
 
 char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6", 0};
@@ -1309,8 +1310,10 @@ void load()
 void reload()
 {
 	char *myappend;
-	char *res, *res2, *rule, *temp, *temp2;
+	char *res, *res2, *rule, *temp, *temp2, *temp3;
 	char *tdomf_old, *tdomf_old2, *texcf_old, *texcf_old2;
+	char *name, *rules = 0;
+	char *domain_names_active = 0;
 	
 	/* alloc mem for transitions */
 	myappend = memget2(max_char);
@@ -1366,9 +1369,28 @@ void reload()
 	
 	/* load old policy from kernel */
 	tdomf_old = file_read(tdomk, 1);
-
+	
 	/* load domain policy to the kernel */
 	while(1){	
+
+		/* get the list of all current active full domain names */
+		strnull2(&domain_names_active);
+		temp = tdomf_old;
+		while(1){
+			/* get next line */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			
+			/* choose only those lines starting with "<kernel>" */
+			if (string_search_keyword_first(res, "<kernel>")){
+				/* add full domain name to my list */
+				strcat2(&domain_names_active, res);
+				strcat2(&domain_names_active, "\n");
+			}
+			free2(res);
+		}
+
+		/* zero my list */
 		strnull2(&myappend);
 
 		/* create append list with deleting old policy from kernel
@@ -1422,26 +1444,64 @@ void reload()
 
 			/* get full domain name with "<kernel>" tag */
 			temp2 = res;
-			res2 = string_get_next_line(&temp2);
-			if (res2){
+			name = string_get_next_line(&temp2);
+			if (name){
+				/* get the rest of the rules */
+				strcpy2(&rules, temp2);
 				/* append list with select <kernel> /bin/... */
-				strcat2(&myappend, res2);
+				strcat2(&myappend, name);
+				strcat2(&myappend, "\n");
+				/* append list with the new rules for my domain */
+				strcat2(&myappend, rules);
 				strcat2(&myappend, "\n");
 
-				/* append list with delete rules */
-				while(1){
-					/* get next rule */
-					rule = string_get_next_line(&temp2);
-					if (!rule) break;
-					/* add only if not an empty line */
-					if (strlen2(&rule)){
-						/* add rule to append list */
-						strcat2(&myappend, rule);
-						strcat2(&myappend, "\n");
+				/* append list with the new rules for the domains of the current running process too */
+				/* i do this by searching through the end of all the active domain names,
+				 * and if my full domain names matches the end of any active domain names,
+				 * then i apply my rules to that one too,
+				 * so this way the current running process will have its rules applied on it on-the-fly,
+				 * while it will also enter to my prepared domain after restart */
+				if (strlen2(&domain_names_active)){
+
+					/* cycle through the active domain names */
+					temp3 = domain_names_active;
+					while(1){
+						/* get next active domain name */
+						res2 = string_get_next_line(&temp3);
+						if (!res2) break;
+
+						/* skip the same as my domain name */
+						if (strcmp(name, res2)){
+							/* compare its end to my domain name */
+							char *s1 = 0;
+							char *s2 = 0;
+							long l1 = strlen2(&name);
+							long l2 = strlen2(&res2);
+							if (l1 > 8 && l2 > 8 && l2 >= l1){
+								/* copy the domain names without the starting "<kernel>" part */
+								strcpy2(&s1, name + 8);
+								strcpy2(&s2, res2 + 8 + l2 - l1);
+
+								/* if they match, then load my new rules to this active domain too */
+								if (!strcmp(s1, s2)){
+									/* append list with select domain name */
+									strcat2(&myappend, "select ");
+									strcat2(&myappend, res2);
+									strcat2(&myappend, "\n");
+									/* append list with the new rules */
+									strcat2(&myappend, rules);
+									strcat2(&myappend, "\n");
+								}
+
+								free2(s1);
+								free2(s2);
+							}
+						}
+						free2(res2);
 					}
-					free2(rule);
-				}
-				free2(res2);
+			 	}
+
+				free2(name);
 			}
 			free2(res);
 		}
@@ -1461,6 +1521,8 @@ void reload()
 		}
 	}
 	
+	free2(domain_names_active);
+	free2(rules);
 	free2(tdomf_old);
 
 	free2(myappend);
