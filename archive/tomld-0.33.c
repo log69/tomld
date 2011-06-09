@@ -160,18 +160,21 @@ flow chart:
 /* tab = 4 chars */
 
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
+#include <dirent.h>
+#include <termios.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/mount.h>
 #include <signal.h>
 
-#include "tio.h"
-
 
 #define max_char	4096
-#define max_num		68
+#define max_num		32
 
 
 /* ------------------------------------------ */
@@ -337,10 +340,17 @@ char *tshellf2[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbas
 "/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish", "/usr/bin/ksh", "/usr/bin/rc",
 "/usr/bin/screen", 0};
 
+char *path_bin[] = {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin", 0};
+
 char *spec_exception[] = {"/etc/", "/home/\\*/", "/root/", 0};
 char *spec[] = {"/home/\\{\\*\\}", "/usr/share/\\{\\*\\}", "/etc/fonts/\\{\\*\\}", "/var/cache/\\{\\*\\}", 0};
 char *spec_ex = 0;
 char *spec1 = 0;
+
+/* other vars */
+struct termio terminal_backup;
+
+int debug_var = 0;
 
 
 /* ----------------------------------- */
@@ -460,6 +470,13 @@ void help() {
 }
 
 
+/* free my allocated dynamic string space */
+void free2(char *ptr)
+{
+	if (ptr) free((unsigned long*)(ptr) - 2);
+}
+
+
 /* free my pointers */
 void myfree()
 {
@@ -492,6 +509,84 @@ void myexit(int num)
 }
 
 
+/* count lines of string */
+int string_count_lines(const char *text)
+{
+	int i = 0;
+	int c = 0;
+	while(1){
+		if (!text[i]) return c;
+		if (text[i] == '\n') c++;
+		i++;
+	}
+}
+
+
+/* print a new line */
+void newl()
+{
+	printf("\n");
+}
+
+
+/* print a new line to stderr */
+void newl_()
+{
+	fprintf(stderr, "%s", "\n");
+	fflush(stderr);
+}
+
+
+/* print debug info about a string */
+void debug(const char *text)
+{
+	long c;
+	long l;
+	/* isn't text a null pointer? */
+	if (text){
+		l = strlen(text);
+		/* count lines of text */
+		c = string_count_lines(text);
+		/* print text and info */
+		printf("--\n");
+		printf(text);
+		/* print newline if missing from the end of string */
+		if (text[l-1] != '\n') newl();
+		printf("-- debug bytes %ld and ", strlen(text));
+		printf("lines %ld\n", c);
+	}
+	else printf("-- null pointer\n");
+}
+
+
+/* print debug info about an integer */
+void debugi(int num)
+{
+	printf("-- debug integer is %d\n", num);
+}
+
+
+/* print debug info about a long integer */
+void debugl(long num)
+{
+	printf("-- debug long integer is %ld\n", num);
+}
+
+
+/* print debug info about a float */
+void debugf(float num)
+{
+	printf("-- debug float is %f\n", num);
+}
+
+
+/* print debug info about a pointer */
+void debugp(char *p)
+{
+	printf("-- debug pointer is %p\n", p);
+}
+
+
 /* print colored output to stdout */
 void color(const char *text, const char *col)
 {
@@ -508,112 +603,970 @@ void color(const char *text, const char *col)
 }
 
 
-/* give a choice */
-int choice(const char *text)
+/* print colored output to stderr */
+void color_(const char *text, const char *col)
 {
-	char c = 0, c2;
-	if (opt_yes){
-		printf(text);
-		printf(" (y)\n");
+	if (opt_color){
+		fprintf(stderr, "%s", col);
+		fprintf(stderr, "%s", text);
+		fprintf(stderr, "%s", clr);
+		fflush(stderr);
 	}
 	else{
-		printf(text);
-		printf(" [y/N]");
-		c = getchar();
-		if (c == '\n') return 0;
-		while((c2 = getchar()) != '\n');
-		if (c == 'y' || c == 'Y') return 1;
-		return 0;
+		fprintf(stderr, "%s", text);
+		fflush(stderr);
 	}
+}
+
+
+/* allocate dynamic string memory for char and return pointer */
+/* my dynamic string looks like this: */
+/* [maxlen] [len] [s t r i n g c h a r s \0 \0 \0] */
+/* i make the pointer point to the data part after maxlen and len data */
+/* returned value must be freed by caller */
+char *memget2(unsigned long num)
+{
+	/* get long pointer for extra datas */
+	unsigned long *p2;
+	/* alloc mem */
+	char *p = malloc(sizeof(char) * (num + 1) + sizeof(unsigned long) + sizeof(unsigned long));
+	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	/* convert pointer */
+	p2 = (unsigned long*)(p);
+	/* store memory size as the first data in pointer */
+	*p2 = num + 1; p2++;
+	/* store string length as the second data in pointer */
+	*p2 = 0; p2++;
+	/* set pointer to string data */
+	p = (char*)(p2);
+	/* clear string */
+	p[0] = 0;
+	return p;
+}
+
+
+/* allocate memory for char and return pointer */
+/* returned value must be freed by caller */
+char *memget(unsigned long num)
+{
+	char *p = malloc((sizeof(char)) * (num + 1));
+	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	/* clear first byte */
+	p[0] = 0;
+	return p;
+}
+
+
+/* allocate memory for char pointer list and return pointer */
+/* returned value must be freed by caller */
+char **memget_ptr(unsigned long num)
+{
+	char** p = malloc((sizeof(char**)) * (num + 1));
+	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	/* clear first byte */
+	p[0] = 0;
+	return p;
+}
+
+
+/* allocate memory for long and return pointer */
+/* returned value must be freed by caller */
+long *memget_long(unsigned long num)
+{
+	long *p = malloc((sizeof(long)) * (num + 1));
+	if (!p){ color_("error: out of memory\n", red); myexit(1); }
+	/* clear first byte */
+	p[0] = 0;
+	return p;
+}
+
+
+/* my strlen for dynamic strings */
+unsigned long strlen2(char **s1)
+{
+	if ((*s1)) return *((unsigned long*)(*s1) - 1);
+	else return 0;
+}
+
+
+/* my setting length for dynamic strings */
+void strlenset2(char **s1)
+{
+	*((unsigned long*)(*s1) - 1) = strlen((*s1));
+}
+
+
+/* my setting length for dynamic strings */
+void strlenset3(char **s1, unsigned long l)
+{
+	*((unsigned long*)(*s1) - 1) = l;
+}
+
+
+/* zero my dynamic string and its length too */
+void strnull2(char **s1)
+{
+	if (*s1){
+		*((unsigned long*)(*s1) - 1) = 0;
+		*(*s1) = 0;
+	}
+}
+
+
+/* my strcpy for dynamic strings */
+void strcpy2(char **s1, const char *s2)
+{
+	unsigned long *p2, l2, size;
+	/* safety check for null pointers */
+	if (!s2) return;
+	/* length of source string */
+	l2 = strlen(s2) + 1;
+	/* alloc mem and initialize it if destination string is a null pointer */
+	if (!(*s1)) *s1 = memget2(l2 * 2);
+	/* get long pointer for extra datas */
+	p2 = (unsigned long*)(*s1);
+	/* maximum size of string memory */
+	size = *(p2 - 2);
+	/* allocate new bigger one if space is smaller than needed */
+	if (size < l2){
+		/* new mem */
+		char *s3 = memget2(l2 * 2);
+		free2(*s1);
+		*s1 = s3;
+		p2 = (unsigned long*)(*s1);
+	}
+	/* store length of new result string */
+	*(p2 - 1) = l2 - 1;
+	/* copy source to dest string */
+	while(l2--) (*s1)[l2] = s2[l2];
+}
+
+
+/* my strcat for dynamic strings */
+void strcat2(char **s1, const char *s2)
+{
+	unsigned long *p2, l1, l2, l3, size;
+	/* safety check for null pointers */
+	if (!s2) return;
+	/* length of source string */
+	l2 = strlen(s2) + 1;
+	/* alloc mem and initialize it if destination string is a null pointer */
+	if (!(*s1)) *s1 = memget2(l2 * 2);
+	/* get long pointer for extra datas */
+	p2 = (unsigned long*)(*s1);
+	/* length of destination string */
+	l1 = *(p2 - 1);
+	/* total length needed to store result */
+	l3 = l1 + l2;
+	/* maximum size of string memory */
+	size = *(p2 - 2);
+	/* allocate new bigger one if space is smaller than needed */
+	if (size < l3){
+		/* new mem */
+		char *s3 = memget2(l3 * 2);
+		unsigned long l4 = l1 + 1;
+		/* copy old string */
+		while(l4--) s3[l4] = (*s1)[l4];
+		free2(*s1);
+		*s1 = s3;
+		p2 = (unsigned long*)(*s1);
+	}
+	/* store length of new result string */
+	*(p2 - 1) = l3 - 1;
+	/* copy source behind dest string */
+	while(l2--) (*s1)[l1 + l2] = s2[l2];
+}
+
+
+/* my strncat */
+/*char *strncat2(char *s1, const char *s2, unsigned long size)
+{
+	return (strncat(s1, s2, size - strlen(s1) - 1));
+*/
+/*	char *res = s1;
+	if (size > 0) {
+		while (*res++);
+		res--;
+		while ((*res++ = *s2++) && (--size));
+		*res = 0;
+		return s1;
+	}
+	else return res;*/
+/*}*/
+
+
+/* my strncpy */
+/*
+char *strncpy2(char *s1, const char *s2, unsigned long size)
+{*/
+	/* this version of strncpy takes ages to finish running */
+	/* because it fills all the the rest of the bytes too */
+/*	char *res = strncpy(s1, s2, size);
+	s1[size - 1] = 0;
+	return res;*/
+
+	/* this version of strncpy is fast */
+/*	char *res = s1;
+	while((*s1++ = *s2++) && (size--));
+	*(--s1) = 0;
+	return res;
+}*/
+
+
+/* convert char to integer */
+int string_ctoi(char c)
+{
+	char s[2];
+	s[0] = c; s[1] = 0;
+	return (atoi(s));
+}
+
+
+/* convert integer to char */
+/* return modulus of dividing by 10 */
+char string_itoc(int i)
+{
+	return ('0' + (i % 10));
+}
+
+
+/* convert integer to string */
+/* returned value must be freed by caller */
+char *string_itos(int num)
+{
+	char *res = memget2(max_num);
+	sprintf(res, "%d", num);
+	strlenset2(&res);
+	return res;
+}
+
+
+/* convert long integer to string */
+/* returned value must be freed by caller */
+char *string_ltos(unsigned long num)
+{
+	char *res = memget2(max_num);
+	sprintf(res, "%ld", num);
+	strlenset2(&res);
+	return res;
+}
+
+
+/* check if link exists and return string with resolved link path */
+/* return null on fail */
+/* returned value must be freed by caller */
+char *link_read(const char *name)
+{
+	int flag = 0;
+	char *temp = 0;
+	char *buff = memget2(max_char);
+	
+	/* resolve links until no more link */
+	strcpy2(&temp, name);
+	while (1){
+		/* read link path */
+		int i = readlink(temp, buff, max_char);
+		/* copy link if any */
+		if (i > 0){
+			flag = 1;
+			buff[i] = 0;
+			strlenset2(&buff);
+			strcpy2(&temp, buff);
+		}
+		else{
+			/* if no link could be resolved at all,
+			 * then return original file name */
+			if (!flag) strcpy2(&buff, name);
+			free2(temp);
+			return buff;
+		}
+	}
+}
+
+
+/* return the filename part of a path string */
+/* returned value must be freed by caller */
+char *path_get_filename(const char *text)
+{
+	char *res;
+	char c;
+	int i, i2, l;
+	
+	/* alloc mem for result */
+	res = memget2(max_char);
+
+	/* search for filename part */
+	l = strlen(text);
+	if (l > 0){
+		i = l;
+		/* search for "/" char backwords and stop at it */
+		while (i--){
+			c = text[i];
+			if (c == '/') { i++; break; }
+		}
+		/* rightmost string is not null? */
+		if (i < l){
+			/* copy string after "/" char */
+			i2 = 0;
+			while(i <= l){
+				res[i2++] = text[i++];
+			}
+			strlenset2(&res);
+			return res;
+		}
+	}
+	
+	return 0;
+}
+
+
+/* return the first occurence of string containing only numbers */
+/* returned value must be freed by caller */
+char *string_get_number(const char *text)
+{
+	char *res;
+	char c;
+	int i = 0;
+	int start = 0;
+	int l;
+	
+	/* go to the first number char */
+	while(1){
+		c = text[i];
+		if (!c || c == '\n') return 0;
+		if (c >= '0' && c <= '9') break;
+		i++;
+	}
+
+	/* read only number chars and stop */
+	start = i;
+	while(1){
+		c = text[i];
+		if (c < '0' || c > '9') break;
+		i++;
+	}
+	
+	l = i - start;
+	/* fail on zero length result */
+	if (l < 1) return 0;
+
+	/* allocate mem for the new string */
+	res = memget2(l);
+	/* copy word */
+	i = l;
+	while(i--){
+		res[i] = text[start + i];
+	}
+	res[l] = 0;
+	strlenset2(&res);
+
+	return res;
+}
+
+
+/* return a new string containing the next line of a string and move the pointer to the beginning of the this line */
+/* returned value must be freed by caller */
+char *string_get_next_line(char **text)
+{
+	char *res = 0, c;
+	int i = 0;
+	
+	if (!(*text)) return 0;
+	if (!(*text)[0]) return 0;
+
+	while(1){
+		c = (*text)[i];
+		/* exit on end or on a new line */
+		if (!c || c == '\n') break;
+		i++;
+	}
+
+	/* copy only "i" chars */
+	c = (*text)[i];
+	(*text)[i] = 0;
+	strcpy2(&res, (*text));
+	(*text)[i] = c;
+	/* move pointer to the next line, or leave it on null end */
+	if (c) i++;
+	(*text) += i;
+
+	return res;
+}
+
+
+/* return a new string containing the last line of a string and move the pointer to the beginning of the this line */
+/* returned value must be freed by caller */
+char *string_get_last_line(char **text)
+{
+	char *res = 0, c;
+	int i, l;
+
+	/* get string length */	
+	l = strlen((*text));
+	/* return null if input string is null too */
+	if (l < 1){
+		res = memget2(1);
+		return res;
+	}
+	
+	/* go backwards till i find a new line */
+	i = l - 1;
+	while(1){
+		/* last char may be new line, that still counts for the last line */
+		i--;
+		if (i < 0) break;
+		c = (*text)[i];
+		if (c == '\n'){ i++; break; }
+	}
+	if (i < 0) i = 0;
+	l = l - i + 1;
+
+	/* move pointer to the next line */
+	(*text) += i;
+	l--;
+	/* copy onyl "l" chars */
+	c = (*text)[l];
+	(*text)[l] = 0;
+	strcpy2(&res, (*text));
+	(*text)[l] = c;
+
+	return res;
+}
+
+
+/* return the length of the next line in a string */
+int string_next_line_len(const char *text)
+{
+	int i = 0;
+	while(1){
+		char c = text[i];
+		/* exit on end or on a new line */
+		if (!c || c == '\n') return i;
+		i++;
+	}
+}
+
+
+/* move pointer to the beginning of next line in a string skipping empty lines */
+/* return null on fail */
+int string_jump_next_line(char **text)
+{
+	char c;
+	int i = 0;
+
+	if (!(*text)) return 0;
+
+	/* jump to next line */
+	while(1){
+		c = (*text)[i++];
+		/* exit on end */
+		if (!c) return 0;
+		/* exit on new line */
+		if (c == '\n') break;
+	}
+
+	/* skip new lines */
+	while(1){
+		c = (*text)[i];
+		/* exit on end */
+		if (!c) return 0;
+		/* exit on new line */
+		if (c != '\n') break;
+		i++;
+	}
+
+	/* success, move pointer */
+	(*text) += i;
 	return 1;
 }
 
 
-/* print sand clock */
-void sand_clock(int dot)
+/* return a new string containing the next word in a string and move the pointer to the beginning of the next word */
+/* check only the current line, not the whole string */
+/* returned value must be freed by caller */
+char *string_get_next_word(char **text)
 {
-	if (dot == 1){
-		if (!flag_firstrun){
-			printf(".");
-			flag_clock = 0;
-		}
+	char *res, c;
+	int i = 0;
+	int start, l;
+
+	if (!(*text)) return 0;
+
+	/* skip white spaces or exit on end of line */
+	while (1){
+		c = (*text)[i];
+		if (!c || c == '\n') return 0;
+		if (c != ' ') break;
+		i++;
 	}
-	else if (dot){
-		if (!flag_firstrun){
-			printf("+");
-			flag_clock = 0;
-		}
+
+	start = i;
+	while (1){
+		/* get next char */
+		c = (*text)[i];
+		/* exit on new line */
+		if (!c || c == '\n' || c == ' ') break;
+		i++;
 	}
-	else{
-		int c = flag_clock % 4;
-		if (c == 0) printf("-\b");
-		if (c == 1) printf("\\\b");
-		if (c == 2) printf("|\b");
-		if (c == 3) printf("/\b");
-		flag_clock += 1;
+	
+	l = i - start;
+	/* fail on zero length result */
+	if (l < 1) return 0;
+
+	/* allocate mem for the new string */
+	res = memget2(l);
+	/* copy word */
+	i = l;
+	while(i--){
+		res[i] = (*text)[start + i];
 	}
-	fflush(stdout);
+	res[l] = 0;
+	strlenset3(&res, l);
+	/* skip more white spaces and move pointer to the next line */
+	i = start + l;
+	while (1){
+		c = (*text)[i];
+		if (c != ' ') break;
+		i++;
+	}
+	(*text) += i;
+
+	return res;
 }
 
 
-/* get kernel version in a format where 2.6.33 will be 263300 */
-int kernel_version()
+/* return n. word from a line of string */
+/* returned value must be freed by caller */
+char *string_get_next_wordn(char **text, int num)
 {
-	char *v = "/proc/sys/kernel/osrelease";
-	char *buff;
-	int c, c2;
-	int ver = 0;
-	char n;
-	/* read kernel version from /proc in a format as 2.6.32-5-amd64 */
-	buff = file_read(v, 1);
-	c = 0;
-	/* create version numbers */
-	c2 = 100000;
-	while (c2){
-		n = buff[c++];
-		if (n != '.'){
-			/* exit if no numbers or at end of string */
-			if (!(n >= '0' && n <= '9') || !n){ free2(buff); return ver; }
-			/* convert string to integer and add it to result */
-			ver += c2 * string_ctoi(n);
-			c2 /= 10;
+	char *res, c;
+	int i = 0;
+	int start = 0;
+	int l;
+
+	if (!(*text)) return 0;
+
+	/* count num pieces of words */
+	if (num < 0) num = 0;
+	num++;
+	while (num--){
+
+		/* skip white spaces or exit on end of line */
+		while (1){
+			c = (*text)[i];
+			/* exit on end */
+			if (!c || c == '\n') return 0;
+			if (c != ' ') break;
+			i++;
+		}
+
+		start = i;
+		while (1){
+			/* get next char */
+			c = (*text)[i];
+			/* exit on end if not the last word yet */
+			if (!c || c == '\n'){
+				if (num > 0) return 0;
+				else break;
+			}
+			if (c == ' ') break;
+			i++;
 		}
 	}
-	free2(buff);
+	
+	l = i - start;
+	/* fail on zero length result */
+	if (l < 1) return 0;
 
-	return ver;
+	/* allocate mem for the new string */
+	res = memget2(l);
+	/* copy word */
+	i = l;
+	while(i--){
+		res[i] = (*text)[start + i];
+	}
+	res[l] = 0;
+	strlenset3(&res, l);
+	/* skip more white spaces and move pointer to the next line */
+	i = start + l;
+	while (1){
+		c = (*text)[i];
+		if (c != ' ') break;
+		i++;
+	}
+	(*text) += i;
+
+	return res;
 }
 
 
-/* get tomoyo version */
-int tomoyo_version()
+/* return last word from a line of string */
+/* returned value must be freed by caller */
+char *string_get_last_word(char **text)
 {
-	char *buff;
-	char n;
-	int c, c2;
-	static int ver = 0;
+	char *res, c;
+	int i = 0;
+	int start, end;
+	int l;
+
+	if (!(*text)) return 0;
+
+	/* skip white spaces or exit on end of line */
+	while (1){
+		c = (*text)[i];
+		/* exit on end */
+		if (!c || c == '\n') return 0;
+		if (c != ' ') break;
+		i++;
+	}
+
+	/* get length from here to the end of the line */
+	start = i;
+	while(1){
+		c = (*text)[i];
+		if (!c || c == '\n') break;
+		i++;
+	}
 	
-	if (ver) return ver;
+	/* get last word going backwards */
+	i--;
+	end = i;
+	while(1){
+		c = (*text)[i];
+		if (c == ' ' || i < start) break;
+		i--;
+	}
+	i++;
+	
+	/* allocate mem for the new string */
+	l = end - i + 1;
+	res = memget2(l + 1);
+	/* copy word */
+	start = i;
+	i = l;
+	while(i--){
+		res[i] = (*text)[start + i];
+	}
+	res[l] = 0;
+	strlenset3(&res, l);
+	/* set pointer to the beginning of the last word */
+	(*text) += start;
 
-	/* read version string */
-	buff = file_read(tverk, 1);
+	return res;
+}
 
-	c = 0;
-	/* create version numbers */
-	c2 = 1000;
-	while (c2){
-		n = buff[c++];
-		if (n != '.'){
-			/* exit if no numbers or at end of string */
-			if (!(n >= '0' && n <= '9') || !n){ free2(buff); return ver; }
-			/* convert string to integer and add it to result */
-			ver += c2 * string_ctoi(n);
-			c2 /= 10;
+
+/* search for a keyword from the beginning of a string */
+/* returns true if success */
+int string_search_keyword_first(const char *text, const char *key)
+{
+	char c1, c2;
+	int i = 0;
+	
+	if (!text) return 0;
+
+	while(1){
+		c1 = text[i];
+		c2 = key[i];
+		if (!c2) return 1;
+		if (!c1 || c1 != c2) return 0;
+		i++;
+	}
+}
+
+
+/* search for a keyword from the end of a string */
+/* returns true if success */
+int string_search_keyword_last(const char *text, const char *key)
+{
+	char c1, c2;
+	int i1, i2;
+	long l1, l2;
+	
+	if (!text) return 0;
+
+	l1 = strlen(text);
+	l2 = strlen(key);
+	if (l2 > l1) return 0;
+
+	i1 = l1 - l2;
+	i2 = 0;
+	while(1){
+		c1 = text[i1];
+		c2 = key[i2];
+		if (!c1) return 1;
+		if (c1 != c2) return 0;
+		i1++; i2++;
+	}
+}
+
+
+/* copy the elements of the array to a string list and return the string */
+/* returned value must be freed by caller */
+char *array_copy_to_string_list(char **array)
+{
+	char *new = 0;
+	char *ptr;
+	
+	while(1){
+		ptr = *(array++);
+		if (!ptr) break;
+		strcat2(&new, ptr);
+		strcat2(&new, "\n");
+	}
+	
+	return new;
+}
+
+
+/* search for a keyword in an array and return pointer to it */
+/* return 0 on fail */
+char *array_search_keyword(char **array, const char *key)
+{
+	char *ptr;
+	
+	while(1){
+		ptr = *(array++);
+		if (!ptr) return 0;
+		if (!strcmp(ptr, key)) return ptr;
+	}
+}
+
+
+/* search for a keyword in a string and return the position where it starts */
+/* return -1 on fail */
+int string_search_keyword(const char *text, const char *key)
+{
+	char c1, c2;
+	int i, i2, start;
+
+	if (!text) return -1;
+
+	/* search for the keyword */
+	i = 0;
+	i2 = 0;
+	start = 0;
+	while(1){
+		c1 = text[i];
+		c2 = key[i2];
+		/* stop on reaching end of keyword and success */
+		if (!c2) return start;
+		/* stop on end of text and fail */
+		if (!c1) return -1;
+		/* stop if no match or if end of text */
+		if (c1 != c2){
+			i2 = 0;
+			start = i + 1;
+		}
+		else i2++;
+		i++;
+	}
+	
+	return -1;
+}
+
+
+/* search for a line in a string and return the position where it starts */
+/* return -1 on fail */
+int string_search_line(const char *text, const char *line)
+{
+	char c1, c2;
+	int i, i2, start;
+	
+	/* fail on null pointer */
+	if (!text) return -1;
+
+	/* search for the line */
+	i = 0;
+	i2 = 0;
+	start = 0;
+	while(1){
+		c1 = text[i];
+		c2 = line[i2];
+		/* stop on reaching end of line and end of string together and success */
+		if (!c2 && (c1 == '\n' || !c1)) return start;
+		/* stop on end of text and fail */
+		if (!c1) return -1;
+		/* jump to next line if no match */
+		if (c1 != c2){
+			while(1){
+				c1 = text[i];
+				/* fail if no more lines */
+				if (!c1) return -1;
+				if (c1 == '\n') break;
+				i++;
+			}
+			i2 = 0;
+			start = i + 1;
+		}
+		else i2++;
+		i++;
+	}
+	
+	return -1;
+}
+
+
+/* remove a whole line from a string and return the result */
+/* returned value must be freed by caller */
+char *string_remove_line(char *text, const char *line)
+{
+	char *res, *temp;
+	char *text_new = memget2(strlen(text));
+	
+	temp = text;
+	while(1){
+		/* get next line */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		/* compare it */
+		if (strcmp(res, line)){
+			/* add line to new string if no match */
+			strcat2(&text_new, res);
+			strcat2(&text_new, "\n");
 		}
 	}
-	free2(buff);
+
+	/* return result */
+	return text_new;
+}
+
+
+/* compare strings for qsort */ 
+int string_cmp(const void *a, const void *b) 
+{ 
+	const char **ia = (const char **)a;
+	const char **ib = (const char **)b;
+	return strcmp(*ia, *ib);
+}
+
+
+/* sort lines of a string and make it uniq */
+/* returned value must be freed by caller */
+char *string_sort_uniq_lines(const char *text)
+{
+	char c, *res, *text_temp, **ptr;
+	char *text_new, *text_final, *text_sort;
+	char *res2 = 0;
+	int flag_first = 0;
+	int flag_newl = 0;
+	int flag_diff = 0;
+	int i, i2, l1, l2, count;
+	int maxl;
+
+	if (!text) return 0;
+
+	/* return null on zero input */
+	if (!text[0]) return (memget2(1));
+
+	maxl = strlen(text) + 1;
+	text_sort = memget2(maxl);
+	/* create a copy of text for sorting */
+	strcpy2(&text_sort, text);
+
+	/* count lines */
+	i = 0;
+	count = 0;
+	while(1){
+		c = text[i++];
+		/* exit on end */
+		if (!c) break;
+		if (c == '\n') count++;
+	}
+
+	/* alloc mem for char pointers pointing to string lines */
+	ptr = memget_ptr(count);
 	
-	return ver;
+	/* change new line chars to nulls and create pointer list to string lines */
+	i = 0;
+	i2 = 0;
+	flag_newl = 0;
+	while(1){
+		c = text_sort[i];
+		/* exit on end */
+		if (!c) break;
+		/* add pointer at first line or after every new line */
+		if (!flag_newl){
+			ptr[i2++] = text_sort + i;
+			flag_newl = 1;
+		}
+		/* make a mark at new line and change new line to zero */
+		if (c == '\n'){
+			text_sort[i] = 0;
+			flag_newl = 0;
+		}
+		i++;
+	}
+	
+	/* sort it */
+	qsort(ptr, count, sizeof(char *), string_cmp);
+
+	/* create another string holder */
+	text_new = memget2(maxl);
+
+	/* collect lines back from pointer list */
+	i = 0;
+	i2 = count;
+	while(i2--){
+		char *s = ptr[i++];
+		strcat2(&text_new, s);
+		strcat2(&text_new, "\n");
+	}
+	free2(text_sort);
+	free(ptr);
+
+	/* create another string holder */
+	text_final = memget2(maxl);
+
+	/* make it uniq */
+	text_temp = text_new;
+	while(1){
+		/* get next line */
+		res = string_get_next_line(&text_temp);
+		/* exit on end */
+		if (!res){
+			free2(res2);
+			break;
+		}
+
+		/* first run */		
+		if (!flag_first){
+			l1 = strlen2(&res);
+			strcat2(&text_final, res);
+			strcat2(&text_final, "\n");
+		}
+		else{
+			/* compare 2 lines */
+			l1 = strlen2(&res);
+			l2 = strlen2(&res2);
+			flag_diff = 0;
+			if (l1 != l2) flag_diff = 1;
+			else if (strcmp(res, res2)) flag_diff = 1;
+			/* store if different */
+			if (flag_diff){
+				strcat2(&text_final, res);
+				strcat2(&text_final, "\n");
+			}
+			free2(res2);
+		}
+		
+		res2 = res;
+		flag_first = 1;
+	}
+	free2(text_new);
+
+	return text_final;
+}
+
+
+/* check if path string ends with "/" char meaning it's a dir */
+/* returns true if so */
+int path_is_dir(const char *path)
+{
+	long l = strlen(path);
+	if (!l) return 0;
+	if (path[l - 1] == '/') return 1;
+	return 0;
 }
 
 
@@ -640,6 +1593,220 @@ int path_is_dir_recursive_wildcard(const char *path)
 
 	free2(s);
 	return 0;
+}
+
+
+/* count subdirs in path name */
+/* returns the number of subdir names between "/" chars in a path name */
+/* path must start with "/" char */
+/* only one "/" counts 1 */
+int path_count_subdirs_name(const char *path)
+{
+	char c, d;
+	int i, i2;
+	
+	i = 0;
+	i2 = 0;
+	c = 0;
+	while(1){
+		d = c;
+		c = path[i];
+		if (!c) break;
+		if (c == '/' && d != '/') i2++;
+		i++;
+	}
+	return i2;
+}
+
+
+/* get n part of subdir names from path name */
+/* value 1 of num gets only a single "/" char if any */
+/* path must start with "/" char */
+/* returned value must be freed by caller */
+char *path_get_subdirs_name(const char *path, int num)
+{
+	char *path_new;
+	char c, d;
+	int n, i, i2;
+
+	/* alloc mem for new path name */
+	path_new = memget2(max_char);
+	
+	/* return empty string if num is null */
+	if (!num) return path_new;
+
+	/* copy path to new path */
+	strcpy2(&path_new, path);
+	
+	n = 0;
+	i = 0;
+	i2 = 0;
+	c = 0;
+	while(1){
+		d = c;
+		c = path[i];
+		if (!c) break;
+		/* move i2 to every end of subdir names following a "/" char */
+		if (c == '/' && d != '/'){ i2 = i + 1; n++; }
+		i++;
+		if (n >= num){
+			break;
+		}
+	}
+	/* give back only subdir names */
+	path_new[i2] = 0;
+	strlenset3(&path_new, i2);
+	
+	return path_new;
+}
+
+
+/* join 2 paths together to make it a full path */
+/* returned value must be freed by caller */
+char *path_join(char *path1, char *path2)
+{
+	long l1 = strlen(path1);
+	char *res = 0;
+	
+	/* create new joined path */
+	strcpy2(&res, path1);
+	/* does path1 end with "/" char? if not, then add "/" char too */
+	if (path1[l1 - 1] != '/') strcat2(&res, "/");
+	strcat2(&res, path2);
+	
+	return res;
+}
+
+
+/* return the parent dir if path is a file */
+/* returned value must be freed by caller */
+char *path_get_parent_dir(char *path)
+{
+	char c;
+	int i;
+	long l;
+	
+	/* alloc mem for new path */
+	char *path_new = 0;
+	/* copy old path */
+	strcpy2(&path_new, path);
+	
+	l = strlen2(&path_new) - 1;
+
+	/* if path is a dir, then remove "/" chars from the end */
+	if (path_is_dir(path_new)){
+		while(1){
+			if (l < 0) break;
+			c = path_new[l];
+			if (c != '/') break;
+			l--;
+		}
+	}
+	
+	/* get the dir part */
+	i = 0;
+	while(1){
+		if (l < 0) break;
+		c = path_new[l];
+		if (c == '/'){ i = l + 1; break; }
+		l--;
+	}
+	path_new[i] = 0;
+	strlenset3(&path_new, i);
+
+	return path_new;
+}
+
+
+/* return the dir part of the path (result is the same if path is a dir) */
+/* returned value must be freed by caller */
+char *path_get_dir(char *path)
+{
+	char c;
+	int i;
+	long l;
+	
+	/* alloc mem for new path */
+	char *path_new = 0;
+	/* copy old path */
+	strcpy2(&path_new, path);
+	
+	/* if path is a dir, then return it */
+	if (path_is_dir(path_new)) return path_new;
+	
+	/* if it's a file, then get dir part */
+	l = strlen2(&path_new) - 1;
+	i = 0;
+	while(1){
+		if (l < 0) break;
+		c = path_new[l];
+		if (c == '/'){ i = l + 1; break; }
+		l--;
+	}
+	path_new[i] = 0;
+	strlenset3(&path_new, i);
+
+	return path_new;
+}
+
+
+/* get dirlist depth for recursive call */
+int path_count_dir_depth_r(char *path)
+{
+	DIR *mydir;
+	struct dirent *md;
+	static int depth = 0;
+	
+	if (!depth) depth = path_count_subdirs_name(path);
+
+	/* open path dir */
+	mydir = opendir(path);
+	/* return null if dir cannot be opened */
+	if (!mydir) return 0;
+	/* cycle through dir recursively */
+	while((md = readdir(mydir))) {
+		/* skip dir . and .. */
+		if(!strcmp(md->d_name, ".") || !strcmp(md->d_name, "..")) continue;
+		/* is it a dir? */
+		if (md->d_type == 4){
+			int d;
+			/* join paths */
+			char *res = path_join(path, md->d_name);
+			/* add "/" char to the end of path */
+			char *res2 = 0;
+			strcpy2(&res2, res);
+			strcat2(&res2, "/");
+			free2(res);
+			/* get dir depth for current dir */
+			path_count_dir_depth_r(res2);
+			/* count dir depth by checking subdir names in path and store the deepest */
+			d = path_count_subdirs_name(res2);
+			if (depth < d) depth = d;
+			free2(res2);
+		}
+	}
+	closedir(mydir);
+	
+	/* return dir depth by calculating depth minus number of original subdir names */
+	return (depth - path_count_subdirs_name(path) + 1);
+}
+
+
+/* count directory depth of a directory */
+int path_count_dir_depth(char *path)
+{
+	char *res;
+	int c;
+	
+	/* get parent dir */
+	res = path_get_dir(path);
+
+	/* get dir depth */	
+	c = path_count_dir_depth_r(res);
+	
+	free2(res);
+	
+	return c;
 }
 
 
@@ -1147,6 +2314,298 @@ void domain_add_rule(char *prog, char *rule)
 }
 
 
+/* ------------------------------------------------------------------------------------- */
+
+
+/* print time elapsed since program start */
+float mytime()
+{
+	static int flag_time = 0;
+	static struct timeval start, end;
+	static long seconds, useconds;
+	static float t = 0;
+
+	/* first run? */
+	if (!flag_time){
+		gettimeofday(&start, 0);
+		flag_time = 1;
+	}
+	else{
+		gettimeofday(&end, 0);
+		seconds  = end.tv_sec  - start.tv_sec;
+		useconds = end.tv_usec - start.tv_usec;
+
+		t = (((seconds) * 1000 + useconds/1000.0) + 0.5) / 1000;
+	}
+	
+	return t;
+}
+
+
+/* set terminal input mode for keyboard read */
+void key_set_mode()
+{
+	int fd = fileno(stdin);
+	struct termio term;
+	ioctl(fd, TCGETA, &terminal_backup);
+	term = terminal_backup;
+	term.c_cc[VMIN] = 0;
+	term.c_cc[VTIME] = 0;
+	term.c_lflag = 0;
+	ioctl(fd, TCSETA, &term);
+}
+
+
+/* restore original terminal mode */
+void key_clear_mode()
+{
+	int fd = fileno(stdin);
+	ioctl(fd, TCSETA, &terminal_backup);
+}
+
+
+/* read keyboard without waiting */
+char key_get()
+{
+	int fd, key;
+	char c = '\0';
+	key_set_mode();
+	fd = fileno(stdin);
+	key = read(fd, &c, 1);
+	if (!key) c = '\0';
+	key_clear_mode();
+	return c;
+}
+
+
+/* give a choice */
+int choice(const char *text)
+{
+	char c = 0, c2;
+	if (opt_yes){
+		printf(text);
+		printf(" (y)\n");
+	}
+	else{
+		printf(text);
+		printf(" [y/N]");
+		c = getchar();
+		if (c == '\n') return 0;
+		while((c2 = getchar()) != '\n');
+		if (c == 'y' || c == 'Y') return 1;
+		return 0;
+	}
+	return 1;
+}
+
+
+/* open pipe and read content with given length */
+/* returned value must be freed by caller */
+char *pipe_read(const char *comm, long length)
+{
+	char *buff;
+	
+	/* open pipe for reading */
+	FILE *p = popen(comm, "r");
+	if (!p){
+		color_("error: cannot open pipe for command: ", red);
+		color_(comm, red); newl_();
+		myexit(1);
+	}
+	
+	/* alloc mem for it */
+	buff = memget2(length);
+	memset(buff, 0, length);
+	/* read pipe */
+	fread(buff, length, 1, p);
+	pclose(p);
+	/* set dynamic string length */
+	strlenset2(&buff);
+	
+	return buff;
+}
+
+
+/* open pipe and write content as input to command */
+/* returned value must be freed by caller */
+void pipe_write(const char *comm, const char *buff)
+{
+	/* open pipe for writing */
+	FILE *p = popen(comm, "w");
+	if (!p){
+		color_("error: cannot open pipe for command: ", red);
+		color_(comm, red); newl_();
+		myexit(1);
+	}
+	
+	/* write pipe */
+	fprintf(p, "%s\n", buff);
+	pclose(p);
+}
+
+
+/* open file and read content with given length, or if length is null, then check length from file descriptor */
+/* returned value must be freed by caller */
+char *file_read(const char *name, long length)
+{
+	char *buff;
+	unsigned long len = 0;
+	
+	/* open file for reading */
+	FILE *f = fopen(name, "r");
+	if (!f){
+		color_("error: cannot read file ", red);
+		color_(name, red); newl_();
+		myexit(1);
+	}
+	/* check file length */
+	if (!length){
+		/* get file length from file descriptor */
+		fseek(f, 0, SEEK_END);
+		len = ftell(f);
+		fseek(f, 0, SEEK_SET);
+	}
+	/* length will be unknown (like with /proc files)
+	 * so check it by buffered reading because i need the exact length.
+	 * unfortunately at tomoyo proc files,
+	 * neither ftell nor fread can tell me the number of file position
+	 * or the number of read bytes,
+	 * so i have to trick with filling the buffer with zero
+	 * and check the string length at the end */
+	else{
+		unsigned long c = 0;
+		len = max_char;
+		buff = memget2(len);
+		while(1){
+			memset(buff, 0, len);
+			if (!fread(buff, len, 1, f)) break;
+			c++;
+		}
+		len = strlen(buff) + c * len;
+		free2(buff);
+		fclose(f);
+		f = fopen(name, "r");
+	}
+	
+	/* alloc mem */
+	buff = memget2(len);
+	/* read file */
+	if (len > 0){
+		fread(buff, len, 1, f);
+	}
+	fclose(f);
+	/* write null to the end of file */
+	buff[len] = 0;
+	/* set dynamic string length */
+	strlenset3(&buff, len);
+
+	return buff;
+}
+
+
+/* open file and write content */
+void file_write(const char *name, const char *buff)
+{
+	FILE *f = fopen(name, "w");
+	if (!f){
+		color_("error: cannot write file ", red);
+		color_(name, red); newl_();
+		myexit(1);
+	}
+	/* write contents if not null */
+	if (buff) fprintf(f, buff);
+	fclose(f);
+}
+
+
+/* get kernel version in a format where 2.6.33 will be 263300 */
+int kernel_version()
+{
+	char *v = "/proc/sys/kernel/osrelease";
+	char *buff;
+	int c, c2;
+	int ver = 0;
+	char n;
+	/* read kernel version from /proc in a format as 2.6.32-5-amd64 */
+	buff = file_read(v, 1);
+	c = 0;
+	/* create version numbers */
+	c2 = 100000;
+	while (c2){
+		n = buff[c++];
+		if (n != '.'){
+			/* exit if no numbers or at end of string */
+			if (!(n >= '0' && n <= '9') || !n){ free2(buff); return ver; }
+			/* convert string to integer and add it to result */
+			ver += c2 * string_ctoi(n);
+			c2 /= 10;
+		}
+	}
+	free2(buff);
+
+	return ver;
+}
+
+
+/* get tomoyo version */
+int tomoyo_version()
+{
+	char *buff;
+	char n;
+	int c, c2;
+	static int ver = 0;
+	
+	if (ver) return ver;
+
+	/* read version string */
+	buff = file_read(tverk, 1);
+
+	c = 0;
+	/* create version numbers */
+	c2 = 1000;
+	while (c2){
+		n = buff[c++];
+		if (n != '.'){
+			/* exit if no numbers or at end of string */
+			if (!(n >= '0' && n <= '9') || !n){ free2(buff); return ver; }
+			/* convert string to integer and add it to result */
+			ver += c2 * string_ctoi(n);
+			c2 /= 10;
+		}
+	}
+	free2(buff);
+	
+	return ver;
+}
+
+
+/* print sand clock */
+void sand_clock(int dot)
+{
+	if (dot == 1){
+		if (!flag_firstrun){
+			printf(".");
+			flag_clock = 0;
+		}
+	}
+	else if (dot){
+		if (!flag_firstrun){
+			printf("+");
+			flag_clock = 0;
+		}
+	}
+	else{
+		int c = flag_clock % 4;
+		if (c == 0) printf("-\b");
+		if (c == 1) printf("\\\b");
+		if (c == 2) printf("|\b");
+		if (c == 3) printf("/\b");
+		flag_clock += 1;
+	}
+	fflush(stdout);
+}
+
+
 /* return an integer containing the pid of the path of executable that is running */
 /* return null if no process is running like that */
 int process_get_pid(const char *name){
@@ -1157,7 +2616,7 @@ int process_get_pid(const char *name){
 	
 	/* open /proc dir */
 	mydir = opendir("/proc/");
-	if (!mydir){ error("error: cannot open /proc/ directory\n"); return 0; }
+	if (!mydir){ color_("error: cannot open /proc/ directory\n", red); return 0; }
 
 	/* cycle through dirs in /proc */
 	while((mydir_entry = readdir(mydir))) {
@@ -1173,7 +2632,7 @@ int process_get_pid(const char *name){
 			strcat2(&mydir_name, "/exe");
 
 			/* resolv the link pointing from the exe name */
-			res = path_link_read(mydir_name);
+			res = link_read(mydir_name);
 			if (res){
 				/* compare the link to the process name */
 				if (!strcmp(res, name)) {
@@ -1214,8 +2673,39 @@ char *process_get_path(int pid)
 	free2(str);
 
 	/* resolv the link pointing from the exe name */
-	res = path_link_read(path);
+	res = link_read(path);
 	free2(path);
+	return res;
+}
+
+
+/* check if dir exists */
+int dir_exist(const char *name){
+	DIR *d;
+	d = opendir(name);
+	if (d) { closedir(d); return 1; }
+	return 0;
+}
+
+
+/* check if file exists */
+int file_exist(const char *name)
+{
+	FILE *f;
+	int res = 0;
+
+	f = fopen(name, "r+");
+	if (f){
+		res = 1;
+		fclose(f);
+	}
+
+	f = fopen(name, "r");
+	if (f){
+		res = 1;
+		fclose(f);
+	}
+
 	return res;
 }
 
@@ -1557,6 +3047,57 @@ int check_instance(){
 }
 
 
+/* search file name in current dir first, then in bin locations and give back full path on success */
+/* returned value must be freed by caller */
+char *which(const char *name){
+	char *res, *full;
+	int i;
+	
+	/* name starts with "/" char? */
+	if (name[0] == '/'){
+		/* file exists? if not, then fail */
+		if (file_exist(name)){
+			/* return resolved link path */
+			return link_read(name);
+		}
+		return 0;
+	}
+	
+	full = memget2(max_char);
+
+	/* fle exists in the current dir? */
+	getcwd(full, max_char);
+	strcat2(&full, "/");
+	strcat2(&full, name);
+	if (file_exist(full)){
+		/* return resolved link path */
+		res = link_read(full);
+		free2(full);
+		return res;
+	}
+
+	/* file exists in the search paths? */
+	i = 0;
+	while(1){
+		res = path_bin[i++];
+		if (!res) break;
+		strcpy2(&full, res);
+		strcat2(&full, "/");
+		strcat2(&full, name);
+		if (file_exist(full)){
+			/* return resolved link path */
+			res = link_read(full);
+			free2(full);
+			return res;
+		}
+		strnull2(&full);
+	}
+
+	free2(full);
+	return 0;
+}
+
+
 /* create profile.conf and manager.conf files and load them to kernel if they are different */
 void create_prof()
 {
@@ -1689,10 +3230,10 @@ void check_options(int argc, char **argv){
 					int l;
 					flag_progs = 0;
 					/* root "/" dir not allowed */
-					if (!strcmp(myarg, "/")){ error("error: root directory is not allowed"); free2(myarg); myexit(1); }
+					if (!strcmp(myarg, "/")){ color_("error: root directory is not allowed", red); free2(myarg); myexit(1); }
 					/* check if dir name exist */
 					if (!dir_exist(myarg)){
-						error("error: no such directory: "); error(myarg); newl(); free2(myarg); myexit(1); }
+						color_("error: no such directory: ", red); color_(myarg, red); newl(); free2(myarg); myexit(1); }
 					/* expand recursive dir names with "/" char if missing */
 					l = strlen2(&myarg);
 					if (myarg[l-1] != '/'){ myarg[l] = '/'; myarg[l+1] = 0; }
@@ -1705,7 +3246,7 @@ void check_options(int argc, char **argv){
 					/* search for name in paths and check if file exists */
 					char *res = which(myarg);
 					if(!res){
-						error("error: no such file: "); error(myarg); newl(); free2(myarg); myexit(1); }
+						color_("error: no such file: ", red); color_(myarg, red); newl(); free2(myarg); myexit(1); }
 					/* if file exists, store it as extra executables */
 					strcat2(&tprogs, res);
 					strcat2(&tprogs, "\n");
@@ -1729,9 +3270,9 @@ void check_options(int argc, char **argv){
 		}
 
 		/* fail if no arguments for --remove option */
-		if (opt_remove && !strlen2(&opt_remove2)){ error("error: bad argument\n"); myexit(1); }
+		if (opt_remove && !strlen2(&opt_remove2)){ color_("error: bad argument\n", red); myexit(1); }
 		/* fail if no arguments for --recursive option */
-		if (opt_recursive && !dirs_recursive){ error("error: bad argument\n"); myexit(1); }
+		if (opt_recursive && !dirs_recursive){ color_("error: bad argument\n", red); myexit(1); }
 
 	}
 }
@@ -1747,7 +3288,7 @@ void check_tomoyo()
 	cmd = file_read("/proc/cmdline", 1);
 	if (string_search_keyword(cmd, " security=tomoyo") == -1){
 		free2(cmd);
-		error("error: tomoyo kernel mode is not activated\n");
+		color_("error: tomoyo kernel mode is not activated\n", red);
 		myexit(1);
 	}
 	free2(cmd);
@@ -1761,7 +3302,7 @@ void check_tomoyo()
 		flag_mount = mount("none", "/sys/kernel/security", "securityfs", MS_NOATIME, 0);
 		if (flag_mount == -1){
 			free2(cmd);
-			error("error: tomoyo securityfs cannot be mounted\n");
+			color_("error: tomoyo securityfs cannot be mounted\n", red);
 			myexit(1);
 		}
 	}
@@ -1772,14 +3313,14 @@ void check_tomoyo()
 	/* check tomoyo version */
 	tver = tomoyo_version();
 	if (tver < 2200 || tver > 2399){
-		error("error: tomoyo version is not compatible\n");
+		color_("error: tomoyo version is not compatible\n", red);
 		myexit(1);
 	}
 
 	/* check tomoyo tool files */
-	if (!file_exist(tinit)){ error("error: "); error(tinit); error(" executable binary missing\n"); myexit(1); }
-	if (!file_exist(tload)){ error("error: "); error(tload); error(" executable binary missing\n"); myexit(1); }
-/*	if (!file_exist(tsave)){ error("error: "); error(tsave); error(" executable binary missing\n"); myexit(1); }*/
+	if (!file_exist(tinit)){ color_("error: ", red); color_(tinit, red); color_(" executable binary missing\n", red); myexit(1); }
+	if (!file_exist(tload)){ color_("error: ", red); color_(tload, red); color_(" executable binary missing\n", red); myexit(1); }
+/*	if (!file_exist(tsave)){ color_("error: ", red); color_(tsave, red); color_(" executable binary missing\n", red); myexit(1); }*/
 
 	/* create tomoyo dir if it doesn't exist yet */
 	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
@@ -1895,7 +3436,7 @@ void domain_info(const char *pattern)
 			else            color(" domains)\n", clr);
 			free2(res);
 		}
-		else error("error: no domains found\n");
+		else color_("error: no domains found\n", red);
 	}
 
 	/* list domain names only */	
@@ -2049,7 +3590,7 @@ void domain_remove(const char *pattern)
 			}
 			else color("no domain was removed\n\n", green);
 		}
-		else error("error: no domains found\n");
+		else color_("error: no domains found\n", red);
 	}
 }
 
@@ -2303,7 +3844,7 @@ void domain_get_log()
 		temp2 += l + 1,
 		res2 = string_get_next_word(&temp2);
 		if (!res2){
-			error("error: unexpected error, log message format is not correct\n");
+			color_("error: unexpected error, log message format is not correct\n", red);
 			free2(res);
 			free2(tlogf2);
 			free2(tlogf3);
@@ -2326,7 +3867,7 @@ void domain_get_log()
 		/* get parameters of rule */
 		res2 = string_get_next_word(&temp2);
 		if (!res2){
-			error("error: unexpected error, log message format is not correct\n");
+			color_("error: unexpected error, log message format is not correct\n", red);
 			free2(res);
 			free2(tlogf2);
 			free2(tlogf3);
@@ -2346,7 +3887,7 @@ void domain_get_log()
 		/* jump behind "denied for " part */
 		i = string_search_keyword(temp2, key2);
 		if (i == -1){
-			error("error: unexpected error, log message format is not correct\n");
+			color_("error: unexpected error, log message format is not correct\n", red);
 			free2(res);
 			free2(tlogf2);
 			free2(tlogf3);
@@ -2358,7 +3899,7 @@ void domain_get_log()
 		temp2 += i + key2_len;
 		res2 = string_get_next_word(&temp2);
 		if (!res2){
-			error("error: unexpected error, log message format is not correct\n");
+			color_("error: unexpected error, log message format is not correct\n", red);
 			free2(res);
 			free2(tlogf2);
 			free2(tlogf3);
@@ -2624,7 +4165,7 @@ void domain_print_mode()
 			if (flag_firstrun) color(", rule exists", clr);
 			/* get profile mode for domain */
 			profile = domain_get_profile(tdomf + pos);
-			if (profile == -1){ error("error: domain policy is corrupt\n"); free2(prog); myexit(1); }
+			if (profile == -1){ color_("error: domain policy is corrupt\n", red); free2(prog); myexit(1); }
 			/* check which mode is on */
 			
 			/* disabled mode */
@@ -2660,6 +4201,26 @@ void domain_print_mode()
 		if (flag_firstrun) newl();
 		
 		free2(prog);
+	}
+}
+
+
+/* check change of policy, and return true if changed */
+int check_policy_change(){
+	/* backup policy exists yet? if not, then copy policy */
+	if (!tdomf_bak){
+		/* copy policy to backup */
+		strcpy2(&tdomf_bak, tdomf);
+		return 1;
+	}
+	else{
+		/* policy files match? if not, then store it */
+		if (!strcmp(tdomf_bak, tdomf)) return 0;
+		else{
+			/* copy policy to backup */
+			strcpy2(&tdomf_bak, tdomf);
+			return 1;
+		}
 	}
 }
 
@@ -3046,7 +4607,7 @@ int compare_rules(char *r1, char *r2)
 
 /* add dir to a list of dirs if it doesn't contain it yet and return new list */
 /* returned value must be freed by caller */
-char *compare_path_add_dir_to_list_uniq(char *list, char *dir)
+char *path_add_dir_to_list_uniq(char *list, char *dir)
 {
 	char *res, *temp, *new = 0;
 	int flag = 0;
@@ -3073,7 +4634,7 @@ char *compare_path_add_dir_to_list_uniq(char *list, char *dir)
 
 
 /* search for dir in a list of dirs and return true on match */
-int compare_path_search_dir_in_list(char *list, char *dir)
+int path_search_dir_in_list(char *list, char *dir)
 {
 	char *res, *temp;
 
@@ -3090,7 +4651,7 @@ int compare_path_search_dir_in_list(char *list, char *dir)
 
 /* return new rules based on the input rule with wildcards of matching recursive dirs */
 /* returned value must be freed by caller */
-char *domain_get_rules_with_recursive_dirs(char *rule)
+char *get_rules_with_recursive_dirs(char *rule)
 {
 	char *type, *path1, *path2;
 	char *res, *res2, *temp, *rules_new;
@@ -3675,7 +5236,7 @@ void domain_reshape_rules_recursive_dirs()
 					strcat2(&rules, "\n");
 					
 					/* get a modified rule by recursive dirs if any */
-					res3 = domain_get_rules_with_recursive_dirs(res2);
+					res3 = get_rules_with_recursive_dirs(res2);
 					if (res3){
 						strcat2(&rules, res3);
 						free2(res3);
@@ -3769,14 +5330,14 @@ void domain_reshape_rules_wildcard_spec()
 					/* are there any parameters (more words)? */
 					if (param1){
 						/* add dir to the list if not there yet */
-						res2 = compare_path_add_dir_to_list_uniq(spec2, pdir1);
+						res2 = path_add_dir_to_list_uniq(spec2, pdir1);
 						free2(spec2); spec2 = res2;
 					}
 
 					/* are there any parameters (more words)? */
 					if (param2){
 						/* add dir to the list if not there yet */
-						res2 = compare_path_add_dir_to_list_uniq(spec2, pdir2);
+						res2 = path_add_dir_to_list_uniq(spec2, pdir2);
 						free2(spec2); spec2 = res2;
 					}
 				}
@@ -3790,7 +5351,7 @@ void domain_reshape_rules_wildcard_spec()
 					if (param1){
 						/* add dir to the list if not there yet */
 						res3 = path_wildcard_dir(param1);
-						res2 = compare_path_add_dir_to_list_uniq(spec3, res3);
+						res2 = path_add_dir_to_list_uniq(spec3, res3);
 						free2(spec3); spec3 = res2;
 						free2(res3);
 					}
@@ -3799,7 +5360,7 @@ void domain_reshape_rules_wildcard_spec()
 					if (param2){
 						/* add dir to the list if not there yet */
 						res3 = path_wildcard_dir(param2);
-						res2 = compare_path_add_dir_to_list_uniq(spec3, res3);
+						res2 = path_add_dir_to_list_uniq(spec3, res3);
 						free2(spec3); spec3 = res2;
 						free2(res3);
 					}
@@ -3900,23 +5461,23 @@ void domain_reshape_rules_wildcard_spec()
 						if (param){
 
 							/* check dir in exception */
-							if (compare_path_search_dir_in_list(spec_ex, pdir)) flag_ex = 1;
+							if (path_search_dir_in_list(spec_ex, pdir)) flag_ex = 1;
 							
 							/* is it in spec? */
 							if (!flag_ex){
-								if (compare_path_search_dir_in_list(spec1, pdir)) flag = 1;
+								if (path_search_dir_in_list(spec1, pdir)) flag = 1;
 							}
 
 							/* is it in spec2? */
 							if (!flag_ex){
 								if (!flag){
-									if (compare_path_search_dir_in_list(spec2, pdir)) flag = 1;
+									if (path_search_dir_in_list(spec2, pdir)) flag = 1;
 								}
 							}
 
 							/* is it in spec3? */
 							if (!flag_ex){
-								if (compare_path_search_dir_in_list(spec3, pdir)) flag3 = 1;
+								if (path_search_dir_in_list(spec3, pdir)) flag3 = 1;
 							}
 							
 							/* path is in spec or spec2 */
@@ -4063,26 +5624,6 @@ void domain_reshape_rules()
 	sand_clock(0);
 	domain_cleanup();
 
-}
-
-
-/* check change of policy, and return true if changed */
-int check_policy_change(){
-	/* backup policy exists yet? if not, then copy policy */
-	if (!tdomf_bak){
-		/* copy policy to backup */
-		strcpy2(&tdomf_bak, tdomf);
-		return 1;
-	}
-	else{
-		/* policy files match? if not, then store it */
-		if (!strcmp(tdomf_bak, tdomf)) return 0;
-		else{
-			/* copy policy to backup */
-			strcpy2(&tdomf_bak, tdomf);
-			return 1;
-		}
-	}
 }
 
 
@@ -4296,7 +5837,7 @@ void check_processes()
 		/* open /proc dir */
 		mydir = opendir("/proc/");
 		if (!mydir){
-			error("error: cannot open /proc/ directory\n");
+			color_("error: cannot open /proc/ directory\n", red);
 			free2(netf3);
 			myexit(1);
 		}
@@ -4315,7 +5856,7 @@ void check_processes()
 				strcat2(&mydir_name, mypid);
 				strcat2(&mydir_name, "/exe");
 				/* resolv the link pointing from the exe name */
-				myprog = path_link_read(mydir_name);
+				myprog = link_read(mydir_name);
 				if (myprog){
 					DIR *mydir2;
 					struct dirent *mydir_entry2;
@@ -4337,7 +5878,7 @@ void check_processes()
 							strcpy2(&mydir_name2, myfd);
 							strcat2(&mydir_name2, mydir_entry2->d_name);
 							/* resolv the links from the /proc/pid/fd/ dir */
-							mysock = path_link_read(mydir_name2);
+							mysock = link_read(mydir_name2);
 							if (mysock){
 								/* does it contain a name like "socket:"? */
 								if (string_search_keyword(mysock, "socket:") > -1){
@@ -4450,10 +5991,10 @@ int main(int argc, char **argv){
 	check_options(argc, argv);
 
 	/* check if i am root */
-	if (getuid()) { error("error: root privilege needed\n"); myexit(1); }
+	if (getuid()) { color_("error: root privilege needed\n", red); myexit(1); }
 
 	/* check already running instance of the program */
-	if (!check_instance()) { error("error: tomld is running already\n"); myexit(1); }
+	if (!check_instance()) { color_("error: tomld is running already\n", red); myexit(1); }
 
 
 	/* ---------------- */
