@@ -22,9 +22,10 @@
 
 changelog:
 -----------
-09/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
+10/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
+                         - merge collected rules from similar domains into my main domain on load
 07/06/2011 - tomld v0.32 - first working c version of tomld
 25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
@@ -867,6 +868,7 @@ char *domain_get_next(char **text)
 	char *text2, *res;
 	int i, start, end;
 
+	if (!(*text)) return 0;
 	if (!(*text)[0]) return 0;
 
 	/* search for first keyword */
@@ -1098,9 +1100,11 @@ void domain_set_profile_all(const char *prog, int profile)
 		if (!res) break;
 		/* check if domain is a main or subdomain of what i'm looking for */
 		res2 = domain_get_name(res);
+		if (res2){
 
-		/* if so, then set its profile mode */
-		if (!strcmp(prog, res2)) domain_set_profile(orig, profile);
+			/* if so, then set its profile mode */
+			if (!strcmp(prog, res2)) domain_set_profile(orig, profile);
+		}
 
 		free2(res2);
 		free2(res);
@@ -1225,7 +1229,8 @@ char *process_get_path(int pid)
 void load()
 {
 	/* vars */
-	char *tdomf_new, *res, *res2, *temp, *temp2;
+	char *tdomf_new, *res, *res2, *res3, *temp, *temp2, *temp3, *temp4;
+	char *name1, *name2;
 	
 	/* load domain config */
 	free2(tdomf);
@@ -1238,20 +1243,112 @@ void load()
 	/* alloc memory for new policy */
 	tdomf_new = memget2(max_char);
 
+
+	/* merge similar domains' rules to my domain
+	 * these are active domains with running processes
+	 * that will transit into my domain after process restart */
+	temp = tdomf;
+	while(1){
+		/* get next domain */
+		res = domain_get_next(&temp);
+		/* exit on end */
+		if (!res) break;
+
+		/* check domains only with profile 1-3 */		
+		if (domain_get_profile(res)){
+
+			/* get full domain name */
+			temp3 = res;
+			name1 = string_get_next_line(&temp3);
+			if (name1){
+
+				/* check if it's not an exception domain */
+				int i = 0;
+				int flag = 0;
+				res2 = 0;
+				while(1){
+					res3 = tprogs_exc_manual[i++];
+					if (!res3) break;
+					strcpy2(&res2, "<kernel> ");
+					strcat2(&res2, res3);
+					if (string_search_keyword_first(name1, res2)){
+						flag = 1;
+						break;
+					}
+				}
+				free2(res2);
+				
+				/* skip cycle on an main exception domain */
+				if (!flag){
+
+					/* add domain and its rules to new policy */
+					strcat2(&tdomf_new, res);
+					strcat2(&tdomf_new, "\n");
+					
+					temp2 = tdomf;
+					while(1){
+						/* get next domain */
+						res2 = domain_get_next(&temp2);
+						/* exit on end */
+						if (!res2) break;
+
+						/* check domains only with profile 1-3 */		
+						if (domain_get_profile(res)){
+
+							/* get full domain name */
+							temp4 = res2;
+							name2 = string_get_next_line(&temp4);
+							if (name2){
+							
+								/* skip the same domain as my domain name */
+								if (strcmp(name1, name2)){
+									long l1 = strlen2(&name1);
+									long l2 = strlen2(&name2);
+									if (l1 > 8 && l2 > 8 && l2 >= l1){
+										/* compare the domain names without the starting "<kernel>" part */
+										/* if they match, then marge this domain's rules to my main domain too */
+										if (!strcmp(name1 + 8, name2 + 8 + l2 - l1)){
+											/* skip "use_profile" line, this is the next line */
+											res3 = string_get_next_line(&temp4);
+											free2(res3);
+											/* add rules */
+											strcat2(&tdomf_new, temp4);
+											strcat2(&tdomf_new, "\n");
+										}
+									}
+								}
+								free2(name2);
+							}
+						}
+						free2(res2);
+					}
+
+					strcat2(&tdomf_new, "\n");
+				}
+				free2(name1);
+			}
+		}
+		free2(res);
+	}
+
+	free2(tdomf);
+	tdomf = tdomf_new;
+	tdomf_new = memget2(max_char);
+
+
 	/* remove disabled mode entries so runtime will be faster */
-	temp2 = tdomf;
-	
+	temp = tdomf;
 	while(1){
 		int flag_deleted = 0;
 		
 		/* get next domain */
-		res = domain_get_next(&temp2);
+		res = domain_get_next(&temp);
 		/* exit on end */
 		if (!res) break;
-		temp = res;
+		temp2 = res;
 
 		/* check if domain is marked as (deleted) */
-		res2 = string_get_next_line(&temp);
+		res2 = string_get_next_line(&temp2);
 		if (res2){
 			/* don't add domain marked as (deleted) */
 			if (string_search_keyword(res2, "(deleted)") > -1) flag_deleted = 1;
@@ -1272,10 +1369,10 @@ void load()
 		/* check domain profile and add only profile with non-zero but only if not marked as deleted */
 		if (domain_get_profile(res) && !flag_deleted){
 			/* if it's not null, then add it to the new policy */
-			temp = res;
+			temp2 = res;
 			while(1){
 				/* read domain line by line */
-				res2 = string_get_next_line(&temp);
+				res2 = string_get_next_line(&temp2);
 				if (!res2) break;
 
 				/* don't add empty lines */
@@ -1312,7 +1409,7 @@ void reload()
 	char *myappend;
 	char *res, *res2, *rule, *temp, *temp2, *temp3;
 	char *tdomf_old, *tdomf_old2, *texcf_old, *texcf_old2;
-	char *name, *rules = 0;
+	char *name1, *name2, *rules = 0;
 	char *domain_names_active = 0;
 	
 	/* alloc mem for transitions */
@@ -1444,12 +1541,12 @@ void reload()
 
 			/* get full domain name with "<kernel>" tag */
 			temp2 = res;
-			name = string_get_next_line(&temp2);
-			if (name){
+			name1 = string_get_next_line(&temp2);
+			if (name1){
 				/* get the rest of the rules */
 				strcpy2(&rules, temp2);
 				/* append list with select <kernel> /bin/... */
-				strcat2(&myappend, name);
+				strcat2(&myappend, name1);
 				strcat2(&myappend, "\n");
 				/* append list with the new rules for my domain */
 				strcat2(&myappend, rules);
@@ -1467,41 +1564,33 @@ void reload()
 					temp3 = domain_names_active;
 					while(1){
 						/* get next active domain name */
-						res2 = string_get_next_line(&temp3);
-						if (!res2) break;
+						name2 = string_get_next_line(&temp3);
+						if (!name2) break;
 
 						/* skip the same as my domain name */
-						if (strcmp(name, res2)){
+						if (strcmp(name1, name2)){
 							/* compare its end to my domain name */
-							char *s1 = 0;
-							char *s2 = 0;
-							long l1 = strlen2(&name);
-							long l2 = strlen2(&res2);
+							long l1 = strlen2(&name1);
+							long l2 = strlen2(&name2);
 							if (l1 > 8 && l2 > 8 && l2 >= l1){
-								/* copy the domain names without the starting "<kernel>" part */
-								strcpy2(&s1, name + 8);
-								strcpy2(&s2, res2 + 8 + l2 - l1);
-
+								/* compare the domain names without the starting "<kernel>" part */
 								/* if they match, then load my new rules to this active domain too */
-								if (!strcmp(s1, s2)){
+								if (!strcmp(name1 + 8, name2 + 8 + l2 - l1)){
 									/* append list with select domain name */
 									strcat2(&myappend, "select ");
-									strcat2(&myappend, res2);
+									strcat2(&myappend, name2);
 									strcat2(&myappend, "\n");
 									/* append list with the new rules */
 									strcat2(&myappend, rules);
 									strcat2(&myappend, "\n");
 								}
-
-								free2(s1);
-								free2(s2);
 							}
 						}
-						free2(res2);
+						free2(name2);
 					}
 			 	}
 
-				free2(name);
+				free2(name1);
 			}
 			free2(res);
 		}
