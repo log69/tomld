@@ -26,6 +26,7 @@ changelog:
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
                          - merge collected rules from similar domains into my main domain on load
+                         - fix a segfault in compare_names()
 07/06/2011 - tomld v0.32 - first working c version of tomld
 25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
@@ -2827,12 +2828,12 @@ int compare_names(char *name1, char *name2)
 	int i1, i2;
 	int flag1 = 0;
 	int flag2 = 0;
-	long l1, l2;
+	long l1 = 0, l2 = 0;
 	long left1l = 0, left2l = 0, right1l = 0, right2l = 0;
 
 	/* get name lengths */
-	l1 = strlen(name1);
-	l2 = strlen(name2);
+	if (name1) l1 = strlen(name1);
+	if (name2) l2 = strlen(name2);
 	s1 = memget2(l1);
 	s2 = memget2(l2);
 	
@@ -2932,7 +2933,7 @@ int compare_names(char *name1, char *name2)
 
 		/* get right 1 */
 		right2 = memget2(l2);
-		i1 = l1;
+		i1 = l2;
 		while(1){
 			if (s2[i1] == '*') break;
 			i1--;
@@ -3129,7 +3130,8 @@ int compare_paths(char *path1, char *path2)
 int compare_rules(char *r1, char *r2)
 {
 	/* vars */
-	char *type1 = 0, *type2 = 0, *rule1a = 0, *rule1b = 0, *rule2a = 0, *rule2b = 0;
+	char *type1 = 0, *type2 = 0;
+	char *rule1a = 0, *rule1b = 0, *rule2a = 0, *rule2b = 0;
 	char *temp1, *temp2;
 	int flag_double = 1;
 	
@@ -3153,14 +3155,19 @@ int compare_rules(char *r1, char *r2)
 	rule1b = string_get_next_word(&temp1);
 	/* fail if no first path in param 1 */
 	if (!rule1a){
-		free2(type1); free2(type2); return 0; }
+		free2(type1); free2(type2);
+		free2(rule1b);
+		return 0;
+	}
 	
 	/* get second params if any */
 	rule2a = string_get_next_word(&temp2);
 	rule2b = string_get_next_word(&temp2);
 	/* fail if no first path in param 2 */
 	if (!rule2a){
-		free2(type1); free2(type2); free2(rule1a); free2(rule1b);
+		free2(type1); free2(type2);
+		free2(rule1a); free2(rule1b);
+		free2(rule2b);
 		return 0;
 	}
 	/* second params exist too */
