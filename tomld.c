@@ -27,6 +27,8 @@ changelog:
                          - apply rules on the active domains of the running processes too
                          - merge collected rules from similar domains into my main domain on load
                          - fix a segfault in compare_names()
+                         - bugfix in domain_sort_uniq_rules(): store only the rule with more wildcards in it,
+                           or if that's equal, then the one with the shortest length from the matching ones
 07/06/2011 - tomld v0.32 - first working c version of tomld
 25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
@@ -3527,6 +3529,7 @@ char *domain_sort_uniq_rules(char *rules)
 {
 	char *res, *res2, *temp, *temp2, *old, *new, *rules_new, *rules2;
 	int i1, i2, l1, l2, lo, ln;
+	int c, c1, c2, co, cn;
 
 	/* alloc mem for new rules */
 	rules_new = memget2(max_char);
@@ -3539,34 +3542,56 @@ char *domain_sort_uniq_rules(char *rules)
 	while(1){
 		res = string_get_next_line(&temp);
 		if (!res) break;
+		/* get length of rule */
 		l1 = strlen2(&res);
+		/* count wildcards in rule */
+		c = l1; c1 = 0;
+		while(c--) if (res[c] == '*') c1++;
 		
 		/* compare rule to all rules */
 		i2 = 0;
 		temp2 = rules;
 		strnull2(&new);
 		while(1){
+			res2 = string_get_next_line(&temp2);
+			if (!res2) break;
 			/* skip comparing the same entry in the list */
 			if (i1 != i2){
-				res2 = string_get_next_line(&temp2);
-				if (!res2) break;
 				
 				/* compare rules containing wildcard */
 				if (compare_rules(res, res2)){
+					/* get length of rule */
 					l2 = strlen2(&res2);
-					if (l1 < l2){ strcpy2(&old, res); lo = l1; }
-					else        { strcpy2(&old, res2); lo = l2; }
-					/* if match, store only the shortest one from the matching ones */
-					ln = strlen2(&new);
-					if ((!ln) || (ln > lo)) strcpy2(&new, old);
+					/* count wildcards in rule */
+					c = l2; c2 = 0;
+					while(c--) if (res2[c] == '*') c2++;
+					/* if match, store only the one with more wildcards in it, or if that's equal,
+					 * then the one with the shortest length from the matching ones */
+					if (c1 != c2){
+						if (c1 > c2){ strcpy2(&old, res);  co = c1; }
+						else        { strcpy2(&old, res2); co = c2; }
+						/* get length of rule */
+						ln = strlen2(&new);
+						/* count wildcards in rule */
+						c = ln; cn = 0;
+						while(c--) if (new[c] == '*') cn++;
+						/* choose the rule with more wildcards */
+						if ((!ln) || (cn < co)) strcpy2(&new, old);
+					}
+					else{
+						if (l1 < l2){ strcpy2(&old, res);  lo = l1; }
+						else        { strcpy2(&old, res2); lo = l2; }
+						ln = strlen2(&new);
+						/* choose the shorter rule */
+						if ((!ln) || (ln > lo)) strcpy2(&new, old);
+					}
 				}
-
-				free2(res2);
 			}
+			free2(res2);
 			i2++;
 		}
 
-		/* store the shorter matched rule if there was any match */
+		/* store the chosen rule if there was any match */
 		if (strlen2(&new)){
 			strcat2(&rules_new, new);
 			strcat2(&rules_new, "\n");
