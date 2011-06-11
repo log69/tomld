@@ -22,13 +22,15 @@
 
 changelog:
 -----------
-10/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
+11/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
                          - merge collected rules from similar domains into my main domain on load
                          - fix a segfault in compare_names()
                          - bugfix in domain_sort_uniq_rules(): store only the rule with more wildcards in it,
                            or if that's equal, then the one with the shortest length from the matching ones
+                         - rewrite reload() to update policy by applying a diff only to avoid a race condition
+                           for security reasons
 07/06/2011 - tomld v0.32 - first working c version of tomld
 25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
@@ -1234,7 +1236,7 @@ void load()
 	/* vars */
 	char *tdomf_new, *res, *res2, *res3, *temp, *temp2, *temp3, *temp4;
 	char *name1, *name2;
-	
+
 	/* load domain config */
 	free2(tdomf);
 	tdomf = file_read(tdomk, 1);
@@ -1399,21 +1401,75 @@ void load()
 }
 
 
+/* get the diff of two strings by adding "delete" keyword and return result */
+/* returned value must be freed by caller */
+char *string_get_diff(char *new, char *old)
+{
+	char *res, *temp;
+	char *list = 0;
+	
+	temp = new;
+	while(1){
+		/* get next line */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		/* skip empty lines */
+		if (strlen2(&res)){
+			/* does the new exist in the old one? */
+			if (string_search_line(old, res) == -1){
+				/* if not, then i add it */
+				strcat2(&list, res);
+				strcat2(&list, "\n");
+			}
+		}
+		free2(res);
+	}
+
+	temp = old;
+	while(1){
+		/* get next line */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		/* skip empty lines */
+		if (strlen2(&res)){
+			/* does the old exist in the new one? */
+			if (string_search_line(new, res) == -1){
+				/* if not, then i delete it */
+				strcat2(&list, "delete ");
+				strcat2(&list, res);
+				strcat2(&list, "\n");
+			}
+		}
+		free2(res);
+	}
+
+	return list;
+}
+
+
 /* reload config files from variables to kernel memory */
 /* this is done using "select" and "delete" keywords during file write */
-/* for example:
- * select <kernel> /usr/sbin/httpd
- * allow_read /var/www/html/\*.html
- * delete allow_read /var/www/html/index.html
- * delete allow_read /var/www/html/welcome.html
+/* to update rules in an existing domain, i feed the diff data:
+  select $domainname
+  $newrule1
+  $newrule2
+  delete $rule1
+  delete $rule2
+  delete $rule3
+  * or if domain doesn't exist, then i create the domain without select keyword,
+  * and load the rules without deleting anything:
+  $domainname
+  $newrule1
+  $newrule2
 */
 void reload()
 {
 	char *myappend;
-	char *res, *res2, *rule, *temp, *temp2, *temp3;
+	char *res, *res2, *res3, *temp, *temp2, *temp3, *temp4;
 	char *tdomf_old, *tdomf_old2, *texcf_old, *texcf_old2;
-	char *name1, *name2, *rules = 0;
+	char *name1, *name2, *rules = 0, *rules_old = 0;
 	char *domain_names_active = 0;
+	int i;
 	
 	/* alloc mem for transitions */
 	myappend = memget2(max_char);
@@ -1423,33 +1479,17 @@ void reload()
 	
 	/* load exception policy to kernel too */
 	while(1){
+		/* zero my list */
 		strnull2(&myappend);
 
-		/* create another append list with deleting exception policy lines */
-		temp = texcf_old;
-		while(1){
-			/* get next line of exception policy */
-			res = string_get_next_line(&temp);
-			if (!res) break;
-			/* append lines with delete keyword */
-			strcat2(&myappend, "delete ");
+		/* get the diff of old and new exception policy */
+		res = string_get_diff(texcf, texcf_old);
+		if (res){
 			strcat2(&myappend, res);
 			strcat2(&myappend, "\n");
 			free2(res);
 		}
 
-		/* add new rules to append list */
-		temp = texcf;
-		while(1){
-			/* get next line of exception policy */
-			res = string_get_next_line(&temp);
-			if (!res) break;
-			/* append lines with delete keyword */
-			strcat2(&myappend, res);
-			strcat2(&myappend, "\n");
-			free2(res);
-		}
-		
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
 		texcf_old2 = file_read(texck, 1);
@@ -1460,6 +1500,7 @@ void reload()
 			break;
 		}
 		else{
+			/* reload changed policy and run whole check again */
 			free2(texcf_old);
 			texcf_old = texcf_old2;
 		}
@@ -1493,48 +1534,6 @@ void reload()
 		/* zero my list */
 		strnull2(&myappend);
 
-		/* create append list with deleting old policy from kernel
-		 * using "select" and "delete" keywords */
-		temp = tdomf_old;
-		while(1){
-			/* get next domain policy */
-			res = domain_get_next(&temp);
-			if (!res) break;
-
-			/* get full domain name with "<kernel>" tag */
-			temp2 = res;
-			res2 = string_get_next_line(&temp2);
-			if (res2){
-				/* append list with select <kernel> /bin/... */
-				strcat2(&myappend, "select ");
-				strcat2(&myappend, res2);
-				strcat2(&myappend, "\n");
-
-				/* skip "use_profile" part and set it to fix 0 */
-				rule = string_get_next_line(&temp2);
-				free2(rule);
-				/* add "use_profile 0" tag to set domain's profile back to zero too */
-				strcat2(&myappend, "use_profile 0\n");
-
-				/* append list with delete rules */
-				while(1){
-					/* get next rule */
-					rule = string_get_next_line(&temp2);
-					if (!rule) break;
-					/* add only if not an empty line */
-					if (strlen2(&rule)){
-						/* add delete keyword and rule to append list */
-						strcat2(&myappend, "delete ");
-						strcat2(&myappend, rule);
-						strcat2(&myappend, "\n");
-					}
-					free2(rule);
-				}
-				free2(res2);
-			}
-			free2(res);
-		}
-
 		/* add new policy to append list */
 		temp = tdomf;
 		while(1){
@@ -1546,14 +1545,42 @@ void reload()
 			temp2 = res;
 			name1 = string_get_next_line(&temp2);
 			if (name1){
-				/* get the rest of the rules */
-				strcpy2(&rules, temp2);
-				/* append list with select <kernel> /bin/... */
-				strcat2(&myappend, name1);
-				strcat2(&myappend, "\n");
-				/* append list with the new rules for my domain */
-				strcat2(&myappend, rules);
-				strcat2(&myappend, "\n");
+				/* does my new domain exist in the old policy? */
+				if (string_search_line(domain_names_active, name1) == -1){
+					/* if not, then i add it as a full new domain without making any diff */
+					/* add domain name */
+					strcat2(&myappend, name1);
+					strcat2(&myappend, "\n");
+					/* get the new rules */
+					strcpy2(&rules, temp2);
+					/* add rules */
+					strcat2(&myappend, rules);
+					strcat2(&myappend, "\n");
+				}
+				else{
+					/* get the new rules */
+					strcpy2(&rules, temp2);
+					/* get the old domain */
+					i = string_search_line(tdomf_old, name1);
+					temp3 = tdomf_old + i;
+					res3 = domain_get_next(&temp3);
+					/* jump to domain's rules */
+					temp4 = res3;
+					string_jump_next_line(&temp4);
+					/* get the old rules */
+					strcpy2(&rules_old, temp4);
+					res2 = string_get_diff(rules, rules_old);
+					if (res2){
+						/* add domain name */
+						strcat2(&myappend, "select ");
+						strcat2(&myappend, name1);
+						strcat2(&myappend, "\n");
+						/* add the diff of my new rules to the list */
+						strcat2(&myappend, res2);
+						strcat2(&myappend, "\n");
+						free2(res2);
+					}
+				}
 
 				/* append list with the new rules for the domains of the current running process too */
 				/* i do this by searching through the end of all the active domain names,
@@ -1579,13 +1606,26 @@ void reload()
 								/* compare the domain names without the starting "<kernel>" part */
 								/* if they match, then load my new rules to this active domain too */
 								if (!strcmp(name1 + 8, name2 + 8 + l2 - l1)){
-									/* append list with select domain name */
-									strcat2(&myappend, "select ");
-									strcat2(&myappend, name2);
-									strcat2(&myappend, "\n");
-									/* append list with the new rules */
-									strcat2(&myappend, rules);
-									strcat2(&myappend, "\n");
+									/* get the old domain */
+									i = string_search_line(tdomf_old, name2);
+									temp3 = tdomf_old + i;
+									res3 = domain_get_next(&temp3);
+									/* jump to domain's rules */
+									temp4 = res3;
+									string_jump_next_line(&temp4);
+									/* get the old rules */
+									strcpy2(&rules_old, temp4);
+									res2 = string_get_diff(rules, rules_old);
+									if (res2){
+										/* add domain name */
+										strcat2(&myappend, "select ");
+										strcat2(&myappend, name2);
+										strcat2(&myappend, "\n");
+										/* add the diff of my new rules to the list */
+										strcat2(&myappend, res2);
+										strcat2(&myappend, "\n");
+										free2(res2);
+									}
 								}
 							}
 						}
@@ -1608,6 +1648,7 @@ void reload()
 			break;
 		}
 		else{
+			/* reload changed policy and run whole check again */
 			free2(tdomf_old);
 			tdomf_old = tdomf_old2;
 		}
