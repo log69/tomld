@@ -93,6 +93,8 @@ char *string_get_next_wordn(char **text, int num);
 
 char *string_get_last_word(char **text);
 
+char *string_get_diff(char *new, char *old);
+
 int string_search_keyword_first(const char *text, const char *key);
 
 int string_search_keyword_last(const char *text, const char *key);

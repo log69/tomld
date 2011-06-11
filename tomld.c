@@ -1401,52 +1401,6 @@ void load()
 }
 
 
-/* get the diff of two strings by adding "delete" keyword and return result */
-/* returned value must be freed by caller */
-char *string_get_diff(char *new, char *old)
-{
-	char *res, *temp;
-	char *list = 0;
-	
-	temp = new;
-	while(1){
-		/* get next line */
-		res = string_get_next_line(&temp);
-		if (!res) break;
-		/* skip empty lines */
-		if (strlen2(&res)){
-			/* does the new exist in the old one? */
-			if (string_search_line(old, res) == -1){
-				/* if not, then i add it */
-				strcat2(&list, res);
-				strcat2(&list, "\n");
-			}
-		}
-		free2(res);
-	}
-
-	temp = old;
-	while(1){
-		/* get next line */
-		res = string_get_next_line(&temp);
-		if (!res) break;
-		/* skip empty lines */
-		if (strlen2(&res)){
-			/* does the old exist in the new one? */
-			if (string_search_line(new, res) == -1){
-				/* if not, then i delete it */
-				strcat2(&list, "delete ");
-				strcat2(&list, res);
-				strcat2(&list, "\n");
-			}
-		}
-		free2(res);
-	}
-
-	return list;
-}
-
-
 /* reload config files from variables to kernel memory */
 /* this is done using "select" and "delete" keywords during file write */
 /* to update rules in an existing domain, i feed the diff data:
