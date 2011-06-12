@@ -443,7 +443,7 @@ int string_next_line_len(const char *text)
 }
 
 
-/* move pointer to the beginning of next line in a string skipping empty lines */
+/* move pointer to the beginning of next line in a string */
 /* return null on fail */
 int string_jump_next_line(char **text)
 {
@@ -454,26 +454,13 @@ int string_jump_next_line(char **text)
 
 	/* jump to next line */
 	while(1){
-		c = (*text)[i++];
-		/* exit on end */
-		if (!c) return 0;
-		/* exit on new line */
-		if (c == '\n') break;
-	}
-
-	/* skip new lines */
-	while(1){
 		c = (*text)[i];
-		/* exit on end */
-		if (!c) return 0;
-		/* exit on new line */
-		if (c != '\n') break;
+		/* exit on end and fail */
+		if (!c){ (*text) += i; return 0; }
+		/* exit on new line and success */
+		if (c == '\n'){ (*text) += i + 1; return 1; }
 		i++;
 	}
-
-	/* success, move pointer */
-	(*text) += i;
-	return 1;
 }
 
 

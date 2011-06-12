@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-11/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
+12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
                          - merge collected rules from similar domains into my main domain on load
@@ -31,6 +31,8 @@ changelog:
                            or if that's equal, then the one with the shortest length from the matching ones
                          - rewrite reload() to update policy by applying a diff only to avoid a race condition
                            for security reasons
+                         - bugfix: disable all other domains and delete their rules from memory too on --clear
+                         - bugfix: don't make a delete line for use_profile when updating policy with diff in reload()
 07/06/2011 - tomld v0.32 - first working c version of tomld
 25/04/2011 - tomld v0.31 - complete rewrite of tomld from python to c language
                          - drop platform check
@@ -1082,6 +1084,7 @@ void domain_set_profile(char *text, int profile)
 
 		/* if match */
 		if (i > -1){
+			/* set profile */
 			i += keyl;
 			p = string_itoc(profile);
 			orig[i] = p;
@@ -1092,7 +1095,7 @@ void domain_set_profile(char *text, int profile)
 
 
 /* set profile number (0-3) of domain and all its subdomains in domain policy */
-void domain_set_profile_all(const char *prog, int profile)
+void domain_set_profile_for_prog(const char *prog, int profile)
 {
 	char *res, *res2, *orig, *temp;
 	
@@ -1419,9 +1422,9 @@ void load()
 void reload()
 {
 	char *myappend;
-	char *res, *res2, *res3, *temp, *temp2, *temp3, *temp4;
+	char *res, *res2, *res3, *res4, *temp, *temp2, *temp3, *temp4;
 	char *tdomf_old, *tdomf_old2, *texcf_old, *texcf_old2;
-	char *name1, *name2, *rules = 0, *rules_old = 0;
+	char *name1, *name2, *rules = 0, *rules_old = 0, *profile = 0;
 	char *domain_names_active = 0;
 	int i;
 	
@@ -1505,13 +1508,23 @@ void reload()
 					/* add domain name */
 					strcat2(&myappend, name1);
 					strcat2(&myappend, "\n");
+					/* get profile */
+					res4 = string_get_next_line(&temp2);
+					strcpy2(&profile, res4);
+					free2(res4);
 					/* get the new rules */
 					strcpy2(&rules, temp2);
 					/* add rules */
+					strcat2(&myappend, profile);
+					strcat2(&myappend, "\n");
 					strcat2(&myappend, rules);
 					strcat2(&myappend, "\n");
 				}
 				else{
+					/* get profile */
+					res4 = string_get_next_line(&temp2);
+					strcpy2(&profile, res4);
+					free2(res4);
 					/* get the new rules */
 					strcpy2(&rules, temp2);
 					/* get the old domain */
@@ -1521,19 +1534,21 @@ void reload()
 					/* jump to domain's rules */
 					temp4 = res3;
 					string_jump_next_line(&temp4);
+					string_jump_next_line(&temp4);
 					/* get the old rules */
 					strcpy2(&rules_old, temp4);
 					res2 = string_get_diff(rules, rules_old);
-					if (res2){
-						/* add domain name */
-						strcat2(&myappend, "select ");
-						strcat2(&myappend, name1);
-						strcat2(&myappend, "\n");
-						/* add the diff of my new rules to the list */
-						strcat2(&myappend, res2);
-						strcat2(&myappend, "\n");
-						free2(res2);
-					}
+					/* add domain name */
+					strcat2(&myappend, "select ");
+					strcat2(&myappend, name1);
+					strcat2(&myappend, "\n");
+					/* add profile */
+					strcat2(&myappend, profile);
+					strcat2(&myappend, "\n");
+					/* add the diff of my new rules to the list */
+					strcat2(&myappend, res2);
+					strcat2(&myappend, "\n");
+					free2(res2);
 				}
 
 				/* append list with the new rules for the domains of the current running process too */
@@ -1567,19 +1582,21 @@ void reload()
 									/* jump to domain's rules */
 									temp4 = res3;
 									string_jump_next_line(&temp4);
+									string_jump_next_line(&temp4);
 									/* get the old rules */
 									strcpy2(&rules_old, temp4);
 									res2 = string_get_diff(rules, rules_old);
-									if (res2){
-										/* add domain name */
-										strcat2(&myappend, "select ");
-										strcat2(&myappend, name2);
-										strcat2(&myappend, "\n");
-										/* add the diff of my new rules to the list */
-										strcat2(&myappend, res2);
-										strcat2(&myappend, "\n");
-										free2(res2);
-									}
+									/* add domain name */
+									strcat2(&myappend, "select ");
+									strcat2(&myappend, name2);
+									strcat2(&myappend, "\n");
+									/* add profile */
+									strcat2(&myappend, profile);
+									strcat2(&myappend, "\n");
+									/* add the diff of my new rules to the list */
+									strcat2(&myappend, res2);
+									strcat2(&myappend, "\n");
+									free2(res2);
 								}
 							}
 						}
@@ -1609,6 +1626,7 @@ void reload()
 	}
 	
 	free2(domain_names_active);
+	free2(profile);
 	free2(rules);
 	free2(tdomf_old);
 
@@ -1935,6 +1953,75 @@ void check_tomoyo()
 }
 
 
+/* disable all domains and delete all rules from kernel memory */
+void domain_delete_all()
+{
+	char *res, *res2, *res3, *temp, *temp2;
+	char *tdomf_old, *tdomf_old2;
+	char *myappend = 0;
+
+	while(1){
+		/* load old policy from kernel memory */
+		tdomf_old = file_read(tdomk, 1);
+		
+		/* zero my config */
+		strnull2(&myappend);
+
+		/* create my list for load */
+		temp = tdomf_old;
+		while(1){
+			/* get next domain policy */
+			res = domain_get_next(&temp);
+			if (!res) break;
+			/* get domain name */
+			temp2 = res;
+			res2 = string_get_next_line(&temp2);
+			if (res2){
+				/* select domain name */
+				strcat2(&myappend, "select ");
+				strcat2(&myappend, res2);
+				strcat2(&myappend, "\nuse_profile 0\n");
+				/* skip "use_profile" line */
+				res3 = string_get_next_line(&temp2);
+				if (res3){
+					free2(res3);
+					/* delete rules */
+					while(1){
+						/* get next rule */
+						res3 = string_get_next_line(&temp2);
+						if (!res3) break;
+						if (strlen2(&res3)){
+							/* set delete for the rule */
+							strcat2(&myappend, "delete ");
+							strcat2(&myappend, res3);
+							strcat2(&myappend, "\n");
+						}
+						free2(res3);
+					}
+				}
+				free2(res2);
+			}
+			free2(res);
+		}
+
+		/* safety code: load old policy again to check if it hasn't changed
+		 * since i started changing it */
+		tdomf_old2 = file_read(tdomk, 1);
+		if (!strcmp(tdomf_old, tdomf_old2)){
+			free2(tdomf_old2);
+			/* write changes to kernel */
+			file_write(tdomk, myappend);
+			break;
+		}
+		else{
+			/* reload changed policy and run again */
+			free2(tdomf_old);
+			tdomf_old = tdomf_old2;
+		}
+	}
+}
+
+
 /* clear config files */
 void clear()
 {
@@ -1946,6 +2033,10 @@ void clear()
 	/* write config files */
 	file_write(texc, texcf);
 	file_write(tdom, tdomf);
+	
+	/* delete all other domains from memory too */
+	domain_delete_all();
+
 	/* load config files from disk to memory */
 	reload();
 }
@@ -2285,7 +2376,7 @@ void domain_set_enforce_old()
 						}
 						/* turn enforcing mode on for domain and all its subdomains */
 						color(prog, blue); newl();
-						domain_set_profile_all(prog, 3);
+						domain_set_profile_for_prog(prog, 3);
 					}
 				}
 				free2(prog);
@@ -2786,7 +2877,7 @@ void domain_print_mode()
 				color("turn on learning mode", green);
 				if (!flag_firstrun) newl();
 				/* turn on learning mode for the domain and all its subdomains */
-				domain_set_profile_all(prog, 1);
+				domain_set_profile_for_prog(prog, 1);
 			}
 
 			/* learning mode */
