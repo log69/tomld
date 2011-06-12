@@ -5,7 +5,7 @@ rm -f tomld
 rm -f *.o
 
 # compile tomld.c
-export CFLAGS="-O2 -Wall -pedantic -Wcomment -Wextra $@"
+export CFLAGS="-O2 -Wall -pedantic -Wcomment -Wextra $*"
 
 cc $CFLAGS -c tstring.c 	-o tstring.o
 cc $CFLAGS -c tpath.c 		-o tpath.o
