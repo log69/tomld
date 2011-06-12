@@ -29,7 +29,7 @@
 struct termio terminal_backup;
 
 
-/* print time elapsed since program start */
+/* return the time elapsed since program start */
 float mytime()
 {
 	static int flag_time = 0;
