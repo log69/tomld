@@ -456,7 +456,7 @@ void help() {
 	printf ("- the running processes need to be restarted on newly created domains\n");
 	printf ("\n");
 	printf ("HOW TO USE:\n");
-	printf ("- download, move it to a directory that root owns only, change its owner to root, ");
+	printf ("- download, move it to a directory that root owns only (for security), change its owner to root, ");
 	printf ("change writeable only by root, make it executable, and run it as root\n");
 	printf ("- run it the 1st time, now it will offer to install all missing packages and setup grub with kernel parameter\n");
 	printf ("- system reboot is necessary now\n");
