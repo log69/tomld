@@ -24,6 +24,9 @@ changelog:
 -----------
 22/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
                          - wildcard random part of file name in special dirs
+                         - delete domain from kernel memory too on --remove
+                         - bugfix: fix a segfault in domain_info() on --info
+                         - bugfix: cleanup domains at the end of every load()
 12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
@@ -357,6 +360,10 @@ char *spec1 = 0;
 /* ----------------------------------- */
 /* ------------ FUNCTIONS ------------ */
 /* ----------------------------------- */
+
+
+void domain_cleanup();
+
 
 /* print version info */
 void version() {
@@ -1518,6 +1525,8 @@ void load()
 
 	free2(tdomf);
 	tdomf = tdomf_new;
+
+	domain_cleanup();
 }
 
 
@@ -2139,6 +2148,80 @@ void domain_delete_all()
 }
 
 
+/* disable domain name and delete all rules of it from kernel memory */
+void domain_delete(const char *name)
+{
+	char *res, *res2, *res3, *temp, *temp2;
+	char *tdomf_old, *tdomf_old2;
+	char *myappend = 0;
+
+	if (!name) return;
+
+	while(1){
+		/* load old policy from kernel memory */
+		tdomf_old = file_read(tdomk, 1);
+		
+		/* zero my config */
+		strnull2(&myappend);
+
+		/* create my list for load */
+		temp = tdomf_old;
+		while(1){
+			/* get next domain policy */
+			res = domain_get_next(&temp);
+			if (!res) break;
+			/* get domain name */
+			temp2 = res;
+			res2 = string_get_next_line(&temp2);
+			if (res2){
+				/* does it match with the domain name to be deleted? */
+				if (!strcmp(res2, name)){
+					/* select domain name */
+					strcat2(&myappend, "select ");
+					strcat2(&myappend, res2);
+					strcat2(&myappend, "\nuse_profile 0\n");
+					/* skip "use_profile" line */
+					res3 = string_get_next_line(&temp2);
+					if (res3){
+						free2(res3);
+						/* delete rules */
+						while(1){
+							/* get next rule */
+							res3 = string_get_next_line(&temp2);
+							if (!res3) break;
+							if (strlen2(&res3)){
+								/* set delete for the rule */
+								strcat2(&myappend, "delete ");
+								strcat2(&myappend, res3);
+								strcat2(&myappend, "\n");
+							}
+							free2(res3);
+						}
+					}
+				}
+				free2(res2);
+			}
+			free2(res);
+		}
+
+		/* safety code: load old policy again to check if it hasn't changed
+		 * since i started changing it */
+		tdomf_old2 = file_read(tdomk, 1);
+		if (!strcmp(tdomf_old, tdomf_old2)){
+			free2(tdomf_old2);
+			/* write changes to kernel */
+			file_write(tdomk, myappend);
+			break;
+		}
+		else{
+			/* reload changed policy and run again */
+			free2(tdomf_old);
+			tdomf_old = tdomf_old2;
+		}
+	}
+}
+
+
 /* clear config files */
 void clear()
 {
@@ -2162,11 +2245,17 @@ void clear()
 /* info about domains by a pattern */
 void domain_info(const char *pattern)
 {
+	int flag_pattern = 0;
+	
 	/* load config files from kernel memory */
 	load();
 
 	/* is there any pattern? */
-	if (pattern[0]){
+	if (pattern){
+		if (pattern[0]) flag_pattern = 1;
+	}
+	
+	if (flag_pattern){
 		char *tdomf2, *res, *res2, *res_temp;
 		int i;
 		int count = 0;
@@ -2291,11 +2380,17 @@ void domain_info(const char *pattern)
 /* remove domains by a pattern */
 void domain_remove(const char *pattern)
 {
+	int flag_pattern = 0;
+	
 	/* load config files from kernel memory */
 	load();
 
 	/* is there any pattern? */
-	if (pattern[0]){
+	if (pattern){
+		if (pattern[0]) flag_pattern = 1;
+	}
+	
+	if (flag_pattern){
 		char *res, *res2, *res3, *temp, *temp2, *temp3;
 		char *tdomf_new, *texcf_new;
 		int i;
@@ -2362,6 +2457,8 @@ void domain_remove(const char *pattern)
 							char *s = 0;
 							/* count for remove */
 							count2++;
+							/* remove domain from active kernel domains */
+							domain_delete(res2);
 							/* remove domain from exception policy too */
 							/* get main domain name */
 							temp3 = res2;
