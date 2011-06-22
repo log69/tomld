@@ -32,6 +32,8 @@
 
 float mytime();
 
+void print_mytime();
+
 void key_set_mode();
 
 void key_clear_mode();

@@ -54,6 +54,17 @@ float mytime()
 }
 
 
+/* print elapsed time since last time */
+void print_mytime()
+{
+	static float t = 0;
+	float t2 = mytime();
+	t = t2 - t;
+	
+	printf("-- time %.2f sec\n", t);
+}
+
+
 /* set terminal input mode for keyboard read */
 void key_set_mode()
 {
