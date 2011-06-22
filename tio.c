@@ -55,7 +55,7 @@ float mytime()
 
 
 /* print elapsed time since last time */
-void print_mytime()
+void mytime_print()
 {
 	static float t = 0;
 	float t2 = mytime();

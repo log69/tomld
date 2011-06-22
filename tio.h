@@ -32,7 +32,7 @@
 
 float mytime();
 
-void print_mytime();
+void mytime_print();
 
 void key_set_mode();
 
