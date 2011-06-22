@@ -1,4 +1,4 @@
-tomld (tomoyo learning daemon) 0.33
+tomld (tomoyo learning daemon) 0.34
 Copyright (C) 2011 Andras Horvath
 E-mail: mail@log69.com - suggestions & feedbacks are welcome
 URL: http://log69.com - the official site
@@ -96,8 +96,9 @@ be regenerated easily
 - the running processes need to be restarted on newly created domains
 
 HOW TO USE:
-- download, move it to a directory that root owns only, change its owner to 
-root, change writeable only by root, make it executable, and run it as root
+- download, move it to a directory that root owns only (for security), change 
+its owner to root, change writeable only by root, make it executable, and run 
+it as root
 - run it the 1st time, now it will offer to install all missing packages and 
 setup grub with kernel parameter
 - system reboot is necessary now
