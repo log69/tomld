@@ -22,6 +22,8 @@
 
 changelog:
 -----------
+22/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
+                         - wildcard random part of file name in special dirs
 12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
@@ -188,7 +190,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.33";
+char *ver = "0.34";
 
 /* home dir */
 char *home = "/home";
@@ -346,7 +348,7 @@ char *tshellf2[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbas
 "/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish", "/usr/bin/ksh", "/usr/bin/rc",
 "/usr/bin/screen", 0};
 
-char *spec_exception[] = {"/etc/", "/home/\\*/", "/root/", 0};
+char *spec_exception[] = {"/dev/", "/etc/", "/home/\\*/", "/root/", 0};
 char *spec[] = {"/home/\\{\\*\\}", "/usr/share/\\{\\*\\}", "/etc/fonts/\\{\\*\\}", "/var/cache/\\{\\*\\}", 0};
 char *spec_ex = 0;
 char *spec1 = 0;
@@ -861,6 +863,121 @@ char *path_wildcard_home(char *path)
 	/* give back original path if no wildcard is added */
 	if (!new) strcpy2(&new, path);
 
+	return new;
+}
+
+
+/* wildcard random part of file name */
+/* i consider random part in a file name if it contains only lower and upper case, and numbers */
+/* if this condition doesn't meet, then i return the original name,
+ * cause probably new random name will come later anyway */
+/* returned value must be freed by caller */
+char *path_wildcard_dir_temp_name(char *name)
+{
+	char *new = 0;
+	char *temp = 0;
+	char c;
+	long l;
+	int i, i2;
+	int flag_now, flag_lcase, flag_ucase, flag_num, flag_count;
+	
+	/* return null on null input */
+	if (!name) return 0;
+
+	/* check length */
+	l = strlen(name);
+	if (!l) return 0;
+	
+	/* alloc mem for temporary name */
+	temp = memget2(l * 2);
+	
+	/* search for random part in name */
+	flag_lcase = 0;
+	flag_ucase = 0;
+	flag_num   = 0;
+	flag_count = 0;
+	i = 0;
+	i2 = 0;
+	while(1){
+		c = name[i++];
+		if (!c) break;
+		/* is char alfanumeric char? */
+		flag_now = 0;
+		if (c >= '0' && c <= '9'){ flag_now = 1; flag_num   = 1; }
+		if (c >= 'a' && c <= 'z'){ flag_now = 1; flag_lcase = 1; }
+		if (c >= 'A' && c <= 'Z'){ flag_now = 1;
+			/* upper case must be exist from the 2nd char */
+			if (flag_count >= 1) flag_ucase = 1;
+		}
+		if (flag_now){
+			if (!flag_count){
+				strcat2(&new, temp);
+				/* reset count */
+				i2 = 0;
+			}
+			/* increase random char count, must be at least 6 or more to success */
+			flag_count++;
+			/* add char to result */
+			temp[i2++] = c; temp[i2] = 0;
+		}
+		else{
+			if (flag_count){
+				/* make a wildcard if random part was more or equal than 6 chars */
+				if (flag_count >= 6 && flag_lcase && flag_ucase && flag_num){
+					strcat2(&new, "\\*");
+				}
+				/* store original sample if less than 6 chars */
+				else{
+					strcat2(&new, temp);
+				}
+				/* reset counts */
+				flag_lcase = 0;
+				flag_ucase = 0;
+				flag_num   = 0;
+				flag_count = 0;
+				i2 = 0;
+			}
+			/* add char to result */
+			temp[i2++] = c; temp[i2] = 0;
+		}
+	}
+
+	/* run check once more after quitting cycle */
+	
+	/* make a wildcard if random part was more or equal than 6 chars */
+	if (flag_count >= 6 && flag_lcase && flag_ucase && flag_num){
+		strcat2(&new, "\\*");
+	}
+	/* store original sample if less than 6 chars */
+	else{
+		strcat2(&new, temp);
+	}
+	
+	return new;
+}
+
+
+/* wildcard temporary (random type) file name in path */
+/* returned value must be freed by caller */
+char *path_wildcard_dir_temp(char *path)
+{
+	char *new = 0;
+	
+	/* is path a file name? */
+	if (!path_is_dir(path)){
+		char *mydir   = path_get_parent_dir(path);
+		char *myname  = path_get_filename(path);
+		char *myname2 = path_wildcard_dir_temp_name(myname);
+		
+		strcpy2(&new, mydir);
+		strcat2(&new, myname2);
+
+		free2(mydir);
+		free2(myname);
+		free2(myname2);
+	}
+	else strcpy2(&new, path);
+	
 	return new;
 }
 
@@ -4188,6 +4305,12 @@ void domain_reshape_rules_wildcard_spec()
 								if (compare_path_search_dir_in_list(spec3, pdir)) flag3 = 1;
 							}
 							
+							/* path is in spec or spec_ex */
+							if (flag_ex){
+								res2 = path_wildcard_dir_temp(param);
+								free2(param); param = res2;
+							}
+							
 							/* path is in spec or spec2 */
 							if (flag){
 								res2 = path_wildcard_dir(param);
@@ -4258,50 +4381,55 @@ void domain_reshape_rules_create_double()
 {
 	/* vars */
 	char *res, *temp, *temp2;
-	char *rule_type, *param;
+	char *rule_type, *params;
 	char *tdomf_new;
 	
+	char *cre[] = {"allow_create", "allow_read/write", "allow_write", "allow_unlink",
+		"allow_truncate", 0};
+		
 	/* alloc mem for new policy */
 	tdomf_new = memget2(max_char);
 	
-	/* cycle through rules of all domains and on create rule, add read/write, unlink and truncate too */
+	/* cycle through rules of all domains and on create rules, add create, read/write,
+	 * unlink and truncate too */
 	temp = tdomf;
 	while(1){
 		/* get next rule */
 		res = string_get_next_line(&temp);
 		if (!res) break;
 		
-		/* is it a rule starting with "allow_" tag? */
-		if (string_search_keyword_first(res, "allow_create ")){
+		/* get rule type and params */
+		temp2 = res;
+		rule_type = string_get_next_word(&temp2);
+		params = string_get_next_line(&temp2);
 
-			/* get rule type */
-			temp2 = res;
-			rule_type = string_get_next_word(&temp2);
-			param = string_get_next_line(&temp2);
+		/* is the rule any of the create rule type? */
+		if(array_search_keyword(cre, rule_type)){
 
-			strcat2(&tdomf_new, res);
+			strcat2(&tdomf_new, "allow_create ");
+			strcat2(&tdomf_new, params);
 			strcat2(&tdomf_new, "\n");
 
 			strcat2(&tdomf_new, "allow_read/write ");
-			strcat2(&tdomf_new, param);
+			strcat2(&tdomf_new, params);
 			strcat2(&tdomf_new, "\n");
 
 			strcat2(&tdomf_new, "allow_unlink ");
-			strcat2(&tdomf_new, param);
+			strcat2(&tdomf_new, params);
 			strcat2(&tdomf_new, "\n");
 
 			strcat2(&tdomf_new, "allow_truncate ");
-			strcat2(&tdomf_new, param);
+			strcat2(&tdomf_new, params);
 			strcat2(&tdomf_new, "\n");
 			
-			free2(param);
-			free2(rule_type);
 		}
 		else{
 			strcat2(&tdomf_new, res);
 			strcat2(&tdomf_new, "\n");
 		}
 		
+		free2(params);
+		free2(rule_type);
 		free2(res);
 	}
 	

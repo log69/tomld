@@ -59,7 +59,7 @@ char *path_link_read(const char *name)
 
 /* return the filename part of a path string */
 /* returned value must be freed by caller */
-char *path_get_filename(const char *text)
+char *path_get_filename(const char *path)
 {
 	char *res;
 	char c;
@@ -69,12 +69,12 @@ char *path_get_filename(const char *text)
 	res = memget2(max_char);
 
 	/* search for filename part */
-	l = strlen(text);
+	l = strlen(path);
 	if (l > 0){
 		i = l;
 		/* search for "/" char backwords and stop at it */
 		while (i--){
-			c = text[i];
+			c = path[i];
 			if (c == '/') { i++; break; }
 		}
 		/* rightmost string is not null? */
@@ -82,7 +82,7 @@ char *path_get_filename(const char *text)
 			/* copy string after "/" char */
 			i2 = 0;
 			while(i <= l){
-				res[i2++] = text[i++];
+				res[i2++] = path[i++];
 			}
 			strlenset2(&res);
 			return res;
@@ -186,7 +186,7 @@ char *path_join(char *path1, char *path2)
 }
 
 
-/* return the parent dir if path is a file */
+/* return the parent dir of path */
 /* returned value must be freed by caller */
 char *path_get_parent_dir(char *path)
 {

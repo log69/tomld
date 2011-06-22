@@ -980,6 +980,8 @@ char *array_search_keyword(char **array, const char *key)
 {
 	char *ptr;
 	
+	if (!key) return 0;
+	
 	while(1){
 		ptr = *(array++);
 		if (!ptr) return 0;
