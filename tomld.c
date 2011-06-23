@@ -22,11 +22,12 @@
 
 changelog:
 -----------
-22/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
+23/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
                          - wildcard random part of file name in special dirs
                          - delete domain from kernel memory too on --remove
                          - bugfix: fix a segfault in domain_info() on --info
                          - bugfix: cleanup domains at the end of every load()
+                         - bugfix: fix log file parsing in domain_get_log()
 12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
@@ -2613,8 +2614,6 @@ void domain_set_enforce_old()
 	}
 }
 
-/* -------------------------------------------------------------------------------------- */
-
 
 /* get recent access deny logs */
 void domain_get_log()
@@ -2746,7 +2745,9 @@ void domain_get_log()
 	/* get list of all subdomains, so later i add those rules only whose domains exist */
 	dlist = domain_get_list();
 
-	l = strlen("TOMOYO-ERROR: Access '");
+	if (tomoyo_version() <= 2299) l = 22;
+	else l = 15;
+
 	temp = tlogf2;
 	while(1){
 		/* next rule */
@@ -2754,7 +2755,7 @@ void domain_get_log()
 		res = string_get_next_line(&temp);
 		if (!res) break;
 		/* get allow_ type */
-		temp2 += l + 1,
+		temp2 += l;
 		res2 = string_get_next_word(&temp2);
 		if (!res2){
 			error("error: unexpected error, log message format is not correct\n");
@@ -2790,7 +2791,7 @@ void domain_get_log()
 		}
 		i = strlen2(&res2);
 		/* remove single quote from the end of param text */
-		if (i > 0) res2[i - 1] = 0;
+		if (res2[i - 1] == '\'') res2[i - 1] = 0;
 		/* add all together, and rule is complete */
 		strcat2(&rules, res2);
 		free2(res2);
@@ -2834,7 +2835,7 @@ void domain_get_log()
 	}
 
 	free2(dlist);
-	
+
 
 	/* ------------------------------- */
 	/* ----- add rules to policy ----- */
@@ -2932,7 +2933,7 @@ void domain_get_log()
 			tdomf = tdomf_new;
 		}
 	}
-	
+
 	free2(prog_rules);
 	free2(tlogf2);
 	free2(tlogf3);
