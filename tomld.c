@@ -216,7 +216,8 @@ char *my_exe_path = 0;
 char *tkern = "security=tomoyo";
 
 /* pattern string for the recursive wildcard "\{\*\}" for compares */
-char *wildcard_recursive_dir = "\\{\\*\\}";
+char *wildcard_recursive_dir = "\\{\\*\\}/";
+char *wildcard_recursive_file = "\\{\\*\\}/\\*";
 
 /* tomoyo vars and files */
 char *tdomf	= 0;
@@ -641,25 +642,27 @@ int tomoyo_version()
 }
 
 
-/* return true if path ends with recursive wildcard */
+/* return true if path ends with recursive wildcard (dir or file) */
 int path_is_dir_recursive_wildcard(const char *path)
 {
 	char *s = 0;
 	long l1 = strlen(path);
 	long l2;
 
-	/* create full wildcard path */
+	/* create full wildcard path of dir */
 	strcpy2(&s, "/");
 	strcat2(&s, wildcard_recursive_dir);
 	l2 = strlen2(&s);
-	
-	/* compare only the end of path */
+	/* compare only the end of paths */
 	if (l2 > l1) return 0;
-	/* without ending "/" char */
 	if (!strcmp(s, path + l1 - l2)){ free2(s); return 1; }
-	/* with ending "/" char */
-	strcat2(&s, "/");
-	l2++;
+
+	/* create full wildcard path of file */
+	strcpy2(&s, "/");
+	strcat2(&s, wildcard_recursive_file);
+	l2 = strlen2(&s);
+	/* compare only the end of paths */
+	if (l2 > l1) return 0;
 	if (!strcmp(s, path + l1 - l2)){ free2(s); return 1; }
 
 	free2(s);
@@ -688,7 +691,7 @@ char *path_wildcard_dir(char *path)
 }
 
 
-/* wildcard the leaf dir or file of a path and its parent too and return the result */
+/* wildcard the leaf dir or file of a path and its parent dir too and return the result */
 /* returned value must be freed by caller */
 char *path_wildcard_dir_plus_parent(char *path)
 {
@@ -701,35 +704,43 @@ char *path_wildcard_dir_plus_parent(char *path)
 	new  = path_get_parent_dir(path);
 	new2 = path_get_parent_dir(new);
 	free2(new); new = new2;
-	/* check if reult is null, if so, then add "/" char */
+
+	/* check if result is null, if so, then add "/" char */
 	if (!strlen2(&new)){
 		strcat2(&new, "/");
 
 		if (flag_rec){
-			strcat2(&new, wildcard_recursive_dir);
-			if (flag_dir) strcat2(&new, "/");
+			if (flag_dir) strcat2(&new, wildcard_recursive_dir);
+			else strcat2(&new, wildcard_recursive_file);
 			return new;
 		}
-
-		if (flag_dir){
-			strcat2(&new, "\\*/");
-		}
 		else{
-			strcat2(&new, "\\*");
+			if (flag_dir){
+				strcat2(&new, "\\*/");
+			}
+			else{
+				strcat2(&new, "\\*");
+			}
 		}
 	}
 	else{
 		if (flag_rec){
-			strcat2(&new, wildcard_recursive_dir);
-			if (flag_dir) strcat2(&new, "/");
+			if (flag_dir) strcat2(&new, wildcard_recursive_dir);
+			else{
+				/* jump one more dir up for recursive file wildcard */
+				new2 = path_get_parent_dir(new);
+				free2(new); new = new2;
+				strcat2(&new, wildcard_recursive_file);
+			}
 			return new;
 		}
-
-		if (flag_dir){
-			strcat2(&new, "\\*/\\*/");
-		}
 		else{
-			strcat2(&new, "\\*/\\*");
+			if (flag_dir){
+				strcat2(&new, "\\*/\\*/");
+			}
+			else{
+				strcat2(&new, "\\*/\\*");
+			}
 		}
 	}
 	
@@ -2028,9 +2039,9 @@ void check_options(int argc, char **argv){
 		}
 
 		/* fail if no arguments for --remove option */
-		if (opt_remove && !strlen2(&opt_remove2)){ error("error: bad argument\n"); myexit(1); }
+		if (opt_remove && !strlen2(&opt_remove2)){ error("error: argument missing for --remove option\n"); myexit(1); }
 		/* fail if no arguments for --recursive option */
-		if (opt_recursive && !dirs_recursive){ error("error: bad argument\n"); myexit(1); }
+		if (opt_recursive && !dirs_recursive){ error("error: argument missing for --recursive option\n"); myexit(1); }
 
 	}
 }
@@ -3327,7 +3338,7 @@ int compare_names(char *name1, char *name2)
 
 /* compare paths with wildcards */
 /* wildcard can be "\\*" or recursive wildcard */
-/* only standalone recursive wildcard is supported */
+/* only standalone recursive wildcard at the end is supported */
 /* return true if they match, even if both are null */
 int compare_paths(char *path1, char *path2)
 {
@@ -3780,9 +3791,8 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 				strcat2(&rules_new, " ");
 				/* add new first param */
 				strcat2(&rules_new, path_new1);
-				strcat2(&rules_new, wildcard_recursive_dir);
-				/* add "/" char if path is a dir */
-				if (path_is_dir(path1)) strcat2(&rules_new, "/");
+				if (path_is_dir(path1)) strcat2(&rules_new, wildcard_recursive_dir);
+				else strcat2(&rules_new, wildcard_recursive_file);
 				strcat2(&rules_new, "\n");
 			}
 		}
@@ -3794,9 +3804,8 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 				strcat2(&rules_new, " ");
 				/* add new first param */
 				strcat2(&rules_new, path_new1);
-				strcat2(&rules_new, wildcard_recursive_dir);
-				/* add "/" char if path is a dir */
-				if (path_is_dir(path1)) strcat2(&rules_new, "/");
+				if (path_is_dir(path1)) strcat2(&rules_new, wildcard_recursive_dir);
+				else strcat2(&rules_new, wildcard_recursive_file);
 				/* add old second param */
 				strcat2(&rules_new, " ");
 				strcat2(&rules_new, path2);
@@ -3811,9 +3820,8 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 				/* add new second param */
 				strcat2(&rules_new, " ");
 				strcat2(&rules_new, path_new2);
-				strcat2(&rules_new, wildcard_recursive_dir);
-				/* add "/" char if path is a dir */
-				if (path_is_dir(path2)) strcat2(&rules_new, "/");
+				if (path_is_dir(path2)) strcat2(&rules_new, wildcard_recursive_dir);
+				else strcat2(&rules_new, wildcard_recursive_file);
 				strcat2(&rules_new, "\n");
 			}
 		}
@@ -3851,9 +3859,15 @@ char *domain_sort_uniq_rules(char *rules)
 		/* get length of rule */
 		l1 = strlen2(&res);
 		/* count wildcards in rule */
-		c = l1; c1 = 0;
-		while(c--) if (res[c] == '*') c1++;
-		
+		/* search for recursive wildcard */
+		/* if there is a recursive wildcard in the path of the rule,
+		 * then i mark it as if it had many wildcard to choose rather this
+		 * instead of the one without recursive wildcard */
+		if (path_is_dir_recursive_wildcard(res)) c1 = 9999;
+		else{
+			c = l1; c1 = 0;
+			while(c--) if (res[c] == '*') c1++;
+		}
 		/* compare rule to all rules */
 		i2 = 0;
 		temp2 = rules;
@@ -3869,9 +3883,14 @@ char *domain_sort_uniq_rules(char *rules)
 					/* get length of rule */
 					l2 = strlen2(&res2);
 					/* count wildcards in rule */
-					c = l2; c2 = 0;
-					while(c--) if (res2[c] == '*') c2++;
-					/* if match, store only the one with more wildcards in it, or if that's equal,
+					/* search for recursive wildcard */
+					if (path_is_dir_recursive_wildcard(res2)) c2 = 9999;
+					else{
+						c = l2; c2 = 0;
+						while(c--) if (res2[c] == '*') c2++;
+					}
+					/* if match, store the one with the recursive wildcard, or else
+					 * store the one with more wildcards in it, or if that's equal,
 					 * then the one with the shortest length from the matching ones */
 					if (c1 != c2){
 						if (c1 > c2){ strcpy2(&old, res);  co = c1; }
@@ -3879,8 +3898,11 @@ char *domain_sort_uniq_rules(char *rules)
 						/* get length of rule */
 						ln = strlen2(&new);
 						/* count wildcards in rule */
-						c = ln; cn = 0;
-						while(c--) if (new[c] == '*') cn++;
+						if (path_is_dir_recursive_wildcard(new)) cn = 9999;
+						else{
+							c = ln; cn = 0;
+							while(c--) if (new[c] == '*') cn++;
+						}
 						/* choose the rule with more wildcards */
 						if ((!ln) || (cn < co)) strcpy2(&new, old);
 					}
@@ -4123,7 +4145,7 @@ void domain_reshape_rules_recursive_dirs()
 
 	/* do the whole check if there are any recursive dirs at all, or else exit */	
 	if (!dirs_recursive) return;
-	
+
 	/* alloc mem for new policy */
 	tdomf_new = memget2(max_char);
 	/* alloc mem for new rule */
@@ -4541,7 +4563,7 @@ void domain_reshape_rules()
 	domain_cleanup();
 	
 	domain_reshape_rules_recursive_dirs();
-	
+
 	sand_clock(0);
 	domain_cleanup();
 	
@@ -4934,6 +4956,15 @@ void finish()
 int main(int argc, char **argv){
 
 	float t, t2, t_start;
+
+
+	char s1[] = "/tmp/\\*/\\{\\*\\}/\\*";
+	char s2[] = "/tmp/hello/\\{\\*\\}/\\*";
+	debug(s1);
+	debug(s2);
+	if (compare_paths(s1, s2)) debug("SUCCESS");
+	myexit(0);
+
 
 	/* store start time */
 	t_start = mytime();
