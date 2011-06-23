@@ -216,6 +216,7 @@ char *my_exe_path = 0;
 char *tkern = "security=tomoyo";
 
 /* pattern string for the recursive wildcard "\{\*\}" for compares */
+/* this means at least one or more dirs plus file at the end */
 char *wildcard_recursive_dir = "\\{\\*\\}/";
 char *wildcard_recursive_file = "\\{\\*\\}/\\*";
 
@@ -4244,10 +4245,13 @@ void domain_reshape_rules_wildcard_spec()
 	 * so this exact dir should be wildcarded too with the files in it */
 	char *cre2[] = {"allow_mkdir", 0};
 
-	/* these are rule types to which i always add a second parameter 0-0xFFFFFFFF
+	/* these are rule types to which i always add a second parameter 0-0xFFFFFFFF */
+	char *cre3[] = {"allow_ioctl", "allow_chown", "allow_chgrp", 0};
+
+	/* these are rule types to which i always add a second parameter FFFF
 	 * because in kernel 2.6.36 and above Tomoyo checks for DAC's permission
 	 * more info on kernel differences: http://tomoyo.sourceforge.jp/comparison.html */
-	char *cre3[] = {"allow_ioctl", "allow_mksock", "allow_chown", "allow_chmod", "allow_chgrp", 0};
+	char *cre4[] = {"allow_create", "allow_mkdir", "allow_mkfifo", "allow_mksock", "allow_chmod", 0};
 	
 	/* initialize special dir lists */
 	if (!spec_ex) spec_ex = array_copy_to_string_list(spec_exception);
@@ -4291,9 +4295,11 @@ void domain_reshape_rules_wildcard_spec()
 
 					/* are there any parameters (more words)? */
 					if (param2){
-						/* add dir to the list if not there yet */
-						res2 = compare_path_add_dir_to_list_uniq(spec2, pdir2);
-						free2(spec2); spec2 = res2;
+						if (param2[0] == '/'){
+							/* add dir to the list if not there yet */
+							res2 = compare_path_add_dir_to_list_uniq(spec2, pdir2);
+							free2(spec2); spec2 = res2;
+						}
 					}
 				}
 				
@@ -4313,11 +4319,13 @@ void domain_reshape_rules_wildcard_spec()
 
 					/* are there any parameters (more words)? */
 					if (param2){
-						/* add dir to the list if not there yet */
-						res3 = path_wildcard_dir(param2);
-						res2 = compare_path_add_dir_to_list_uniq(spec3, res3);
-						free2(spec3); spec3 = res2;
-						free2(res3);
+						if (param2[0] == '/'){
+							/* add dir to the list if not there yet */
+							res3 = path_wildcard_dir(param2);
+							res2 = compare_path_add_dir_to_list_uniq(spec3, res3);
+							free2(spec3); spec3 = res2;
+							free2(res3);
+						}
 					}
 				}
 				
@@ -4358,9 +4366,9 @@ void domain_reshape_rules_wildcard_spec()
 				if (param1) pdir1 = path_get_parent_dir(param1);
 				if (param2) pdir2 = path_get_parent_dir(param2);
 
-				/* handle some of the special allow_ entries differently whose parameters are not dirs */
+				/* handle allow_ioctl whose first parameter may not be, and second parameter is not a dir */
 				/* **************************************************** */
-				/* check if rule is an "allow_ioctl, mksock, etc." rule */
+				/* check if rule is an "allow_ioctl" rule */
 				/* **************************************************** */
 				if(array_search_keyword(cre3, rule_type)){
 
@@ -4376,6 +4384,22 @@ void domain_reshape_rules_wildcard_spec()
 						/* wildcard param2 if it exists, or always add it above kernel 2.6.36 */
 						if (param2 || (kernel_version() >= 263600)){
 							strcpy2(&param2, "0-0xFFFFFFFF");
+						}
+					}
+				}
+
+				/* handle allow_mksock and the same whose second parameters are not dirs */
+				/* ********************************************** */
+				/* check if rule is an "mksock, mkfifo etc." rule */
+				/* ********************************************** */
+				if(array_search_keyword(cre4, rule_type)){
+
+					/* param2 */
+					if (param2){
+
+						/* wildcard param2 if it exists, or always add it above kernel 2.6.36 */
+						if (kernel_version() >= 263600){
+							strcpy2(&param2, "7777");
 						}
 					}
 				}
@@ -4498,7 +4522,7 @@ void domain_reshape_rules_create_double()
 {
 	/* vars */
 	char *res, *temp, *temp2;
-	char *rule_type, *params;
+	char *rule_type, *param1, *param2;
 	char *tdomf_new;
 	
 	char *cre[] = {"allow_create", "allow_read/write", "allow_write", "allow_unlink",
@@ -4518,25 +4542,30 @@ void domain_reshape_rules_create_double()
 		/* get rule type and params */
 		temp2 = res;
 		rule_type = string_get_next_word(&temp2);
-		params = string_get_next_line(&temp2);
+		param1 = string_get_next_word(&temp2);
+		param2 = string_get_next_word(&temp2);
 
 		/* is the rule any of the create rule type? */
 		if(array_search_keyword(cre, rule_type)){
 
+			/* allow_create can have second parameter from kernel 2.6.36 and above */
 			strcat2(&tdomf_new, "allow_create ");
-			strcat2(&tdomf_new, params);
+			strcat2(&tdomf_new, param1);
+			strcat2(&tdomf_new, " ");
+			if (param2) strcat2(&tdomf_new, param2);
+			else strcat2(&tdomf_new, "7777");
 			strcat2(&tdomf_new, "\n");
 
 			strcat2(&tdomf_new, "allow_read/write ");
-			strcat2(&tdomf_new, params);
+			strcat2(&tdomf_new, param1);
 			strcat2(&tdomf_new, "\n");
 
 			strcat2(&tdomf_new, "allow_unlink ");
-			strcat2(&tdomf_new, params);
+			strcat2(&tdomf_new, param1);
 			strcat2(&tdomf_new, "\n");
 
 			strcat2(&tdomf_new, "allow_truncate ");
-			strcat2(&tdomf_new, params);
+			strcat2(&tdomf_new, param1);
 			strcat2(&tdomf_new, "\n");
 			
 		}
@@ -4545,7 +4574,8 @@ void domain_reshape_rules_create_double()
 			strcat2(&tdomf_new, "\n");
 		}
 		
-		free2(params);
+		free2(param1);
+		free2(param2);
 		free2(rule_type);
 		free2(res);
 	}
@@ -4571,7 +4601,7 @@ void domain_reshape_rules()
 	
 	sand_clock(0);
 	domain_cleanup();
-	
+
 	domain_reshape_rules_create_double();
 
 	sand_clock(0);
@@ -4958,12 +4988,11 @@ int main(int argc, char **argv){
 	float t, t2, t_start;
 
 
-	char s1[] = "/tmp/\\*/\\{\\*\\}/\\*";
-	char s2[] = "/tmp/hello/\\{\\*\\}/\\*";
-	debug(s1);
-	debug(s2);
-	if (compare_paths(s1, s2)) debug("SUCCESS");
-	myexit(0);
+//	char s1[] = "/tmp/\\*/\\{\\*\\}/\\*";
+//	char s2[] = "/tmp/hello/\\{\\*\\}/\\*";
+//	debug(s1); debug(s2);
+//	if (compare_paths(s1, s2)) debug("SUCCESS");
+//	myexit(0);
 
 
 	/* store start time */
