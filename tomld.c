@@ -28,6 +28,8 @@ changelog:
                          - bugfix: fix a segfault in domain_info() on --info
                          - bugfix: cleanup domains at the end of every load()
                          - bugfix: fix log file parsing in domain_get_log()
+                         - make reshape compatible with kernel 2.6.36 and above
+                         - speed up kernel_version()
 12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
@@ -581,8 +583,11 @@ int kernel_version()
 	char *v = "/proc/sys/kernel/osrelease";
 	char *buff;
 	int c, c2;
-	int ver = 0;
 	char n;
+	static int ver = 0;
+
+	if (ver) return ver;
+
 	/* read kernel version from /proc in a format as 2.6.32-5-amd64 */
 	buff = file_read(v, 1);
 	c = 0;
@@ -4216,6 +4221,11 @@ void domain_reshape_rules_wildcard_spec()
 	 * new dir too, and it cannot be surely told if the dir itself has a unique name too,
 	 * so this exact dir should be wildcarded too with the files in it */
 	char *cre2[] = {"allow_mkdir", 0};
+
+	/* these are rule types to which i always add a second parameter 0-0xFFFFFFFF
+	 * because in kernel 2.6.36 and above Tomoyo checks for DAC's permission
+	 * more info on kernel differences: http://tomoyo.sourceforge.jp/comparison.html */
+	char *cre3[] = {"allow_ioctl", "allow_mksock", "allow_chown", "allow_chmod", "allow_chgrp", 0};
 	
 	/* initialize special dir lists */
 	if (!spec_ex) spec_ex = array_copy_to_string_list(spec_exception);
@@ -4318,6 +4328,7 @@ void domain_reshape_rules_wildcard_spec()
 			if (rule_type){
 
 				char *pdir1 = 0, *pdir2 = 0;
+				int c;
 
 				/* get params and their parent dirs */
 				param1 = string_get_next_word(&temp2);
@@ -4326,62 +4337,49 @@ void domain_reshape_rules_wildcard_spec()
 				if (param2) pdir2 = path_get_parent_dir(param2);
 
 				/* handle some of the special allow_ entries differently whose parameters are not dirs */
-				/* ************************************** */
-				/* check if rule is an "allow_ioctl" rule */
-				/* ************************************** */
-				if(string_search_keyword_first(rule_type, "allow_ioctl")){
-
-					/* add rule to new policy */
-					strcat2(&tdomf_new, rule_type);
+				/* **************************************************** */
+				/* check if rule is an "allow_ioctl, mksock, etc." rule */
+				/* **************************************************** */
+				if(array_search_keyword(cre3, rule_type)){
 
 					/* param1 */
 					if (param1){
+
 						/* check for socket param */
 						if (string_search_keyword_first(param1, "socket:[")){
 							/* wildcard socket param */
 							strcpy2(&param1, "socket:[\\*]");
 						}
 						
-						/* add param1 to new policy */
-						strcat2(&tdomf_new, " ");
-						strcat2(&tdomf_new, param1);
+						/* wildcard param2 if it exists, or always add it above kernel 2.6.36 */
+						if (param2 || (kernel_version() >= 263600)){
+							strcpy2(&param2, "0-0xFFFFFFFF");
+						}
 					}
-
-					/* param2 */
-					if (param2){
-						/* wildcard socket param */
-						strcpy2(&param2, "0x0000-0xFFFF");
-
-						/* add param2 to new policy */
-						strcat2(&tdomf_new, " ");
-						strcat2(&tdomf_new, param2);
-					}
-
-					/* new lin in new policy */
-					strcat2(&tdomf_new, "\n");
 				}
 
-				/* *************************** */
-				/* handle params that are dirs */
-				/* *************************** */
-				else{
-					int c;
+				/* ****************************************************** */
+				/* handle the rest of the rules with params that are dirs */
+				/* ****************************************************** */
 
-					/* add rule to new policy */
-					strcat2(&tdomf_new, rule_type);
+				/* add rule to new policy */
+				strcat2(&tdomf_new, rule_type);
 
-					/* cycle through the 2 params */
-					c = 0;
-					while(++c <= 2){
-						int flag    = 0;
-						int flag3   = 0;
-						int flag_ex = 0;
-						char *param = 0, *pdir = 0;
+				/* cycle through the 2 params */
+				c = 0;
+				while(++c <= 2){
+					int flag    = 0;
+					int flag3   = 0;
+					int flag_ex = 0;
+					char *param = 0, *pdir = 0;
 
-						/* set param to 1 and after 2 */
-						if (c == 1){ strcpy2(&param, param1); strcpy2(&pdir, pdir1); }
-						if (c == 2){ strcpy2(&param, param2); strcpy2(&pdir, pdir2); }
-						if (param){
+					/* set param to 1 and after 2 */
+					if (c == 1){ strcpy2(&param, param1); strcpy2(&pdir, pdir1); }
+					if (c == 2){ strcpy2(&param, param2); strcpy2(&pdir, pdir2); }
+					if (param){
+						
+						/* check param only if it's a dir starting with "/" char */
+						if (param[0] == '/'){
 
 							/* check dir in exception */
 							if (compare_path_search_dir_in_list(spec_ex, pdir)) flag_ex = 1;
@@ -4432,19 +4430,18 @@ void domain_reshape_rules_wildcard_spec()
 							/* wildcard /home/$USER/ dir to support multiple users */
 							res2 = path_wildcard_home(param);
 							free2(param); param = res2;
-
-							
-							/* add param2 to new policy */
-							strcat2(&tdomf_new, " ");
-							strcat2(&tdomf_new, param);
 						}
-						free2(pdir);
-						free2(param);
+						
+						/* add param to rule */
+						strcat2(&tdomf_new, " ");
+						strcat2(&tdomf_new, param);
 					}
-
-					/* new lin in new policy */
-					strcat2(&tdomf_new, "\n");
+					free2(pdir);
+					free2(param);
 				}
+
+				/* new lin in new policy */
+				strcat2(&tdomf_new, "\n");
 				
 				
 				free2(pdir1);
