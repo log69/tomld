@@ -4520,10 +4520,8 @@ void domain_reshape_rules_wildcard_spec()
 							
 							/* path is in spec3_mkdir */
 							if (flag3){
-printf("-- %s %s\n", rule_type, param);
 								res2 = path_wildcard_dir_plus_parent(param);
 								free2(param); param = res2;
-printf("-- %s %s\n", rule_type, param);
 							}
 
 							/* wildcard library files version numbers */
