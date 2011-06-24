@@ -22,14 +22,16 @@
 
 changelog:
 -----------
-23/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
+24/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
                          - wildcard random part of file name in special dirs
                          - delete domain from kernel memory too on --remove
                          - bugfix: fix a segfault in domain_info() on --info
                          - bugfix: cleanup domains at the end of every load()
                          - bugfix: fix log file parsing in domain_get_log()
-                         - make reshape compatible with kernel 2.6.36 and above
+                         - bugfix: fix special recursive directory wildcard usage
+                           (it means at least 1 or more directories, not zero or more)
                          - speed up kernel_version()
+                         - make reshape compatible with kernel 2.6.36 and above
 12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
@@ -217,8 +219,9 @@ char *tkern = "security=tomoyo";
 
 /* pattern string for the recursive wildcard "\{\*\}" for compares */
 /* this means at least one or more dirs plus file at the end */
-char *wildcard_recursive_dir = "\\{\\*\\}/";
-char *wildcard_recursive_file = "\\{\\*\\}/\\*";
+char *wildcard_recursive_plain = "\\{\\*\\}";
+char *wildcard_recursive_dir   = "\\{\\*\\}/";
+char *wildcard_recursive_file  = "\\{\\*\\}/\\*";
 
 /* tomoyo vars and files */
 char *tdomf	= 0;
@@ -356,7 +359,7 @@ char *tshellf2[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbas
 "/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish", "/usr/bin/ksh", "/usr/bin/rc",
 "/usr/bin/screen", 0};
 
-char *spec_exception[] = {"/dev/", "/etc/", "/home/\\*/", "/root/", 0};
+char *spec_exception[] = {"/", "/dev/", "/etc/", "/home/\\*/", "/root/", 0};
 char *spec[] = {"/home/\\{\\*\\}", "/usr/share/\\{\\*\\}", "/etc/fonts/\\{\\*\\}", "/var/cache/\\{\\*\\}", 0};
 char *spec_ex = 0;
 char *spec1 = 0;
@@ -727,12 +730,10 @@ char *path_wildcard_dir_plus_parent(char *path)
 	else{
 		if (flag_rec){
 			if (flag_dir) strcat2(&new, wildcard_recursive_dir);
-			else{
-				/* jump one more dir up for recursive file wildcard */
-				new2 = path_get_parent_dir(new);
-				free2(new); new = new2;
-				strcat2(&new, wildcard_recursive_file);
-			}
+			/* when path ends with a recursive wildcard dir and with a wildcarded file "\\*",
+			 * then path stays the same after this,
+			 * because here the file and its parent is wildcarded already too */
+			else strcat2(&new, wildcard_recursive_file);
 			return new;
 		}
 		else{
@@ -3347,6 +3348,8 @@ int compare_paths(char *path1, char *path2)
 	char c1, c2;
 	int flag;
 	int i, i1, i2;
+	int w1, w2;
+	int is_dir;
 	char *s1, *s2;
 	
 	if (!path1 || !path2) return 0;
@@ -3360,6 +3363,10 @@ int compare_paths(char *path1, char *path2)
 	
 	/* fail if they don't start with "/" char */
 	if (c1 != '/' || c2 != '/') return 0;
+	
+	/* fail if one of it is a dir and the other is a file */
+	is_dir = path_is_dir(path1);
+	if (is_dir != path_is_dir(path2)) return 0;
 	
 	/* alloc mem for subdir names */
 	s1 = memget2(max_char);
@@ -3414,9 +3421,20 @@ int compare_paths(char *path1, char *path2)
 		strlenset3(&s2, i);
 
 		/* if any of the subdir name contains recursive wildcard, then success */
-		/* i check only for full name of recursive wildcards */
+		/* i check full name of recursive wildcards only at the end */
 		/* recursive wildcard somewhere in the name is not supported */
-		if (!strcmp(s1, wildcard_recursive_dir) || !strcmp(s2, wildcard_recursive_dir)){
+		w1 = strcmp(s1, wildcard_recursive_plain);
+		w2 = strcmp(s2, wildcard_recursive_plain);
+		if (!w1 || !w2){
+			/* if paths are not dirs, then there must be another subdir in the other path
+			 * that is not special recursive wildcard, because the wildcard means
+			 * at least 1 or more dirs */
+			if (!is_dir){
+				/* if s1 is recursive wildcard and s2 is the last subdir (file), then fail */
+				if (!w1 && !c2) break;
+				/* if s2 is recursive wildcard and s1 is the last subdir (file), then fail */
+				if (!w2 && !c1) break;
+			}
 			free2(s1);
 			free2(s2);
 			return 1;
@@ -3792,8 +3810,21 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 				strcat2(&rules_new, " ");
 				/* add new first param */
 				strcat2(&rules_new, path_new1);
-				if (path_is_dir(path1)) strcat2(&rules_new, wildcard_recursive_dir);
-				else strcat2(&rules_new, wildcard_recursive_file);
+				if (path_is_dir(path1)){
+					strcat2(&rules_new, wildcard_recursive_dir);
+				}
+				else{
+					/* for recursive access of a dir, 2 lines needed, for example:
+					 * "allow_read /tmp/test/\{\*\}/\*" and
+					 * "allow_read /tmp/test/\*" to allow read from the dir itself too,
+					 * cause recursive wildcard means at least 1 dir or more */
+					strcat2(&rules_new, wildcard_recursive_file);
+					strcat2(&rules_new, "\n");
+					strcat2(&rules_new, type);
+					strcat2(&rules_new, " ");
+					strcat2(&rules_new, path_new1);
+					strcat2(&rules_new, "\\*");
+				}
 				strcat2(&rules_new, "\n");
 			}
 		}
@@ -3805,8 +3836,19 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 				strcat2(&rules_new, " ");
 				/* add new first param */
 				strcat2(&rules_new, path_new1);
-				if (path_is_dir(path1)) strcat2(&rules_new, wildcard_recursive_dir);
-				else strcat2(&rules_new, wildcard_recursive_file);
+				if (path_is_dir(path1)){
+					strcat2(&rules_new, wildcard_recursive_dir);
+				}
+				else{
+					strcat2(&rules_new, wildcard_recursive_file);
+					strcat2(&rules_new, " ");
+					strcat2(&rules_new, path2);
+					strcat2(&rules_new, "\n");
+					strcat2(&rules_new, type);
+					strcat2(&rules_new, " ");
+					strcat2(&rules_new, path_new1);
+					strcat2(&rules_new, "\\*");
+				}
 				/* add old second param */
 				strcat2(&rules_new, " ");
 				strcat2(&rules_new, path2);
@@ -3821,8 +3863,19 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 				/* add new second param */
 				strcat2(&rules_new, " ");
 				strcat2(&rules_new, path_new2);
-				if (path_is_dir(path2)) strcat2(&rules_new, wildcard_recursive_dir);
-				else strcat2(&rules_new, wildcard_recursive_file);
+				if (path_is_dir(path1)){
+					strcat2(&rules_new, wildcard_recursive_dir);
+				}
+				else{
+					strcat2(&rules_new, wildcard_recursive_file);
+					strcat2(&rules_new, "\n");
+					strcat2(&rules_new, type);
+					strcat2(&rules_new, " ");
+					strcat2(&rules_new, path1);
+					strcat2(&rules_new, " ");
+					strcat2(&rules_new, path_new2);
+					strcat2(&rules_new, "\\*");
+				}
 				strcat2(&rules_new, "\n");
 			}
 		}
@@ -4231,7 +4284,7 @@ void domain_reshape_rules_wildcard_spec()
 	 * and do this overall because it cannot be known if one non-unique filname will be reused
 	 * by other processes */
 	char *spec2 = 0;
-	char *spec3 = 0;
+	char *spec3_mkdir = 0;
 
 	/* these are the special create entries, where the place of the file will be wildcarded
 	 * because it cannot be determined fully yet if the file being created has a unique filename
@@ -4312,8 +4365,8 @@ void domain_reshape_rules_wildcard_spec()
 					if (param1){
 						/* add dir to the list if not there yet */
 						res3 = path_wildcard_dir(param1);
-						res2 = compare_path_add_dir_to_list_uniq(spec3, res3);
-						free2(spec3); spec3 = res2;
+						res2 = compare_path_add_dir_to_list_uniq(spec3_mkdir, res3);
+						free2(spec3_mkdir); spec3_mkdir = res2;
 						free2(res3);
 					}
 
@@ -4322,8 +4375,8 @@ void domain_reshape_rules_wildcard_spec()
 						if (param2[0] == '/'){
 							/* add dir to the list if not there yet */
 							res3 = path_wildcard_dir(param2);
-							res2 = compare_path_add_dir_to_list_uniq(spec3, res3);
-							free2(spec3); spec3 = res2;
+							res2 = compare_path_add_dir_to_list_uniq(spec3_mkdir, res3);
+							free2(spec3_mkdir); spec3_mkdir = res2;
 							free2(res3);
 						}
 					}
@@ -4442,9 +4495,15 @@ void domain_reshape_rules_wildcard_spec()
 								}
 							}
 
-							/* is it in spec3? */
+							/* is it in spec3_mkdir? */
 							if (!flag_ex){
-								if (compare_path_search_dir_in_list(spec3, pdir)) flag3 = 1;
+								/* isn't parent dir in special excluded dir? */
+								res2 = path_get_parent_dir(pdir);
+								if (!compare_path_search_dir_in_list(spec_ex, res2)){
+									/* is dir in mkdir list? */
+									if (compare_path_search_dir_in_list(spec3_mkdir, pdir)) flag3 = 1;
+								}
+								free2(res2);
 							}
 							
 							/* path is in spec or spec_ex */
@@ -4459,10 +4518,12 @@ void domain_reshape_rules_wildcard_spec()
 								free2(param); param = res2;
 							}
 							
-							/* path is in spec3 */
+							/* path is in spec3_mkdir */
 							if (flag3){
+printf("-- %s %s\n", rule_type, param);
 								res2 = path_wildcard_dir_plus_parent(param);
 								free2(param); param = res2;
+printf("-- %s %s\n", rule_type, param);
 							}
 
 							/* wildcard library files version numbers */
@@ -4508,7 +4569,7 @@ void domain_reshape_rules_wildcard_spec()
 	}
 
 	free2(spec2);
-	free2(spec3);
+	free2(spec3_mkdir);
 	free2(tdomf);
 	tdomf = tdomf_new;
 }
@@ -4986,14 +5047,6 @@ void finish()
 int main(int argc, char **argv){
 
 	float t, t2, t_start;
-
-
-//	char s1[] = "/tmp/\\*/\\{\\*\\}/\\*";
-//	char s2[] = "/tmp/hello/\\{\\*\\}/\\*";
-//	debug(s1); debug(s2);
-//	if (compare_paths(s1, s2)) debug("SUCCESS");
-//	myexit(0);
-
 
 	/* store start time */
 	t_start = mytime();
