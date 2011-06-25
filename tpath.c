@@ -89,6 +89,7 @@ char *path_get_filename(const char *path)
 		}
 	}
 	
+	free2(res);
 	return 0;
 }
 

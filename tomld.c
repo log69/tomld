@@ -30,6 +30,8 @@ changelog:
                          - bugfix: fix log file parsing in domain_get_log()
                          - bugfix: fix special recursive directory wildcard usage
                            (it means at least 1 or more directories, not zero or more)
+                         - bugfix: domain wasn't switched back to learning mode after adding access deny messages
+                         - bugfix: fix several memory leaks
                          - speed up kernel_version()
                          - make reshape compatible with kernel 2.6.36 and above
 12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
@@ -658,7 +660,7 @@ int path_is_dir_recursive_wildcard(const char *path)
 	strcat2(&s, wildcard_recursive_dir);
 	l2 = strlen2(&s);
 	/* compare only the end of paths */
-	if (l2 > l1) return 0;
+	if (l2 > l1){ free2(s); return 0; }
 	if (!strcmp(s, path + l1 - l2)){ free2(s); return 1; }
 
 	/* create full wildcard path of file */
@@ -666,7 +668,7 @@ int path_is_dir_recursive_wildcard(const char *path)
 	strcat2(&s, wildcard_recursive_file);
 	l2 = strlen2(&s);
 	/* compare only the end of paths */
-	if (l2 > l1) return 0;
+	if (l2 > l1){ free2(s); return 0; }
 	if (!strcmp(s, path + l1 - l2)){ free2(s); return 1; }
 
 	free2(s);
@@ -889,6 +891,8 @@ char *path_wildcard_home(char *path)
 	/* give back original path if no wildcard is added */
 	if (!new) strcpy2(&new, path);
 
+	free2(h);
+
 	return new;
 }
 
@@ -978,6 +982,8 @@ char *path_wildcard_dir_temp_name(char *name)
 	else{
 		strcat2(&new, temp);
 	}
+	
+	free2(temp);
 	
 	return new;
 }
@@ -1209,7 +1215,7 @@ int domain_get_profile(char *text)
 /* set profile number (0-3) of a domain at text position from the beginning of domain policy */
 void domain_set_profile(char *text, int profile)
 {
-	int i, p;
+	int p;
 	char *key = "use_profile ";
 	int keyl = 12;
 	char *res, *orig;
@@ -1222,17 +1228,13 @@ void domain_set_profile(char *text, int profile)
 		if (!res) break;
 
 		/* search for the keyword */
-		i = string_search_keyword(res, key);
-		free2(res);
-
-		/* if match */
-		if (i > -1){
+		if (string_search_keyword_first(res, key)){
 			/* set profile */
-			i += keyl;
 			p = string_itoc(profile);
-			orig[i] = p;
+			orig[keyl] = p;
 			break;
 		}
+		free2(res);
 	}
 }
 
@@ -1694,6 +1696,7 @@ void reload()
 					strcat2(&myappend, res2);
 					strcat2(&myappend, "\n");
 					free2(res2);
+					free2(res3);
 				}
 
 				/* append list with the new rules for the domains of the current running process too */
@@ -1742,13 +1745,13 @@ void reload()
 									strcat2(&myappend, res2);
 									strcat2(&myappend, "\n");
 									free2(res2);
+									free2(res3);
 								}
 							}
 						}
 						free2(name2);
 					}
 			 	}
-
 				free2(name1);
 			}
 			free2(res);
@@ -1771,6 +1774,7 @@ void reload()
 	}
 	
 	free2(domain_names_active);
+	free2(rules_old);
 	free2(profile);
 	free2(rules);
 	free2(tdomf_old);
@@ -2573,11 +2577,11 @@ void domain_set_enforce_old()
 			orig = temp;
 			res = domain_get_next(&temp);
 			if (!res) break;
+			free2(res);
 			/* get domain profile */
 			m = domain_get_profile(orig);
 			/* there are old enforcing mode domains, i have the answer, so quit */
 			if (m == 3){ flag_old = 1; break; }
-			free2(res);
 		}
 
 		/* turn old domains into enforcing mode */
@@ -2860,7 +2864,7 @@ void domain_get_log()
 	/* ------------------------------- */
 
 	if (prog_rules){
-		char *tdomf_new, *prog, *rule, *orig, *prog_rules_new = 0;
+		char *tdomf_new, *prog, *rule, *rules_new = 0, *orig, *prog_rules_new = 0;
 
 		/* sort and uniq rules */
 		res = string_sort_uniq_lines(prog_rules);
@@ -2908,13 +2912,13 @@ void domain_get_log()
 				/* get next domain policy */
 				res = domain_get_next(&temp);
 				if (!res) break;
-				/* add domain policy to new policy */
-				strcat2(&tdomf_new, res);
 				/* get subdomian name */
 				res2 = domain_get_name_sub(res);
 				if (res2){
 					int flag_prof = 0;
 					temp2 = prog_rules;
+					strnull2(&rules_new);
+
 					while(1){
 						/* get prog name and its rules */
 						prog = string_get_next_word(&temp2);
@@ -2925,11 +2929,11 @@ void domain_get_log()
 						/* compare prog name to subdomain name */
 						if (!strcmp(prog, res2)){
 							/* if match, add rule to domain policy */
-							strcat2(&tdomf_new, rule);
-							strcat2(&tdomf_new, "\n");
+							strcat2(&rules_new, rule);
+							strcat2(&rules_new, "\n");
 							/* switch domain to learning mode */
 							if (!flag_prof){
-								domain_set_profile(orig, 1);
+								domain_set_profile(res, 1);
 								/* do it only once per domain for speed */
 								flag_prof = 1;
 							}
@@ -2940,9 +2944,14 @@ void domain_get_log()
 					}
 					free2(res2);
 				}
+				/* add domain policy to new policy */
+				strcat2(&tdomf_new, res);
+				strcat2(&tdomf_new, "\n");
+				strcat2(&tdomf_new, rules_new);
 				strcat2(&tdomf_new, "\n");
 				free2(res);
 			}
+			free2(rules_new);
 			
 			color("learning mode turned on for domains with new rules\n", red);
 
