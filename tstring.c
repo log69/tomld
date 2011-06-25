@@ -365,7 +365,7 @@ int string_is_number(const char *text)
 {
 	int i = 0;
 	char c;
-	int res = 0;
+	int res = 1;
 
 	if (!text) return 0;
 
@@ -375,7 +375,7 @@ int string_is_number(const char *text)
 		/* exit on null */
 		if (!c) break;
 		/* fail if not only numbers are in text */
-		if (c < '0' || c > '9'){ res = 1; break; }
+		if (c < '0' || c > '9'){ res = 0; break; }
 	}
 	
 	return res;
