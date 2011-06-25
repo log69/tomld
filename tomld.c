@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-24/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
+25/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
                          - wildcard random part of file name in special dirs
                          - delete domain from kernel memory too on --remove
                          - bugfix: fix a segfault in domain_info() on --info
@@ -34,6 +34,7 @@ changelog:
                          - bugfix: fix several memory leaks
                          - speed up kernel_version()
                          - make reshape compatible with kernel 2.6.36 and above
+                         - replace strspn() with my function
 12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
@@ -1322,8 +1323,8 @@ int process_get_pid(const char *name){
 		/* get the dir names inside /proc dir */
 		strcpy2(&mypid, mydir_entry->d_name);
 
-		/* does it contain numbers only meaning they are pids? */
-		if (strspn(mypid, "0123456789") == strlen2(&mypid)) {
+		/* does it contain only numbers meaning they are pids? */
+		if (string_is_number(mypid)) {
 			char *res;
 			/* create dirname like /proc/pid/exe */
 			strcpy2(&mydir_name, "/proc/");
@@ -4918,8 +4919,8 @@ void check_processes()
 			/* get my pid number from dir name in /proc */
 			mypid = memget2(max_num);
 			strcpy2(&mypid, mydir_entry->d_name);
-			/* does it contain numbers only meaning they are pids? */
-			if (strspn(mypid, "0123456789") == strlen2(&mypid)) {
+			/* does it contain only numbers meaning they are pids? */
+			if (string_is_number(mypid)) {
 				char *mydir_name;
 				/* create dirname like /proc/pid/exe */
 				mydir_name = memget2(max_char);
