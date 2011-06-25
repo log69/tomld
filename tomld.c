@@ -39,6 +39,7 @@ changelog:
                          - speed up kernel_version()
                          - make reshape compatible with kernel 2.6.36 and above
                          - replace strspn() with my function
+                         - improve path_wildcard_proc() by replacing all subdirs by numeric wildcard that consist of only numbers
 12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
@@ -832,30 +833,48 @@ char *path_wildcard_lib(char *path)
 /* returned value must be freed by caller */
 char *path_wildcard_proc(char *path)
 {
-	char *new = 0;
+	char *new = 0, *temp;
 	char c;
-	int i, flag;
+	int i, i2, flag;
+	long l;
+	
+	if (!path) return 0;
 	
 	/* does the path start with "/proc/"? */
 	if (string_search_keyword_first(path, "/proc/")){
 		
-		/* replace all subdirs that consist of only numbers with numeric wildcard */
+		l = strlen(path);
+		temp = memget2(l * 2);
+		new  = memget2(l * 2);
+		strcpy2(&new, "/proc/");
 		
-		/* does the second subdir contain only nums? */
+		/* replace all subdirs that consist of only numbers with numeric wildcard */
 		flag = 1;
 		i = 6;
+		i2 = 0;
 		while(1){
 			c = path[i];
-			if (!c || c == '/') break;
-			if (c < '0' || c > '9'){ flag = 0; break; }
+			if (!c || c == '/'){
+				if (!flag){
+					if (i2) strcat2(&new, temp);
+				}
+				else{
+					if (i2) strcat2(&new, "\\$");
+				}
+				if (i2 && c) strcat2(&new, "/");
+				i2 = 0;
+				temp[0] = 0;
+				flag = 1;
+			}
+			else{
+				temp[i2++] = c; temp[i2] = 0;
+				if (c < '0' || c > '9') flag = 0;
+			}
+			if (!c) break;
 			i++;
 		}
-
-		/* replace second subdir with numeric wildcard */
-		if (flag){
-			strcpy2(&new, "/proc/\\$");
-			strcat2(&new, path + i);
-		}
+		
+		free2(temp);
 	}
 	
 	/* give back original path if no wildcard is added */
