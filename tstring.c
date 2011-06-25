@@ -360,6 +360,28 @@ char *string_get_number(const char *text)
 }
 
 
+/* return true if string consists of only numbers */
+int string_is_number(const char *text)
+{
+	int i = 0;
+	char c;
+	int res = 0;
+
+	if (!text) return 0;
+
+	/* search for only num chars */
+	while(1){
+		c = text[i++];
+		/* exit on null */
+		if (!c) break;
+		/* fail if not only numbers are in text */
+		if (c < '0' || c > '9'){ res = 1; break; }
+	}
+	
+	return res;
+}
+
+
 /* return a new string containing the next line of a string and move the pointer to the beginning of the this line */
 /* returned value must be freed by caller */
 char *string_get_next_line(char **text)
