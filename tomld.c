@@ -827,7 +827,8 @@ char *path_wildcard_lib(char *path)
 }
 
 
-/* wildcard /proc/$PID/ numbers */
+/* wildcard /proc/$PID/ numbers
+ * and replace all subdirs that consist of only numbers with numeric wildcard */
 /* returned value must be freed by caller */
 char *path_wildcard_proc(char *path)
 {
@@ -837,6 +838,9 @@ char *path_wildcard_proc(char *path)
 	
 	/* does the path start with "/proc/"? */
 	if (string_search_keyword_first(path, "/proc/")){
+		
+		/* replace all subdirs that consist of only numbers with numeric wildcard */
+		
 		/* does the second subdir contain only nums? */
 		flag = 1;
 		i = 6;
