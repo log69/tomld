@@ -32,6 +32,10 @@ changelog:
                            (it means at least 1 or more directories, not zero or more)
                          - bugfix: domain wasn't switched back to learning mode after adding access deny messages
                          - bugfix: fix several memory leaks
+                         - bugfix in path_is_dir_recursive_wildcard() and speed up the function too
+                         - bugfix in compare_paths() to take care of the second parameter too if it is not a dir
+                           (since kernel 2.6.33 and above)
+                         - bugfix in domain_sort_uniq_rules() to search for wildcard in parameter dir instead of whole rule
                          - speed up kernel_version()
                          - make reshape compatible with kernel 2.6.36 and above
                          - replace strspn() with my function
@@ -224,7 +228,11 @@ char *tkern = "security=tomoyo";
 /* this means at least one or more dirs plus file at the end */
 char *wildcard_recursive_plain = "\\{\\*\\}";
 char *wildcard_recursive_dir   = "\\{\\*\\}/";
+char *wildcard_recursive_dir2  = "/\\{\\*\\}/";
+int   wildcard_recursive_dir2_len = 8;
 char *wildcard_recursive_file  = "\\{\\*\\}/\\*";
+char *wildcard_recursive_file2 = "/\\{\\*\\}/\\*";
+int   wildcard_recursive_file2_len = 10;
 
 /* tomoyo vars and files */
 char *tdomf	= 0;
@@ -652,27 +660,22 @@ int tomoyo_version()
 /* return true if path ends with recursive wildcard (dir or file) */
 int path_is_dir_recursive_wildcard(const char *path)
 {
-	char *s = 0;
-	long l1 = strlen(path);
-	long l2;
+	long l1;
+	
+	if (!path) return 0;
 
-	/* create full wildcard path of dir */
-	strcpy2(&s, "/");
-	strcat2(&s, wildcard_recursive_dir);
-	l2 = strlen2(&s);
-	/* compare only the end of paths */
-	if (l2 > l1){ free2(s); return 0; }
-	if (!strcmp(s, path + l1 - l2)){ free2(s); return 1; }
+	/* get path length */
+	l1 = strlen(path);
 
-	/* create full wildcard path of file */
-	strcpy2(&s, "/");
-	strcat2(&s, wildcard_recursive_file);
-	l2 = strlen2(&s);
-	/* compare only the end of paths */
-	if (l2 > l1){ free2(s); return 0; }
-	if (!strcmp(s, path + l1 - l2)){ free2(s); return 1; }
+	/* compare wildcard dir to the end of paths */
+	/* wildcard file's length is longer than dir's, so i compare file first */
+	if (wildcard_recursive_file2_len > l1) return 0;
+	if (!strcmp(wildcard_recursive_file2, path + l1 - wildcard_recursive_file2_len)) return 1;
 
-	free2(s);
+	/* compare wildcard file to the end of paths */
+	if (wildcard_recursive_dir2_len > l1) return 0;
+	if (!strcmp(wildcard_recursive_dir2, path + l1 - wildcard_recursive_dir2_len)) return 1;
+
 	return 0;
 }
 
@@ -3371,8 +3374,12 @@ int compare_paths(char *path1, char *path2)
 	if (!c1 && !c2) return 1;
 	if (!c1 || !c2) return 0;
 	
-	/* fail if they don't start with "/" char */
-	if (c1 != '/' || c2 != '/') return 0;
+	/* fail if they don't start with "/" char and they don't match either */
+	/* this is needed for kernel above 2.6.33 where an allow_create and allow_mkdir
+	 * rule can have a second parameter that is not a dir (like 7777) */
+	if (c1 != '/' || c2 != '/'){
+		if (strcmp(path1, path2)) return 0;
+	}
 	
 	/* fail if one of it is a dir and the other is a file */
 	is_dir = path_is_dir(path1);
@@ -3905,7 +3912,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 /* returned value must be freed by caller */
 char *domain_sort_uniq_rules(char *rules)
 {
-	char *res, *res2, *temp, *temp2, *old, *new, *rules_new, *rules2;
+	char *res, *res2, *temp, *temp2, *temp3, *old, *new, *rules_new, *rules2, *param1, *param2;
 	int i1, i2, l1, l2, lo, ln;
 	int c, c1, c2, co, cn;
 
@@ -3920,6 +3927,10 @@ char *domain_sort_uniq_rules(char *rules)
 	while(1){
 		res = string_get_next_line(&temp);
 		if (!res) break;
+		/* get params of rule */
+		temp3 = res;
+		param1 = string_get_next_wordn(&temp3, 1);
+		param2 = string_get_next_word(&temp3);
 		/* get length of rule */
 		l1 = strlen2(&res);
 		/* count wildcards in rule */
@@ -3927,11 +3938,12 @@ char *domain_sort_uniq_rules(char *rules)
 		/* if there is a recursive wildcard in the path of the rule,
 		 * then i mark it as if it had many wildcard to choose rather this
 		 * instead of the one without recursive wildcard */
-		if (path_is_dir_recursive_wildcard(res)) c1 = 9999;
+		if (path_is_dir_recursive_wildcard(param1) || path_is_dir_recursive_wildcard(param2)) c1 = 9999;
 		else{
 			c = l1; c1 = 0;
 			while(c--) if (res[c] == '*') c1++;
 		}
+		free2(param1); free2(param2);
 		/* compare rule to all rules */
 		i2 = 0;
 		temp2 = rules;
@@ -3944,15 +3956,20 @@ char *domain_sort_uniq_rules(char *rules)
 				
 				/* compare rules containing wildcard */
 				if (compare_rules(res, res2)){
+					/* get params of rule */
+					temp3 = res2;
+					param1 = string_get_next_wordn(&temp3, 1);
+					param2 = string_get_next_word(&temp3);
 					/* get length of rule */
 					l2 = strlen2(&res2);
 					/* count wildcards in rule */
 					/* search for recursive wildcard */
-					if (path_is_dir_recursive_wildcard(res2)) c2 = 9999;
+					if (path_is_dir_recursive_wildcard(param1) || path_is_dir_recursive_wildcard(param2)) c2 = 9999;
 					else{
 						c = l2; c2 = 0;
 						while(c--) if (res2[c] == '*') c2++;
 					}
+					free2(param1); free2(param2);
 					/* if match, store the one with the recursive wildcard, or else
 					 * store the one with more wildcards in it, or if that's equal,
 					 * then the one with the shortest length from the matching ones */
