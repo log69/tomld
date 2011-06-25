@@ -2768,7 +2768,7 @@ void domain_get_log()
 	/* ----- convert logs to rules ----- */
 	/* --------------------------------- */
 
-	/* get list of all subdomains, so later i add those rules only whose domains exist */
+	/* get a list of all subdomains, so later i add those rules only whose domains exist */
 	dlist = domain_get_list();
 
 	if (tomoyo_version() <= 2299) l = 22;
@@ -2805,7 +2805,29 @@ void domain_get_log()
 		free2(res2);
 		
 		/* get parameters of rule */
-		res2 = string_get_next_word(&temp2);
+		/* search the position of "denied for " text,
+		 * so i know that all the text before is the parameters of the rule */
+		i = string_search_keyword(temp2, key2);
+		if (i == -1){
+			error("error: unexpected error, log message format is not correct\n");
+			free2(tlogf2);
+			free2(tlogf3);
+			free2(prog_rules);
+			free2(rules);
+			myexit(1);
+		}
+		/* get the rule only from log */
+		res2 = 0;
+		strcpy2(&res2, temp2);
+		/* remove spaces from the end of parameter text */
+		while(1){
+			char c;
+			if (i <= 0) break;
+			c = res[--i];
+			if (c != ' ') break;
+		}
+		res2[i] = 0;
+		strlenset3(&res2, i);
 		if (!res2){
 			error("error: unexpected error, log message format is not correct\n");
 			free2(res);
@@ -3376,7 +3398,7 @@ int compare_paths(char *path1, char *path2)
 	
 	/* fail if they don't start with "/" char and they don't match either */
 	/* this is needed for kernel above 2.6.33 where an allow_create and allow_mkdir
-	 * rule can have a second parameter that is not a dir (like 7777) */
+	 * rule can have a second parameter that is not a dir (like 0644) */
 	if (c1 != '/' || c2 != '/'){
 		if (strcmp(path1, path2)) return 0;
 	}
@@ -4479,7 +4501,7 @@ void domain_reshape_rules_wildcard_spec()
 
 						/* wildcard param2 if it exists, or always add it above kernel 2.6.36 */
 						if (kernel_version() >= 263600){
-							strcpy2(&param2, "7777");
+							strcpy2(&param2, "0-0xFFFF");
 						}
 					}
 				}
@@ -4639,7 +4661,7 @@ void domain_reshape_rules_create_double()
 			strcat2(&tdomf_new, param1);
 			strcat2(&tdomf_new, " ");
 			if (param2) strcat2(&tdomf_new, param2);
-			else strcat2(&tdomf_new, "7777");
+			else strcat2(&tdomf_new, "0-0xFFFF");
 			strcat2(&tdomf_new, "\n");
 
 			strcat2(&tdomf_new, "allow_read/write ");
