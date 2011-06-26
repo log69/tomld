@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+26/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
 25/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
                          - wildcard random part of file name in special dirs
                          - delete domain from kernel memory too on --remove
@@ -206,7 +207,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.34";
+char *ver = "0.35";
 
 /* home dir */
 char *home = "/home";
@@ -5223,6 +5224,7 @@ int main(int argc, char **argv){
 				/* setup signal handler here and exit on a SIGINT interrupt */
 				signal (SIGINT,  finish);
 				signal (SIGTERM, finish);
+				signal (SIGQUIT, finish);
 			}
 
 			/* now it's safe to enforce mode and save config on interrupt, cause check() finished running */
