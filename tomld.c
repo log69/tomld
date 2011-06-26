@@ -40,7 +40,7 @@ changelog:
                          - speed up kernel_version()
                          - make reshape compatible with kernel 2.6.36 and above
                          - replace strspn() with my function
-                         - improve path_wildcard_proc() by replacing all subdirs by numeric wildcard that consist of only numbers
+                         - improve path_wildcard_proc() by replacing all subdirs with numeric wildcard that consist of only numbers
 12/06/2011 - tomld v0.33 - handle SIGINT and SIGTERM interrupt signals
                          - fix to view options without root privilege
                          - apply rules on the active domains of the running processes too
@@ -5221,9 +5221,10 @@ int main(int argc, char **argv){
 				if (!opt_once){
 					color("(press q to quit)\n", red);
 				}
-				/* setup signal handler here and exit on a SIGINT interrupt */
+				/* setup signal handler here and exit on interrupt signals */
 				signal (SIGINT,  finish);
 				signal (SIGTERM, finish);
+				/* tomld gets SIGQUIT on machine reboot or shutdown */
 				signal (SIGQUIT, finish);
 			}
 
