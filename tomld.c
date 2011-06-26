@@ -23,6 +23,7 @@
 changelog:
 -----------
 26/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
+                         - use second parameter for allow_create and similar only from kernel 2.6.36 and above
 25/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
                          - wildcard random part of file name in special dirs
                          - delete domain from kernel memory too on --remove
@@ -4685,7 +4686,9 @@ void domain_reshape_rules_create_double()
 			strcat2(&tdomf_new, param1);
 			strcat2(&tdomf_new, " ");
 			if (param2) strcat2(&tdomf_new, param2);
-			else strcat2(&tdomf_new, "0-0xFFFF");
+			else{
+				if (kernel_version() >= 263600) strcat2(&tdomf_new, "0-0xFFFF");
+			}
 			strcat2(&tdomf_new, "\n");
 
 			strcat2(&tdomf_new, "allow_read/write ");
