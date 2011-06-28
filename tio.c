@@ -58,8 +58,7 @@ float mytime()
 void mytime_print()
 {
 	static float t = 0;
-	float t2 = mytime();
-	t = t2 - t;
+	t = mytime() - t;
 	
 	printf("-- time %.2f sec\n", t);
 }
