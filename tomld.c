@@ -22,8 +22,9 @@
 
 changelog:
 -----------
-26/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
+29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
+                         - wildcard pipe values too
 25/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
                          - wildcard random part of file name in special dirs
                          - delete domain from kernel memory too on --remove
@@ -4506,6 +4507,12 @@ void domain_reshape_rules_wildcard_spec()
 						if (string_search_keyword_first(param1, "socket:[")){
 							/* wildcard socket param */
 							strcpy2(&param1, "socket:[\\*]");
+						}
+						
+						/* check for pipe param */
+						if (string_search_keyword_first(param1, "pipe:[")){
+							/* wildcard socket param */
+							strcpy2(&param1, "pipe:[\\*]");
 						}
 						
 						/* wildcard param2 if it exists, or always add it above kernel 2.6.36 */
