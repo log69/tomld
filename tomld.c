@@ -25,6 +25,7 @@ changelog:
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
+                         - expand special directory list
 25/06/2011 - tomld v0.34 - create allow_create rules for allow_write too
                          - wildcard random part of file name in special dirs
                          - delete domain from kernel memory too on --remove
@@ -375,7 +376,7 @@ char *tshellf2[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbas
 "/usr/bin/screen", 0};
 
 char *spec_exception[] = {"/", "/dev/", "/etc/", "/home/\\*/", "/root/", 0};
-char *spec[] = {"/home/\\{\\*\\}", "/usr/share/\\{\\*\\}", "/etc/fonts/\\{\\*\\}", "/var/cache/\\{\\*\\}", 0};
+char *spec[] = {"/home/\\{\\*\\}", "/usr/share/\\{\\*\\}", "/etc/fonts/\\{\\*\\}", "/var/cache/\\{\\*\\}", "/dev/pts/", "/var/run/gdm/auth-for-\\*/", 0};
 char *spec_ex = 0;
 char *spec1 = 0;
 
