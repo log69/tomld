@@ -14,9 +14,16 @@
    id="svg2"
    version="1.1"
    inkscape:version="0.47 r22583"
-   sodipodi:docname="drawing.svg">
+   sodipodi:docname="flowchart.svg">
   <defs
      id="defs4">
+    <inkscape:perspective
+       sodipodi:type="inkscape:persp3d"
+       inkscape:vp_x="0 : 526.18109 : 1"
+       inkscape:vp_y="0 : 1000 : 0"
+       inkscape:vp_z="744.09448 : 526.18109 : 1"
+       inkscape:persp3d-origin="372.04724 : 350.78739 : 1"
+       id="perspective152" />
     <marker
        inkscape:stockid="Arrow1Lend"
        orient="auto"
@@ -30,27 +37,20 @@
          style="fill-rule:evenodd;stroke:#000000;stroke-width:1.0pt;marker-start:none;"
          transform="scale(0.8) rotate(180) translate(12.5,0)" />
     </marker>
-    <inkscape:perspective
-       sodipodi:type="inkscape:persp3d"
-       inkscape:vp_x="0 : 526.18109 : 1"
-       inkscape:vp_y="0 : 1000 : 0"
-       inkscape:vp_z="744.09448 : 526.18109 : 1"
-       inkscape:persp3d-origin="372.04724 : 350.78739 : 1"
-       id="perspective10" />
   </defs>
   <sodipodi:namedview
      id="base"
      pagecolor="#ffffff"
      bordercolor="#666666"
      borderopacity="1.0"
-     inkscape:pageopacity="0.0"
+     inkscape:pageopacity="1"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.9913503"
-     inkscape:cx="329.30077"
-     inkscape:cy="520.86617"
+     inkscape:zoom="0.93680228"
+     inkscape:cx="324.95308"
+     inkscape:cy="519.02959"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
-     showgrid="true"
+     showgrid="false"
      units="mm"
      inkscape:showpageshadow="false"
      borderlayer="true"
@@ -61,7 +61,8 @@
      inkscape:window-y="0"
      inkscape:window-maximized="1"
      inkscape:snap-grids="false"
-     inkscape:snap-page="false">
+     inkscape:snap-page="false"
+     inkscape:snap-to-guides="true">
     <inkscape:grid
        type="xygrid"
        id="grid3748"
@@ -82,7 +83,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -91,6 +92,16 @@
      inkscape:groupmode="layer"
      id="layer1"
      transform="translate(0,-2.5390623e-6)">
+    <rect
+       style="fill:#ffffff;fill-opacity:1;stroke:none"
+       id="rect2957"
+       width="338.44003"
+       height="592.44092"
+       x="155.73306"
+       y="237.11214"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        y="287.00784"
        x="290.55118"
@@ -425,7 +436,7 @@
          y="401.46936"
          x="325.81076"
          sodipodi:role="line"
-         id="tspan4326">cycle through all processes</tspan></text>
+         id="tspan2959">cycle through all processes</tspan></text>
     <rect
        y="492.51962"
        x="418.18503"
@@ -469,38 +480,6 @@
          x="442.89536"
          sodipodi:role="line"
          id="tspan4352">check domain</tspan></text>
-    <text
-       xml:space="preserve"
-       style="font-size:3.56469059px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
-       x="442.98141"
-       y="539.34198"
-       id="text4354"
-       sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.99970701)"><tspan
-         id="tspan4356"
-         sodipodi:role="line"
-         x="442.98141"
-         y="539.34198">time for enforcing</tspan><tspan
-         sodipodi:role="line"
-         x="442.98141"
-         y="543.79785"
-         id="tspan4358">mode seems ok?</tspan></text>
-    <text
-       sodipodi:linespacing="125%"
-       id="text4360"
-       y="528.56769"
-       x="442.98141"
-       style="font-size:3.56469059px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
-       xml:space="preserve"
-       transform="scale(1.0002931,0.99970701)"><tspan
-         id="tspan4364"
-         y="528.56769"
-         x="442.98141"
-         sodipodi:role="line">gathered rules</tspan><tspan
-         y="533.02356"
-         x="442.98141"
-         sodipodi:role="line"
-         id="tspan4368">seem enough?</tspan></text>
     <path
        style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 432.36655,549.21252 0,14.17322"
@@ -577,16 +556,16 @@
        y="605.90546" />
     <text
        xml:space="preserve"
-       style="font-size:5.40982103px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
-       x="325.82761"
-       y="614.66418"
+       style="font-size:4.37835312px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
+       x="325.85657"
+       y="614.37964"
        id="text4402"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.99970701)"><tspan
+       transform="scale(1.0002931,0.999707)"><tspan
          id="tspan4404"
          sodipodi:role="line"
-         x="325.82761"
-         y="614.66418">add rules to policy</tspan></text>
+         x="325.85657"
+         y="614.37964">add rules to policy if ok</tspan></text>
     <rect
        y="627.16522"
        x="297.64194"
@@ -865,7 +844,7 @@
          y="271.10114"
          x="212.55269"
          sodipodi:role="line"
-         id="tspan3104">(uncomplete, still may change)</tspan></text>
+         id="tspan3104">(uncomplete, may still change)</tspan></text>
     <path
        style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 382.65224,747.63778 -28.38385,0"
@@ -881,19 +860,19 @@
     <text
        transform="scale(1.0002931,0.99970699)"
        xml:space="preserve"
-       style="font-size:3.41891575px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
-       x="325.83136"
-       y="743.11896"
+       style="font-size:4.94256973px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
+       x="325.79306"
+       y="742.58704"
        id="text3086"
        sodipodi:linespacing="125%"><tspan
          id="tspan3088"
          sodipodi:role="line"
-         x="325.83136"
-         y="743.11896">5 min passed since last time?</tspan><tspan
+         x="325.79306"
+         y="742.58704">5 min passed?</tspan><tspan
          sodipodi:role="line"
-         x="325.83136"
-         y="747.39258"
-         id="tspan3090">if so, then save policy to disk</tspan></text>
+         x="325.79306"
+         y="748.7652"
+         id="tspan3090">save policy to disk</tspan></text>
     <rect
        y="698.03149"
        x="382.67715"
@@ -937,5 +916,29 @@
          sodipodi:role="line"
          x="219.38567"
          y="261.0051">tomld flowchart</tspan></text>
+    <text
+       sodipodi:linespacing="125%"
+       id="text4360"
+       y="529.36102"
+       x="443.00333"
+       style="font-size:4.24921846px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
+       xml:space="preserve"
+       transform="scale(1.0002931,0.99970699)"><tspan
+         id="tspan4364"
+         y="529.36102"
+         x="443.00333"
+         sodipodi:role="line">gathered rules</tspan><tspan
+         y="534.67255"
+         x="443.00333"
+         sodipodi:role="line"
+         id="tspan4368">seem enough?</tspan><tspan
+         y="539.98407"
+         x="443.00333"
+         sodipodi:role="line"
+         id="tspan2963">time for enforcing</tspan><tspan
+         y="545.29559"
+         x="443.00333"
+         sodipodi:role="line"
+         id="tspan2965">mode seems ok?</tspan></text>
   </g>
 </svg>
