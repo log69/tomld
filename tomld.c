@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+03/07/2011 - tomld v0.36 - empty pid file on exit
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
@@ -210,7 +211,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.35";
+char *ver = "0.36";
 
 /* home dir */
 char *home = "/home";
@@ -528,6 +529,8 @@ void myfree()
 /* my exit point */
 void myexit(int num)
 {
+	/* empty pid file */
+	if (file_exist(tpid)) file_write(tpid, "");
 	/* free my pointers */
 	myfree();
 	exit(num);
