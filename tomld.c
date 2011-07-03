@@ -1268,6 +1268,7 @@ void domain_set_profile(char *text, int profile)
 			/* set profile */
 			p = string_itoc(profile);
 			orig[keyl] = p;
+			free2(res);
 			break;
 		}
 		free2(res);
@@ -2206,6 +2207,9 @@ void domain_delete_all()
 			tdomf_old = tdomf_old2;
 		}
 	}
+	
+	free2(tdomf_old);
+	free2(myappend);
 }
 
 
