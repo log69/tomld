@@ -320,6 +320,8 @@ char *tmark	= "/var/local/tomld.logmark";
 char *tmarkf = 0;
 /* tomld pid file */
 char *tpid	= "/var/run/tomld.pid";
+int flag_pid = 0;
+
 
 /* options */
 int opt_version		= 0;
@@ -530,7 +532,7 @@ void myfree()
 void myexit(int num)
 {
 	/* empty pid file */
-	if (file_exist(tpid)) file_write(tpid, "");
+	if (flag_pid && file_exist(tpid)) file_write(tpid, 0);
 	/* free my pointers */
 	myfree();
 	exit(num);
@@ -1878,6 +1880,8 @@ int check_instance(){
 		char *pid2;
 		/* read pid number from pid file */
 		pid2 = file_read(tpid, 0);
+		/* is it zero? if so, then no instance, so write pid and success */
+		if (!strlen2(&pid2)){ file_write(tpid, mypid); free2(mypid); free2(pid2); return 1; }
 		/* is it me? */
 		if (!strcmp(mypid, pid2)){ free2(mypid); free2(pid2); return 0; }
 		else{
@@ -5144,6 +5148,7 @@ int main(int argc, char **argv){
 
 	/* check already running instance of the program */
 	if (!check_instance()) { error("error: tomld is running already\n"); myexit(1); }
+	flag_pid = 1;
 
 
 	/* ---------------- */
