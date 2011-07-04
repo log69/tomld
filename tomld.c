@@ -23,6 +23,7 @@
 changelog:
 -----------
 03/07/2011 - tomld v0.36 - empty pid file on exit
+                         - fix some mem leaks
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
