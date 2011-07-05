@@ -22,8 +22,9 @@
 
 changelog:
 -----------
-03/07/2011 - tomld v0.36 - empty pid file on exit
+05/07/2011 - tomld v0.36 - empty pid file on exit
                          - fix some mem leaks
+                         - runtime working directory is /var/run/tomld/ from now
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
@@ -317,10 +318,10 @@ char *tlogf = 0;
 
 /* this stores the kernel time of the last line of system log */
 /* to identify the end of tomoyo logs and make sure not to read it twice */
-char *tmark	= "/var/local/tomld.logmark";
+char *tmark	= "/var/run/tomld/tomld.logmark";
 char *tmarkf = 0;
 /* tomld pid file */
-char *tpid	= "/var/run/tomld.pid";
+char *tpid	= "/var/run/tomld/tomld.pid";
 int flag_pid = 0;
 
 
@@ -2097,6 +2098,7 @@ void check_options(int argc, char **argv){
 void check_tomoyo()
 {
 	char *cmd;
+	char *mydir;
 	int tver;
 
 	/* check kernel command line */
@@ -2122,8 +2124,6 @@ void check_tomoyo()
 		}
 	}
 	free2(cmd);
-
-	color("tomoyo kernel mode is active\n", clr);
 	
 	/* check tomoyo version */
 	tver = tomoyo_version();
@@ -2139,6 +2139,14 @@ void check_tomoyo()
 
 	/* create tomoyo dir if it doesn't exist yet */
 	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
+
+	/* create tomld dir "/var/run/tomld" if it doesn't exist yet */
+	mydir = path_get_parent_dir(tpid);
+	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
+	free2(mydir);
+	mydir = path_get_parent_dir(tmark);
+	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
+	free2(mydir);
 }
 
 
@@ -5151,6 +5159,9 @@ int main(int argc, char **argv){
 	/* check if i am root */
 	if (getuid()) { error("error: root privilege needed\n"); myexit(1); }
 
+	/* check tomoyo status */
+	check_tomoyo();
+
 	/* check already running instance of the program */
 	if (!check_instance()) { error("error: tomld is running already\n"); myexit(1); }
 	flag_pid = 1;
@@ -5165,9 +5176,6 @@ int main(int argc, char **argv){
 	
 	/* store kernel version */
 	flag_kernel_version = kernel_version();
-
-	/* check tomoyo status */
-	check_tomoyo();
 
 	/* create profile.conf and manager.conf files */
 	create_prof();
