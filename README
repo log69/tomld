@@ -88,9 +88,9 @@ to force a rule for all kinds of behave
 entries still won't be considered, so it really means a new start
 - the program can be stopped any time by pressing q whereafter all old domains 
 (learning and permissive) are turned into enforcing mode
-- tomld files: /var/local/tomld.logmark (this contains a mark to identify the 
-end of the recently read message logs), /var/run/tomld.pid (pid file to avoid 
-multpiple instances of the program to be running at the same time)
+- tomld files: /var/run/tomld/tomld.logmark (this contains a mark to identify 
+the end of the recently read message logs), /var/run/tomld/tomld.pid (pid file 
+to avoid multpiple instances of the program to be running at the same time)
 - in case a software or its settings change with a new version, the rules can 
 be regenerated easily
 - the running processes need to be restarted on newly created domains
