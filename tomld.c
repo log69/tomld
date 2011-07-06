@@ -22,9 +22,13 @@
 
 changelog:
 -----------
-05/07/2011 - tomld v0.36 - empty pid file on exit
+06/07/2011 - tomld v0.36 - empty pid file on exit
                          - fix some mem leaks
                          - runtime working directory is /var/run/tomld/ from now
+                         - add a rule with a uniq id and with time in seconds to every domain to mark the creation of domain
+                           this is to determine from the uptime of process belonging to the domain
+                           if it is restarted at least once to enter the its new domain
+                           and also this is to determine if the config was created by tomld
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
@@ -198,6 +202,7 @@ flow chart:
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
+#include <time.h>
 #include <sys/mount.h>
 #include <signal.h>
 
@@ -214,6 +219,12 @@ flow chart:
 
 /* program version */
 char *ver = "0.36";
+
+/* my uniq id for version compatibility */
+/* this is a remark in the policy for me to know if it's my config
+ * and when the domain was created */
+/* echo $(echo "tomld" | openssl md5) $ver | openssl md5 */
+char *myuid = "allow_read /tomld/ed9f8563e922172c855961ff2024a4f7";
 
 /* home dir */
 char *home = "/home";
@@ -1377,6 +1388,8 @@ int process_get_pid(const char *name){
 					closedir(mydir);
 					free2(res);
 					free2(mydir_name);
+
+					/* convert pid string to integer */
 					p = atoi(mypid);
 					free2(mypid);
 					return p;
@@ -1391,6 +1404,78 @@ int process_get_pid(const char *name){
 	free2(mypid);
 
 	return 0;
+	
+}
+
+
+/* return an integer containing the least uptime of the same running processes */
+/* return null if no process is running like that */
+int process_get_least_uptime(const char *name){
+	DIR *mydir;
+	struct dirent *mydir_entry;
+	char *mydir_name = 0, *mypid = 0;
+	/* my uptime value to compare to and find the least one */
+	int myuptime = 0;
+	int myuptime_flag_first = 0;
+	int jiffies_per_second=sysconf(_SC_CLK_TCK);
+	
+	/* open /proc dir */
+	mydir = opendir("/proc/");
+	if (!mydir){ error("error: cannot open /proc/ directory\n"); return 0; }
+
+	/* cycle through dirs in /proc */
+	while((mydir_entry = readdir(mydir))) {
+		/* get the dir names inside /proc dir */
+		strcpy2(&mypid, mydir_entry->d_name);
+
+		/* does it contain only numbers meaning they are pids? */
+		if (string_is_number(mypid)) {
+			char *res;
+			/* create dirname like /proc/pid/exe */
+			strcpy2(&mydir_name, "/proc/");
+			strcat2(&mydir_name, mypid);
+			strcat2(&mydir_name, "/exe");
+
+			/* resolv the link pointing from the exe name */
+			res = path_link_read(mydir_name);
+			if (res){
+				/* compare the link to the process name */
+				if (!strcmp(res, name)) {
+					char *pstat, *temp, *putime;
+					int t;
+					
+					/* create dirname like /proc/pid/stat */
+					strcpy2(&mydir_name, "/proc/");
+					strcat2(&mydir_name, mypid);
+					strcat2(&mydir_name, "/stat");
+					/* read process stat value */
+					pstat = file_read(mydir_name, 1);
+					temp = pstat;
+					/* get starttime of process in jiffies */
+					putime = string_get_next_wordn(&temp, 21);
+					/* calculate process uptime in sec */
+					t = sys_get_uptime() - atoi(putime) / jiffies_per_second;
+					/* store the least value */
+					if (!myuptime_flag_first){
+						myuptime_flag_first = 1;
+						myuptime = t;
+					}
+					else{
+						if (myuptime > t) myuptime = t;
+					}
+					free2(putime);
+					free2(pstat);
+				}
+				free2(res);
+			}
+		}
+	}
+	closedir(mydir);
+
+	free2(mydir_name);
+	free2(mypid);
+
+	return myuptime;
 	
 }
 
@@ -1427,6 +1512,11 @@ void load()
 	/* load domain config */
 	free2(tdomf);
 	tdomf = file_read(tdomk, 1);
+	
+	/* search for my uniq id in domain policy */
+	if (string_search_keyword(tdomf, myuid) == -1){
+		error("error: tomoyo config is not made by tomld or not compatible with this version and a new one needs to be created\n"); myexit(1); }
+
 
 	/* load exception config */
 	free2(texcf);
@@ -2302,7 +2392,10 @@ void clear()
 	/* create new configs */
 	strnull2(&tdomf);
 	strnull2(&texcf);
-	strcpy2(&tdomf, "<kernel>\nuse_profile 0\n\n");
+	strcpy2(&tdomf, "<kernel>\nuse_profile 0\n");
+	/* add a rule with my uniq id */
+	strcat2(&tdomf, myuid);
+	strcat2(&tdomf, "\n");
 	strcpy2(&texcf, "initialize_domain /sbin/init\n");
 	/* write config files */
 	file_write(texc, texcf);
@@ -2685,6 +2778,13 @@ void domain_set_enforce_old()
 	else{
 		color("keep domains unchanged for now on demand\n", red);
 	}
+}
+
+
+/* check if time for enforcing mode has come for any domain
+ * and if so, then turn domain into enforcing mode */
+void domain_check_enforcing()
+{
 }
 
 
@@ -3161,6 +3261,7 @@ void domain_print_mode()
 		/* does the rule exist for it? */
 		pos = domain_exist(prog);
 		if (pos == -1){
+			char *t;
 			color(", no rule, ", clr);
 			color("create rule with learning mode on", green);
 			if (!flag_firstrun) newl();
@@ -3168,6 +3269,16 @@ void domain_print_mode()
 			strcat2(&tdomf, "<kernel> ");
 			strcat2(&tdomf, prog);
 			strcat2(&tdomf, "\nuse_profile 1\n");
+			/* add a rule with my uniq id and the time in seconds
+			 * to know when i created this domain
+			 * so i will know from the uptime of the process
+			 * if it was restarted at least once since domain creation */
+			strcat2(&tdomf, myuid);
+			strcat2(&tdomf, "/create_time/");
+			t = string_ltos(time(0));
+			strcat2(&tdomf, t);
+			strcat2(&tdomf, "\n");
+			free2(t);
 			/* store prog name to know not to turn on enforcing mode for these ones on exit */
 			if(string_search_line(tprogs_learn, prog) == -1){
 				strcat2(&tprogs_learn, prog);
@@ -3198,6 +3309,10 @@ void domain_print_mode()
 			/* learning mode */
 			if (profile == 1){
 				if (flag_firstrun) color(", learning mode on", clr);
+
+				/* check if time for enforcing mode has come for any domain
+				 * and if so, then turn domain into enforcing mode */
+				else domain_check_enforcing();
 			}
 
 			/* permissive mode */
