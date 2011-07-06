@@ -27,7 +27,7 @@ changelog:
                          - runtime working directory is /var/run/tomld/ from now
                          - add a rule with a uniq id and with time in seconds to every domain to mark the creation of domain
                            this is to determine from the uptime of process belonging to the domain
-                           if it is restarted at least once to enter the its new domain
+                           if it is restarted at least once and so entered its new domain
                            and also this is to determine if the config was created by tomld
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
