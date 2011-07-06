@@ -34,6 +34,10 @@ float mytime();
 
 void mytime_print();
 
+int sys_get_uptime();
+
+void mytime_print();
+
 void key_set_mode();
 
 void key_clear_mode();
