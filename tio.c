@@ -64,6 +64,27 @@ void mytime_print()
 }
 
 
+/* get system uptime in seconds */
+int sys_get_uptime()
+{
+	char *f = "/proc/uptime";
+	char *res, *res2;
+	int i;
+	
+	/* read uptime from /proc system */
+	res = file_read(f, 1);
+	/* read first number part only */
+	res2 = string_get_number(res);
+	/* convert string number to integer */
+	i = atoi(res2);
+
+	free2(res2);
+	free2(res);
+
+	return i;
+}
+
+
 /* set terminal input mode for keyboard read */
 void key_set_mode()
 {
