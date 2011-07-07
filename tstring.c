@@ -326,6 +326,8 @@ char *string_get_number(const char *text)
 	int start = 0;
 	int l;
 	
+	if (!text) return 0;
+	
 	/* go to the first number char */
 	while(1){
 		c = text[i];
@@ -343,6 +345,55 @@ char *string_get_number(const char *text)
 	}
 	
 	l = i - start;
+	/* fail on zero length result */
+	if (l < 1) return 0;
+
+	/* allocate mem for the new string */
+	res = memget2(l);
+	/* copy word */
+	i = l;
+	while(i--){
+		res[i] = text[start + i];
+	}
+	res[l] = 0;
+	strlenset2(&res);
+
+	return res;
+}
+
+
+/* return the last occurence of string containing only numbers */
+/* returned value must be freed by caller */
+char *string_get_number_last(const char *text)
+{
+	char *res;
+	char c;
+	int i = 0;
+	int start, end;
+	int l;
+	
+	if (!text) return 0;
+
+	i = strlen(text);
+	
+	/* go to the first number char from the end */
+	while(1){
+		i--;
+		if (i < 0) return 0;
+		c = text[i];
+		if (c >= '0' && c <= '9') break;
+	}
+
+	/* read only number chars and stop */
+	end = i;
+	while(1){
+		c = text[i];
+		if (c < '0' || c > '9') break;
+		i--;
+	}
+	
+	start = i + 1;
+	l = end - start + 1;
 	/* fail on zero length result */
 	if (l < 1) return 0;
 
