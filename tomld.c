@@ -22,13 +22,20 @@
 
 changelog:
 -----------
-06/07/2011 - tomld v0.36 - empty pid file on exit
+07/07/2011 - tomld v0.36 - empty pid file on exit
                          - fix some mem leaks
                          - runtime working directory is /var/run/tomld/ from now
                          - add a rule with a uniq id and with time in seconds to every domain to mark the creation of domain
                            this is to determine from the uptime of process belonging to the domain
                            if it is restarted at least once and so entered its new domain
                            and also this is to determine if the config was created by tomld
+                         - add --manual switch to effect the enforcing mode
+                         - reorder option switch handling so the not so effective switches run first
+                         - add process_get_cpu_time_all()
+                         - add domain_check_enforcing()
+                         - add domain_update_change_time()
+                         - fully automatic enforcing mode is half ready
+                         - some bugfixes
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
@@ -225,6 +232,8 @@ char *ver = "0.36";
  * and when the domain was created */
 /* echo $(echo "tomld" | openssl md5) $ver | openssl md5 */
 char *myuid = "allow_read /tomld/ed9f8563e922172c855961ff2024a4f7";
+char *myuid_create = 0;
+char *myuid_change = 0;
 
 /* home dir */
 char *home = "/home";
@@ -321,7 +330,8 @@ char *tload	= "/usr/sbin/tomoyo-loadpolicy";
 char *tsave	= "/usr/sbin/tomoyo-savepolicy";
 
 /* backup conf for checking change of rules */
-char *tdomf_bak = 0;
+char *tdomf_bak  = 0;
+char *tdomf_bak2 = 0;
 
 /* system log */
 char *tlog	= "/var/log/syslog";
@@ -341,6 +351,7 @@ int opt_version		= 0;
 int opt_help		= 0;
 int opt_color		= 0;
 int opt_learn		= 0;
+int opt_manual		= 0;
 int opt_clear		= 0;
 int opt_reset		= 0;
 int opt_info		= 0;
@@ -376,6 +387,9 @@ char *red		= "\033[31;48m";
 char *yellow	= "\033[33;48m";
 char *bold		= "\033[1m";
 char *clr		= "\033[0m";
+
+/* run time */
+float t_start;
 
 /* arrays */
 char *tprogs = 0;
@@ -468,15 +482,17 @@ void help() {
 	printf ("                            (all previously learnt rules will be backed up)\n");
 	printf ("    -i   --info   [pattern] print domains' rules by pattern\n");
 	printf ("                            (without pattern, print a list of main domains)\n");
-	printf ("    -l   --learn            turn learning mode back for all domains\n");
-	printf ("                            (this is not advised, only for correction purposes)\n");
 	printf ("    -r   --remove [pattern] remove domains by pattern\n");
-	printf ("         --yes              auto confirm with yes\n");
+	printf ("    -m   --manual           in manual mode, quitting from tomld for the second time\n");
+	printf ("                            turns all old learning mode domains into enforcing mode\n");
+	printf ("    -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards\n");
 	printf ("    -k   --keep             don't change domain's mode for this run\n");
 	printf ("                            (learning mode domains will stay so on exit)\n");
-	printf ("    -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards\n");
+	printf ("    -l   --learn            turn learning mode back for all domains\n");
+	printf ("                            (this is not advised, only for correction purposes)\n");
 	printf ("    -1   --once             quit after first cycle\n");
 	printf ("                            (might be useful for scripts)\n");
+	printf ("         --yes              auto confirm everything with yes\n");
 	printf ("\n");
 	printf ("*executables are additonal programs to create domains for\n");
 	printf ("\n");
@@ -536,8 +552,11 @@ void myfree()
 	free2(tmarkf);
 	free2(tlogf);
 	free2(tdomf_bak);
+	free2(tdomf_bak2);
 	free2(spec_ex);
 	free2(spec1);
+	free2(myuid_create);
+	free2(myuid_change);
 }
 
 
@@ -1072,6 +1091,7 @@ char *domain_get_next(char **text)
 	long l;
 	char *text2, *res;
 	int i, start, end;
+	char c;
 
 	if (!(*text)) return 0;
 	if (!(*text)[0]) return 0;
@@ -1091,9 +1111,20 @@ char *domain_get_next(char **text)
 		end = 0;
 		while(text2[end++]);
 	}
+
+	/* remove extra empty lines from the end */
+	while(1){
+		if (!end) break;
+		end--;
+		c = text2[end];
+		if (c && c != '\n'){
+			end += 2;
+			break;
+		}
+	}
 	
 	/* domain block length */
-	l = keyl + end - 1;
+	l = keyl + end;
 
 	/* allocate mem for the new string */
 	res = memget2(l);
@@ -1357,7 +1388,8 @@ void domain_add_rule(char *prog, char *rule)
 
 /* return an integer containing the pid of the path of executable that is running */
 /* return null if no process is running like that */
-int process_get_pid(const char *name){
+int process_get_pid(const char *name)
+{
 	DIR *mydir;
 	struct dirent *mydir_entry;
 	char *mydir_name = 0, *mypid = 0;
@@ -1410,13 +1442,17 @@ int process_get_pid(const char *name){
 
 /* return an integer containing the least uptime of the same running processes */
 /* return null if no process is running like that */
-int process_get_least_uptime(const char *name){
+int process_get_least_uptime(const char *name)
+{
 	DIR *mydir;
 	struct dirent *mydir_entry;
 	char *mydir_name = 0, *mypid = 0;
 	/* my uptime value to compare to and find the least one */
 	int myuptime = 0;
 	int myuptime_flag_first = 0;
+	/* get system uptime */
+	int s_uptime = sys_get_uptime();
+	/* converting jiffies to second, this is from manpage of proc */
 	int jiffies_per_second=sysconf(_SC_CLK_TCK);
 	
 	/* open /proc dir */
@@ -1454,7 +1490,7 @@ int process_get_least_uptime(const char *name){
 					/* get starttime of process in jiffies */
 					putime = string_get_next_wordn(&temp, 21);
 					/* calculate process uptime in sec */
-					t = sys_get_uptime() - atoi(putime) / jiffies_per_second;
+					t = s_uptime - atoi(putime) / jiffies_per_second;
 					/* store the least value */
 					if (!myuptime_flag_first){
 						myuptime_flag_first = 1;
@@ -1476,6 +1512,83 @@ int process_get_least_uptime(const char *name){
 	free2(mypid);
 
 	return myuptime;
+	
+}
+
+
+/* return an integer containing the sum of cpu time of all of the same running processes in clock ticks */
+/* return null if no process is running like that */
+int process_get_cpu_time_all(const char *name)
+{
+	DIR *mydir;
+	struct dirent *mydir_entry;
+	char *mydir_name = 0, *mypid = 0;
+	/* my uptime value to compare to and find the least one */
+	int mycputime = 0;
+	
+	/* open /proc dir */
+	mydir = opendir("/proc/");
+	if (!mydir){ error("error: cannot open /proc/ directory\n"); return 0; }
+
+	/* cycle through dirs in /proc */
+	while((mydir_entry = readdir(mydir))) {
+		/* get the dir names inside /proc dir */
+		strcpy2(&mypid, mydir_entry->d_name);
+
+		/* does it contain only numbers meaning they are pids? */
+		if (string_is_number(mypid)) {
+			char *res;
+			/* create dirname like /proc/pid/exe */
+			strcpy2(&mydir_name, "/proc/");
+			strcat2(&mydir_name, mypid);
+			strcat2(&mydir_name, "/exe");
+
+			/* resolv the link pointing from the exe name */
+			res = path_link_read(mydir_name);
+			if (res){
+				/* compare the link to the process name */
+				if (!strcmp(res, name)) {
+					char *pstat, *temp, *ptime;
+					int t;
+					
+					/* create dirname like /proc/pid/stat */
+					strcpy2(&mydir_name, "/proc/");
+					strcat2(&mydir_name, mypid);
+					strcat2(&mydir_name, "/stat");
+					/* read process stat value */
+					pstat = file_read(mydir_name, 1);
+					/* get all utime, stime, cutime and cstime of process in seconds */
+					t = 0;
+					temp = pstat;
+					ptime = string_get_next_wordn(&temp, 13);
+					t += atoi(ptime);
+					free2(ptime);
+					temp = pstat;
+					ptime = string_get_next_wordn(&temp, 14);
+					t += atoi(ptime);
+					free2(ptime);
+					temp = pstat;
+					ptime = string_get_next_wordn(&temp, 15);
+					t += atoi(ptime);
+					free2(ptime);
+					temp = pstat;
+					ptime = string_get_next_wordn(&temp, 16);
+					t += atoi(ptime);
+					free2(ptime);
+					/* add the sum of times */
+					mycputime += t;
+					free2(pstat);
+				}
+				free2(res);
+			}
+		}
+	}
+	closedir(mydir);
+
+	free2(mydir_name);
+	free2(mypid);
+
+	return mycputime;
 	
 }
 
@@ -2096,6 +2209,7 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color  = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "-k") || !strcmp(myarg, "--keep" ))	{ opt_keep   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	{ opt_learn  = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "-m") || !strcmp(myarg, "--manual"))	{ opt_manual  = 1; flag_ok = 1; }
 
 			if (!strcmp(myarg, "-i") || !strcmp(myarg, "--info"     ))	{ opt_info       = 1; flag_ok = 2; }
 			if (!strcmp(myarg, "-r") || !strcmp(myarg, "--remove"   ))	{ opt_remove     = 1; flag_ok = 3; }
@@ -2392,10 +2506,12 @@ void clear()
 	/* create new configs */
 	strnull2(&tdomf);
 	strnull2(&texcf);
+
 	strcpy2(&tdomf, "<kernel>\nuse_profile 0\n");
-	/* add a rule with my uniq id */
+	/* add a rule with my uniq id too */
 	strcat2(&tdomf, myuid);
 	strcat2(&tdomf, "\n");
+
 	strcpy2(&texcf, "initialize_domain /sbin/init\n");
 	/* write config files */
 	file_write(texc, texcf);
@@ -2782,9 +2898,65 @@ void domain_set_enforce_old()
 
 
 /* check if time for enforcing mode has come for any domain
- * and if so, then turn domain into enforcing mode */
-void domain_check_enforcing()
+ * and if so, then turn it into enforcing mode */
+void domain_check_enforcing(char *domain)
 {
+	char *name, *res, *res2, *temp;
+	int i, d_create, d_change, p_uptime, p_cputime;
+	
+	/* get main domain name */
+	name = domain_get_name(domain);
+
+	/* get process uptime of domain */
+	p_uptime = process_get_least_uptime(name);
+	/* get creation time of domain */
+	i = string_search_keyword(domain, myuid_create);
+	if (i > -1){
+		temp = domain + i;
+		/* get my uniq id with the creation time in it */
+		res = string_get_next_line(&temp);
+		/* get epoch time from my uid */
+		res2 = string_get_number_last(res);
+		/* convert epoch string to integer */
+		d_create = time(0) - atoi(res2);
+		
+		free2(res); free2(res2);
+
+		/* is process uptime less than domain creation time?
+		 * if so, then this means there is at least one process of the domain
+		 * that has been restarted since domain creation,
+		 * so this one gives ok to turn it into enforcing mode */
+		if (d_create > p_uptime){
+
+			/* get the sum of cpu times of the domain's all processes */
+			p_cputime = process_get_cpu_time_all(name);
+			/* get last change time of domain */
+			i = string_search_keyword(domain, myuid_change);
+			if (i > -1){
+				temp = domain + i;
+				/* get my uniq id with the creation time in it */
+				res = string_get_next_line(&temp);
+				/* get epoch time from my uid */
+				res2 = string_get_number_last(res);
+				/* convert epoch string to integer */
+				d_change = time(0) - atoi(res2);
+				
+				free2(res); free2(res2);
+				
+				/* have the processes' cpu time reached a value compared to the last change time of the domain?
+				 * if so, then i turn the domain into enforcing mode */
+				if (d_change < p_cputime / 100){
+
+					/* turn domain into enforcing mode */
+					color(name, blue);
+					color(" enforcing mode on\n", purple);
+					domain_set_profile_for_prog(name, 3);
+				}
+			}
+		}
+	}
+	
+	free2(name);
 }
 
 
@@ -3270,12 +3442,14 @@ void domain_print_mode()
 			strcat2(&tdomf, prog);
 			strcat2(&tdomf, "\nuse_profile 1\n");
 			/* add a rule with my uniq id and the time in seconds
-			 * to know when i created this domain
+			 * to know when i created this domain and when it changed last time
 			 * so i will know from the uptime of the process
 			 * if it was restarted at least once since domain creation */
-			strcat2(&tdomf, myuid);
-			strcat2(&tdomf, "/create_time/");
 			t = string_ltos(time(0));
+			strcat2(&tdomf, myuid_create);
+			strcat2(&tdomf, t);
+			strcat2(&tdomf, "\n");
+			strcat2(&tdomf, myuid_change);
 			strcat2(&tdomf, t);
 			strcat2(&tdomf, "\n");
 			free2(t);
@@ -3312,7 +3486,17 @@ void domain_print_mode()
 
 				/* check if time for enforcing mode has come for any domain
 				 * and if so, then turn domain into enforcing mode */
-				else domain_check_enforcing();
+				else{
+					if (!opt_manual){
+						/* set position in domain policy to beginning of domain */
+						char *temp = tdomf + pos;
+						/* get domain policy */
+						char *res = domain_get_next(&temp);
+						/* check domain if it has to be turned into enforcing mode */
+						domain_check_enforcing(res);
+						free2(res);
+					}
+				}
 			}
 
 			/* permissive mode */
@@ -4888,6 +5072,138 @@ void domain_reshape_rules()
 }
 
 
+/* update the change time entries in the domains whose rules changed since last time */
+void domain_update_change_time()
+{
+	char *d1, *d2, *name1, *name2, *res, *temp, *temp2, *temp3;
+	char *tdomf_new;
+	int flag_match, flag_change;
+	
+	/* backup policy exists yet? if not, then copy policy */
+	if (!tdomf_bak2){
+		/* copy policy to backup */
+		strcpy2(&tdomf_bak2, tdomf);
+		return;
+	}
+	else{
+		/* policy files match? if not, then store it */
+		if (!strcmp(tdomf_bak2, tdomf)) return;
+	}
+	
+	/* if backup policy exists but it doesn't match to current policy,
+	 * then update change times in current one and copy it to backup */
+	tdomf_new = memget2(max_char);
+	temp = tdomf;
+	while(1){
+		/* get next domain from backup */
+		d1 = domain_get_next(&temp);
+		if (!d1) break;
+
+		/* this is a flag to see if there was any match in backup domain and current one */
+		flag_match  = 0;
+		flag_change = 0;
+
+		/* get domain name */
+		name1 = domain_get_name_sub(d1);
+		if (name1){
+			
+			temp2 = tdomf_bak2;
+			while(1){
+				/* get next current domain */
+				d2 = domain_get_next(&temp2);
+				if (!d2) break;
+				/* get domain name */
+				name2 = domain_get_name_sub(d2);
+				if (name2){
+					
+					/* compare backup domain to current one */
+					if (!strcmp(name1, name2)){
+						/* there was a match */
+						flag_match = 1;
+
+						/* compare backup domain's policy to current domain's policy */
+						if (strcmp(d1, d2)){
+							/* there is a difference */
+							flag_change = 1;
+						}
+						
+						/* jump out because there was a matching domain name */
+						free2(name2);
+						free2(d2);
+						break;
+					}
+					free2(name2);
+				}
+				free2(d2);
+			}
+			
+			/* if there was no match, then this is a new domain,
+			 * so i add it to new policy */
+			if (!flag_match){
+				strcat2(&tdomf_new, d1);
+				strcat2(&tdomf_new, "\n");
+			}
+			else{
+				/* if there was a match and they are the same,
+				 * then i also add the domain to new policy */
+				if (!flag_change){
+					strcat2(&tdomf_new, d1);
+					strcat2(&tdomf_new, "\n");
+				}
+				else{
+					/* if no match, then update current domain's policy by
+					 * copying every rule except my uuid that i change before */
+					temp3 = d1;
+					/* copy headers, like domain name and use_profile */
+					res = string_get_next_line(&temp3);
+					strcat2(&tdomf_new, res);
+					strcat2(&tdomf_new, "\n");
+					free2(res);
+					res = string_get_next_line(&temp3);
+					strcat2(&tdomf_new, res);
+					strcat2(&tdomf_new, "\n");
+					free2(res);
+
+					/* copy the rest of the rules */
+					while(1){
+						/* get next rule */
+						res = string_get_next_line(&temp3);
+						if (!res) break;
+
+						/* check if rule is my uniq id */
+						if (string_search_keyword_first(res, myuid_change)){
+							/* copy my uniq id of change time with the new time */
+							char *t = string_ltos(time(0));
+							strcat2(&tdomf_new, myuid_change);
+							strcat2(&tdomf_new, t);
+							strcat2(&tdomf_new, "\n");
+							free2(t);
+						}
+						else{
+							/* copy rule to new policy */
+							strcat2(&tdomf_new, res);
+							strcat2(&tdomf_new, "\n");
+						}
+						
+						free2(res);
+					}
+					strcat2(&tdomf_new, "\n");
+				}
+			}
+			free2(name1);
+		}
+		free2(d1);
+	}
+
+	/* copy new policy to current one */
+	free2(tdomf);
+	tdomf = tdomf_new;
+
+	/* copy new policy to backup */
+	strcpy2(&tdomf_bak2, tdomf);
+}
+
+
 /* check change of policy, and return true if changed */
 int check_policy_change(){
 	/* backup policy exists yet? if not, then copy policy */
@@ -4932,6 +5248,9 @@ void check()
 
 		/* reshape rules */
 		domain_reshape_rules();
+		
+		/* domain update change times */
+		domain_update_change_time();
 		
 		/* reload config files into memory */
 		sand_clock(0);
@@ -5239,8 +5558,9 @@ void finish()
 	newl();
 
 	if (flag_safe){
-		/* turn on enforcing mode for all old domains before exiting */
-		domain_set_enforce_old();
+		/* turn on enforcing mode for all old domains before exiting
+		 * but only in manual mode */
+		if (opt_manual) domain_set_enforce_old();
 
 		/* save configs to disk */
 		save();
@@ -5257,16 +5577,30 @@ void finish()
 }
 
 
+/* some initializations */
+void myinit()
+{
+	/* store start time */
+	t_start = mytime();
+	
+	/* create my uids */
+	strcpy2(&myuid_create, myuid);
+	strcpy2(&myuid_change, myuid);
+	strcat2(&myuid_create, "/create_time/");
+	strcat2(&myuid_change, "/change_time/");
+}
+
+
 /* ----------------------------------- */
 /* ------------ MAIN PART ------------ */
 /* ----------------------------------- */
 
 int main(int argc, char **argv){
 
-	float t, t2, t_start;
+	float t, t2;
 
-	/* store start time */
-	t_start = mytime();
+	/* some initializations */
+	myinit();
 
 	/* check command line options */
 	check_options(argc, argv);
@@ -5295,38 +5629,9 @@ int main(int argc, char **argv){
 	/* create profile.conf and manager.conf files */
 	create_prof();
 
-	/* on --reset option, create backup of config files with tomoyo-savepolicy */
-	/* (tomoyo-savepolicy always creates backup files using timestamp) */
-	if (opt_reset){
-		color("* resetting domain configurations on demand\n", red);
-		if (!choice("are you sure?")) myexit(0);
-		backup();
-		color("policy file backups created\n", green);
-	}
-
-	/* create new empty policy files if missing or if --reset switch is on */
-	if (!file_exist(tdom) || !file_exist(texc) || opt_reset) clear();
-
-	/* on --clear, empty configuration files */
-	if (!opt_reset && opt_clear){
-		color("* clearing domain configurations on demand\n", red);
-		if (!choice("are you sure?")) myexit(0);
-		backup();
-		color("policy file backups created\n", green);
-		clear();
-		color("* configuration cleared\n", red);
-		myexit(0);
-	}
-
 	/* on --info, print domain information */
 	if (opt_info){
 		domain_info(opt_info2);
-		myexit(0);
-	}
-
-	/* on --remove, remove domain */
-	if (opt_remove){
-		domain_remove(opt_remove2);
 		myexit(0);
 	}
 
@@ -5341,7 +5646,36 @@ int main(int argc, char **argv){
 		myexit(0);
 	}
 
-	/* create excaption list from program names and available shells */
+	/* on --remove, remove domain */
+	if (opt_remove){
+		domain_remove(opt_remove2);
+		myexit(0);
+	}
+
+	/* on --clear, empty configuration files */
+	if (!opt_reset && opt_clear){
+		color("* clearing domain configurations on demand\n", red);
+		if (!choice("are you sure?")) myexit(0);
+		backup();
+		color("policy file backups created\n", green);
+		clear();
+		color("* configuration cleared\n", red);
+		myexit(0);
+	}
+
+	/* on --reset option, create backup of config files with tomoyo-savepolicy */
+	/* (tomoyo-savepolicy always creates backup files using timestamp) */
+	if (opt_reset){
+		color("* resetting domain configurations on demand\n", red);
+		if (!choice("are you sure?")) myexit(0);
+		backup();
+		color("policy file backups created\n", green);
+	}
+
+	/* create new empty policy files if missing or if --reset switch is on */
+	if (!file_exist(tdom) || !file_exist(texc) || opt_reset) clear();
+
+	/* create exception list from program names and available shells */
 	check_exceptions();
 
 	/* store negatív reference time for check() function to make check() run at least once */	
