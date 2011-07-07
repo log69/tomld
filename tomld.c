@@ -483,8 +483,8 @@ void help() {
 	printf ("    -i   --info   [pattern] print domains' rules by pattern\n");
 	printf ("                            (without pattern, print a list of main domains)\n");
 	printf ("    -r   --remove [pattern] remove domains by pattern\n");
-	printf ("    -m   --manual           in manual mode, quitting from tomld for the second time\n");
-	printf ("                            turns all old learning mode domains into enforcing mode\n");
+	printf ("    -m   --manual           exiting from tomld for the second time turns\n");
+	printf ("                            all old learning mode domains into enforcing mode\n");
 	printf ("    -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards\n");
 	printf ("    -k   --keep             don't change domain's mode for this run\n");
 	printf ("                            (learning mode domains will stay so on exit)\n");
