@@ -36,6 +36,8 @@ changelog:
                          - add domain_update_change_time()
                          - fully automatic enforcing mode is half ready
                          - some bugfixes
+                         - check if tomoyo support is compiled into kernel above version 2.6.36
+                         - auto yes for adding denied rules in non-manual mode is disabled
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
@@ -591,11 +593,14 @@ void color(const char *text, const char *col)
 int choice(const char *text)
 {
 	char c = 0, c2;
+	
+	/* is auto yes on? */
 	if (opt_yes){
 		printf(text);
 		printf(" (y)\n");
 	}
 	else{
+		/* ask question and wait for user input */
 		printf(text);
 		printf(" [y/N]");
 		c = getchar();
@@ -2305,6 +2310,17 @@ void check_tomoyo()
 	char *mydir;
 	int tver;
 
+	/* check availability of tomoyo system compiled into the kernel above 2.6.36 */
+	if (kernel_version() >= 263600){
+		cmd = file_read("/proc/kallsyms", 1);
+		if (string_search_keyword(cmd, "tomoyo_supervisor") == -1){
+			free2(cmd);
+			error("error: current kernel is not compiled with tomoyo support\n");
+			myexit(1);
+		}
+		free2(cmd);
+	}
+
 	/* check kernel command line */
 	cmd = file_read("/proc/cmdline", 1);
 	if (string_search_keyword(cmd, " security=tomoyo") == -1){
@@ -2942,7 +2958,8 @@ void domain_check_enforcing(char *domain)
 				d_change = time(0) - atoi(res2);
 				
 				free2(res); free2(res2);
-				
+
+printf(" \nname = %s, d_change = %d, p_cputime = %d\n", name, d_change, p_cputime);				
 				/* have the processes' cpu time reached a value compared to the last change time of the domain?
 				 * if so, then i turn the domain into enforcing mode */
 				if (d_change < p_cputime / 100){
@@ -3232,11 +3249,19 @@ void domain_get_log()
 			color(prog, blue);
 			color("  ", clr);
 			color(rule, purple);
-			if (choice("  add rules?")){
-				/* add rules to new rules */
-				strcat2(&prog_rules_new, res);
-				strcat2(&prog_rules_new, "\n");
+			/* is manual mode on? */
+			if (opt_manual){
+				/* choose if to allow denied rule */
+				if (choice("  add rules?")){
+					/* add rules to new rules */
+					strcat2(&prog_rules_new, res);
+					strcat2(&prog_rules_new, "\n");
+				}
 			}
+			else{
+				printf("  add rules? (n)\n");
+			}
+
 			free2(prog);
 			free2(rule);
 			free2(res);
@@ -5072,7 +5097,10 @@ void domain_reshape_rules()
 }
 
 
-/* update the change time entries in the domains whose rules changed since last time */
+/* update the change time entries in the domains whose rules changed since last time
+ * i reset last changed time even if it is because of another domain's change,
+ * because after turning the domain into enforcing mode,
+ * the rules cannot be changed anymore */
 void domain_update_change_time()
 {
 	char *d1, *d2, *name1, *name2, *res, *temp, *temp2, *temp3;
