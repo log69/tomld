@@ -56,10 +56,8 @@ The following options are supported:
     -i   --info   [pattern] print domains' rules by pattern
                             (without pattern, print a list of main domains)
     -r   --remove [pattern] remove domains by pattern
-    -m   --manual           in manual mode, quitting from tomld for the second 
-time
-                            turns all old learning mode domains into enforcing 
-mode
+    -m   --manual           exiting from tomld for the second time turns
+                            all old learning mode domains into enforcing mode
     -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards
     -k   --keep             don't change domain's mode for this run
                             (learning mode domains will stay so on exit)
