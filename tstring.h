@@ -79,6 +79,8 @@ char *string_ltos(unsigned long num);
 
 char *string_get_number(const char *text);
 
+char *string_get_number_last(const char *text);
+
 int string_is_number(const char *text);
 
 char *string_get_next_line(char **text);
