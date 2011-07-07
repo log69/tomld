@@ -1530,6 +1530,8 @@ int process_get_cpu_time_all(const char *name)
 	char *mydir_name = 0, *mypid = 0;
 	/* my uptime value to compare to and find the least one */
 	int mycputime = 0;
+	/* converting jiffies to second, this is from manpage of proc */
+	int jiffies_per_second=sysconf(_SC_CLK_TCK);
 	
 	/* open /proc dir */
 	mydir = opendir("/proc/");
@@ -1581,7 +1583,7 @@ int process_get_cpu_time_all(const char *name)
 					t += atoi(ptime);
 					free2(ptime);
 					/* add the sum of times */
-					mycputime += t;
+					mycputime += t / jiffies_per_second;
 					free2(pstat);
 				}
 				free2(res);
