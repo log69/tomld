@@ -55,15 +55,19 @@ The following options are supported:
                             (all previously learnt rules will be backed up)
     -i   --info   [pattern] print domains' rules by pattern
                             (without pattern, print a list of main domains)
-    -l   --learn            turn learning mode back for all domains
-                            (this is not advised, only for correction purposes)
     -r   --remove [pattern] remove domains by pattern
-         --yes              auto confirm with yes
+    -m   --manual           in manual mode, quitting from tomld for the second 
+time
+                            turns all old learning mode domains into enforcing 
+mode
+    -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards
     -k   --keep             don't change domain's mode for this run
                             (learning mode domains will stay so on exit)
-    -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards
+    -l   --learn            turn learning mode back for all domains
+                            (this is not advised, only for correction purposes)
     -1   --once             quit after first cycle
                             (might be useful for scripts)
+         --yes              auto confirm everything with yes
 
 *executables are additonal programs to create domains for
 
