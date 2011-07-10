@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-07/07/2011 - tomld v0.36 - empty pid file on exit
+10/07/2011 - tomld v0.36 - empty pid file on exit
                          - fix some mem leaks
                          - runtime working directory is /var/run/tomld/ from now
                          - add a rule with a uniq id and with time in seconds to every domain to mark the creation of domain
@@ -35,9 +35,11 @@ changelog:
                          - add domain_check_enforcing()
                          - add domain_update_change_time()
                          - fully automatic enforcing mode is half ready
-                         - some bugfixes
                          - check if tomoyo support is compiled into kernel above version 2.6.36
                          - auto yes for adding denied rules in non-manual mode is disabled
+                         - offer terminating already running automatic mode tomld process when running it in manual mode
+                         - bugfix in file_read()
+                         - some more bugfixes
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
@@ -220,6 +222,8 @@ flow chart:
 
 #define max_char	4096
 #define max_num		68
+#define max_proc	1000
+
 
 
 /* ------------------------------------------ */
@@ -366,8 +370,8 @@ int opt_once		= 0;
 char *opt_info2		= 0;
 char *opt_remove2	= 0;
 char *dirs_recursive = 0;
-long *dirs_recursive_depth = 0;
-long *dirs_recursive_sub = 0;
+int  *dirs_recursive_depth = 0;
+int  *dirs_recursive_sub = 0;
 
 int flag_reset		= 0;
 int flag_check		= 0;
@@ -565,7 +569,7 @@ void myfree()
 /* my exit point */
 void myexit(int num)
 {
-	/* empty pid file */
+	/* empty pid file, but only after options check */
 	if (flag_pid && file_exist(tpid)) file_write(tpid, 0);
 	/* free my pointers */
 	myfree();
@@ -1392,7 +1396,7 @@ void domain_add_rule(char *prog, char *rule)
 
 
 /* return an integer containing the pid of the path of executable that is running */
-/* return null if no process is running like that */
+/* return null if no process like that is running */
 int process_get_pid(const char *name)
 {
 	DIR *mydir;
@@ -1402,7 +1406,7 @@ int process_get_pid(const char *name)
 	
 	/* open /proc dir */
 	mydir = opendir("/proc/");
-	if (!mydir){ error("error: cannot open /proc/ directory\n"); return 0; }
+	if (!mydir){ error("error: cannot open /proc/ directory\n"); myexit(1); }
 
 	/* cycle through dirs in /proc */
 	while((mydir_entry = readdir(mydir))) {
@@ -1441,7 +1445,72 @@ int process_get_pid(const char *name)
 	free2(mypid);
 
 	return 0;
+}
+
+
+/* return an integer list with an ending zero containing all pids of the same executables
+ * that are running currently */
+/* return null if no process like that is running */
+/* returned value must be freed by caller */
+int *process_get_pid_list(const char *name)
+{
+	long list_length = max_proc;
+	int list_counter = 0;
+	int *list;
+	DIR *mydir;
+	struct dirent *mydir_entry;
+	char *mydir_name = 0, *mypid = 0;
+	int p = 0;
 	
+	/* open /proc dir */
+	mydir = opendir("/proc/");
+	if (!mydir){ error("error: cannot open /proc/ directory\n"); myexit(1); }
+
+	/* alloc mem for list */
+	list = memget_int(list_length);
+	
+	/* cycle through dirs in /proc */
+	while((mydir_entry = readdir(mydir))) {
+		/* get the dir names inside /proc dir */
+		strcpy2(&mypid, mydir_entry->d_name);
+
+		/* does it contain only numbers meaning they are pids? */
+		if (string_is_number(mypid)) {
+			char *res;
+			/* create dirname like /proc/pid/exe */
+			strcpy2(&mydir_name, "/proc/");
+			strcat2(&mydir_name, mypid);
+			strcat2(&mydir_name, "/exe");
+
+			/* resolv the link pointing from the exe name */
+			res = path_link_read(mydir_name);
+			if (res){
+				/* compare the link to the process name */
+				if (!strcmp(res, name)) {
+					/* convert pid string to integer */
+					p = atoi(mypid);
+					/* store pid in my list */
+					list[list_counter++] = p;
+					
+					/* check array boundaries */
+					if (list_counter >= list_length){
+						error("error: list array too small in process_get_pid_list()\n"); myexit(1); }
+				}
+				free2(res);
+			}
+		}
+	}
+	closedir(mydir);
+	free2(mydir_name);
+	free2(mypid);
+
+	/* if no process was found, then free list and fail */
+	if (!list_counter){ free(list); return 0; }
+	
+	/* put an ending zero to the end of list */
+	list[list_counter] = 0;
+
+	return list;
 }
 
 
@@ -1517,7 +1586,6 @@ int process_get_least_uptime(const char *name)
 	free2(mypid);
 
 	return myuptime;
-	
 }
 
 
@@ -1617,6 +1685,69 @@ char *process_get_path(int pid)
 
 	/* resolv the link pointing from the exe name */
 	res = path_link_read(path);
+	free2(path);
+	return res;
+}
+
+
+/* return a list with the command line options of running process of that pid */
+/* return null if no process like that is running */
+/* returned value must be freed by caller */
+char *process_get_cmdline(int pid)
+{
+	char *pid2;
+	char *path = 0;
+	char *cmd;
+	int l;
+
+	/* convert pid integer to string */
+	pid2 = string_itos(pid);
+	/* create /proc/pid/cmdline path from pid */
+	strcpy2(&path, "/proc/");
+	strcat2(&path, pid2);
+	strcat2(&path, "/cmdline");
+
+	/* file exist? */
+	if (!file_exist(path)){
+		free2(path); free2(pid2); return 0;
+	}
+	/* load tomld parameters */
+	cmd = file_read(path, 1);
+	/* convert null chars to new lines except ending null,
+	 * because /proc/pid/cmdline gives back options separated by null char */
+	l = strlen2(&cmd);
+	if (l > 0){
+		while(1){
+			l--;
+			if (!l) break;
+			/* if char is null, then change it to new line */
+			if (!cmd[l]) cmd[l] = '\n';
+		}
+	}
+	/* add a new line to it */
+	strcat2(&cmd, "\n");
+	
+	free2(path);
+	free2(pid2);
+	return cmd;
+}
+
+
+/* is process with the pid running */
+int process_running(int pid)
+{
+	int res;
+	char *path = 0;
+	/* convert pid integer to string */
+	char *pid2 = string_itos(pid);
+	/* create process path */
+	strcpy2(&path, "/proc/");
+	strcat2(&path, pid2);
+
+	/* does process dir exist? */
+	res = dir_exist(path);
+
+	free2(pid2);
 	free2(path);
 	return res;
 }
@@ -2078,49 +2209,157 @@ void backup()
 }
 
 
-/* check if only one instance of the program is running */
-int check_instance(){
+/* check if only one instance of the program is running and store pid in pid file */
+/* fail if tomld is running already, and they have the same mode (both automatic or both manual) */
+/* if the running one ia automatic and the second is manual,
+ * then offer terminating the automatic before continue to run manual mode tomld */
+void check_instance(){
 	char *mypid;
+	char *cmd;
+	char *pid2;
+	int  p;
+	int  *pid_list;
+	int  len;
+	int  flag_pid_file;
+	int  flag_manual;
+	
+	/* signal to write null to pid file on exit */
+	flag_pid = 1;
 
-	/* store path to my executable */
-	/* to a global variable for later */
+	/* store path to my executable to a global variable for later */
 	my_exe_path = process_get_path(getpid());
+
+	/* get pid list of the same running processes */
+	pid_list = process_get_pid_list(my_exe_path);
+	if (!pid_list){
+		error("error: zero instance of tomld seem to be running\n");
+		myexit(1);
+	}
 
 	/* get my pid number and convert it to string */
 	mypid = string_itos(getpid());
+
+	/* get pid from pid file */
+	p = 0;
 	/* check if my pid file exists */
 	if (file_exist(tpid)){
-		char *pid2;
 		/* read pid number from pid file */
 		pid2 = file_read(tpid, 0);
-		/* is it zero? if so, then no instance, so write pid and success */
-		if (!strlen2(&pid2)){ file_write(tpid, mypid); free2(mypid); free2(pid2); return 1; }
-		/* is it me? */
-		if (!strcmp(mypid, pid2)){ free2(mypid); free2(pid2); return 0; }
-		else{
-			/* is the process with the foreign pid still running? */
-			char *path;
-			path = memget2(max_num);
-			strcpy2(&path, "/proc/");
-			strcat2(&path, pid2);
-			/* if running, then return false */
-			if (dir_exist(path)){ free2(mypid); free2(pid2); free2(path); return 0; }
-			/* if not running, then overwrite pid number in pid file */
-			else{
-				file_write(tpid, mypid);
+		/* is it zero? */
+		if (strlen2(&pid2)){
+			/* is it me? */
+			if (strcmp(mypid, pid2)){
+				/* is the process with the foreign pid still running?
+				 * if so, then store pid number as an extra tomld process */
+				p = atoi(pid2);
+				if (!process_running(p)) p = 0;
 			}
-			free2(path);
 		}
 		free2(pid2);
 	}
-	/* create pid file if it doesn't exist */
-	else{
-		file_write(tpid, mypid);
+
+
+	/* get list length */
+	len = 0;
+	flag_pid_file = 0;
+	while(1){
+		int p2 = pid_list[len];
+		if (!p2) break;
+		/* compare ites from list to pid from pid file */
+		if (p && p == p2) flag_pid_file = 1;
+		len++;
+	}
+	/* if pid from pid file didn't match the list, then add it to the list */
+	if (p && !flag_pid_file){
+		if (len < max_proc){
+			pid_list[len++] = p;
+			pid_list[len] = 0;
+		}
 	}
 
-	free2(mypid);
+	/* fail if length is zero or greater than 2,
+	 * this error is never supposed to happen */
+	if (!len || len > 2){
+		error("error: abnormal number of tomld instances seem to be running\n");
+		flag_pid = 0;
+		free2(mypid); free(pid_list);
+		myexit(1);
+	}
+	/* if only 1 is running, then write pid file and success */
+	if (len == 1){
+		/* store pid file */
+		file_write(tpid, mypid);
+		free2(mypid); free(pid_list);
+		return;
+	}
+
+	/* len is supposed to be 2 here meaning 2 tomld processes are running */
+
+	/* if second tomld is in automatic mode, then always fail */
+	if (!opt_manual){
+		error("error: tomld is already running\n");
+		free2(mypid); free(pid_list);
+		myexit(1);
+	}
+
+	/* check if first tomld process has been started in manual mode or not */
+	/* get the other tomld process' pid */
+	p = getpid();
+	if (p != pid_list[0]) p = pid_list[0];
+	else p = pid_list[1];
+	/* get command line options of pid */
+	cmd = process_get_cmdline(p);
+	/* search for --manual switch */
+	flag_manual = 0;
+	if (string_search_line(cmd, "--manual") > -1 || string_search_line(cmd, "-m") > -1) flag_manual = 1;
+	free2(cmd);
+
+	/* if first tomld is in manual mode, then always fail too */
+	if (flag_manual){
+		error("error: tomld is already running\n");
+		free2(mypid); free(pid_list);
+		myexit(1);
+	}
+	/* if first tomld is in automatic mode and second is in manual,
+	 * then i ask if second tomld should terminate the first one */
+	else{
+		color("tomld is already running in automatic mode\n", red);
+		if (choice("should i terminate it and run this one?")){
+			int c;
+			if (kill(p, SIGTERM)){
+				error("error: could not terminate other tomld process\n");
+				free2(mypid); free(pid_list);
+				myexit(1);
+			}
+			color("waiting for other tomld process to terminate...\n", clr);
+			
+			/* wait for process to terminate for maximum 10 seconds */
+			c = 101;
+			while(--c){
+				/* still running? if not, then success and exit */
+				if (!process_running(p)) break;
+				/* wait 0.1 sec */
+				usleep(100000);
+			}
+			/* hasn't process terminated succesfully? */
+			if (!c){
+				flag_pid = 0;
+				free2(mypid); free(pid_list);
+				myexit(1);
+			}
+		}
+		else{
+			flag_pid = 0;
+			free2(mypid); free(pid_list);
+			myexit(1);
+		}
+	}
 	
-	return 1;
+	/* store my pid file */
+	file_write(tpid, mypid);
+
+	free2(mypid); free(pid_list);
+	return;
 }
 
 
@@ -4004,7 +4243,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 	char *res, *res2, *temp, *rules_new;
 	char *path_new1, *path_new2;
 	int i, count1, count2;
-	long c = 0;
+	int c = 0;
 
 	/* return null if input rule is null */
 	if (!rule) return 0;
@@ -5367,8 +5606,8 @@ void check_exceptions()
 	if (dirs_recursive){
 		i = string_count_lines(dirs_recursive);
 		if (i > 0){
-			if (!dirs_recursive_depth) dirs_recursive_depth = memget_long(i+1);
-			if (!dirs_recursive_sub)   dirs_recursive_sub   = memget_long(i+1);
+			if (!dirs_recursive_depth) dirs_recursive_depth = memget_int(i+1);
+			if (!dirs_recursive_sub)   dirs_recursive_sub   = memget_int(i+1);
 			while(i--){
 				dirs_recursive_depth[i] = -1;
 				dirs_recursive_sub[i]   = -1;
@@ -5642,8 +5881,7 @@ int main(int argc, char **argv){
 	check_tomoyo();
 
 	/* check already running instance of the program */
-	if (!check_instance()) { error("error: tomld is running already\n"); myexit(1); }
-	flag_pid = 1;
+	check_instance();
 
 
 	/* ---------------- */
