@@ -55,7 +55,7 @@ char *memget(unsigned long num);
 
 char **memget_ptr(unsigned long num);
 
-long *memget_long(unsigned long num);
+int *memget_int(unsigned long num);
 
 unsigned long strlen2(char **s1);
 
