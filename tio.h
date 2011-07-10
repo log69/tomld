@@ -22,6 +22,7 @@
 ----------------------------------------------------------------------
 */
 
+#include <time.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <termios.h>
@@ -34,9 +35,11 @@ float mytime();
 
 void mytime_print();
 
-int sys_get_uptime();
-
 void mytime_print();
+
+char *mytime_get_date();
+
+int sys_get_uptime();
 
 void key_set_mode();
 
