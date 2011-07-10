@@ -64,6 +64,26 @@ void mytime_print()
 }
 
 
+/* return a string containing the full date */
+/* returned value must be freed by caller */
+char *mytime_get_date()
+{
+	char *res = 0;
+	long l;
+	/* get epoch time */
+	time_t  timer = time(NULL);
+	/* convert epoch time to full date string */
+	strcpy2(&res, ctime(&timer));
+	l = strlen2(&res);
+	/* remove ending new line char from date string */
+	if (l > 0) l--;
+	res[l] = 0;
+	strlenset3(&res, l);
+
+	return res;
+}
+
+
 /* get system uptime in seconds */
 int sys_get_uptime()
 {
@@ -166,7 +186,8 @@ void pipe_write(const char *comm, const char *buff)
 }
 
 
-/* open file and read content with given length, or if length is null, then check length from file descriptor */
+/* open file and read content with given length, or if length is null,
+ * then check length from file descriptor */
 /* returned value must be freed by caller */
 char *file_read(const char *name, long length)
 {
@@ -203,7 +224,13 @@ char *file_read(const char *name, long length)
 			if (!fread(buff, len, 1, f)) break;
 			c++;
 		}
-		len = strlen(buff) + c * len;
+		/* check length of last buffered string by searching for non-zero char backwards */
+		len = max_char;
+		while(1){
+			if (!len) break;
+			if (buff[--len]){ len++; break; }
+		}
+		len += c * max_char;
 		free2(buff);
 		fclose(f);
 		f = fopen(name, "r");
