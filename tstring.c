@@ -170,9 +170,9 @@ char **memget_ptr(unsigned long num)
 
 /* allocate memory for long and return pointer */
 /* returned value must be freed by caller */
-long *memget_long(unsigned long num)
+int *memget_int(unsigned long num)
 {
-	long *p = malloc((sizeof(long)) * (num + 1));
+	int *p = malloc((sizeof(int)) * (num + 1));
 	if (!p){ error("error: out of memory\n"); exit(1); }
 	/* clear first byte */
 	p[0] = 0;
