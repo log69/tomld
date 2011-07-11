@@ -186,8 +186,9 @@ void pipe_write(const char *comm, const char *buff)
 }
 
 
-/* open file and read content with given length, or if length is null,
- * then check length from file descriptor */
+/* open file and read content with given length if length is greater than 1,
+ * or if length is null, check length from file descriptor,
+ * or if length is -1, check length from read file */
 /* returned value must be freed by caller */
 char *file_read(const char *name, long length)
 {
