@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-11/07/2011 - tomld v0.36 - fully automatic enforcing mode is half ready
+11/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
                          - fix some mem leaks
@@ -42,6 +42,7 @@ changelog:
                          - bugfix in file_read()
                          - some more bugfixes
                          - print start time and end time of tomld
+                         - print statistics about min/avg/max times of check() cycles on exit
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
@@ -250,8 +251,17 @@ char *home = "/home";
 float time_check = 10;
 /* interval of saving configs to disk in seconds */
 float time_save = 300;
-/* interval of maximum time in seconds to wait in temporary learning mode for domains with deny logs */
-float time_maxlearn = 3600;
+/* interval of maximum time in seconds to wait in temporary learning mode for domains with deny logs
+ * (1 hour) */
+float time_max_learn = 60 * 60;
+/* interval of maximum time in seconds that needs to pass since last domain change for tomld
+ * to automatically turn domain into enforcing mode, otherwise it calculates it to make a decision
+ * (1 week) */
+int time_max_change = 60 * 60 * 24 * 7;
+/* constant for measuring the complexity of a domain
+ * i multiply the number of rules of the domain by this and compare it to its process' cpu time */
+int domain_complexity_factor = 100;
+
 
 /* path to my executable */
 char *my_exe_path = 0;
@@ -388,6 +398,13 @@ int flag_firstrun	= 1;
 int flag_safe		= 0;
 int flag_new_proc	= 0;
 
+/* time variables for statistics of check cycle time */
+float time_max_cycle = 0;
+float time_min_cycle = 60 * 60 * 24 * 365;
+float time_avg_cycle = 0;
+int   time_avg_cycle_counter = 0;
+
+
 /* colors */
 char *gray		= "\033[37;48m";
 char *cyan		= "\033[36;48m";
@@ -401,6 +418,11 @@ char *clr		= "\033[0m";
 
 /* run time */
 float t_start;
+
+/* contains domain names with their cpu times next to them for the case
+ * when a domain enters learning mode from enforcing mode for user request
+ * and i need to calculate process cpu time compared to this moment */
+char *domain_cputime_list = 0;
 
 /* arrays */
 char *tprogs = 0;
@@ -1225,6 +1247,33 @@ int domain_main_exist(char *prog)
 }
 
 
+/* return a new string containing the main domain of that name
+ * or return null if no main domain exists like that */
+char *domain_get(char *prog)
+{
+	char *res, *res2, *temp;
+
+	temp = tdomf;
+	while(1){
+		/* get first line containing the name of the domain */
+		res = domain_get_next(&temp);
+		if (!res) break;
+		/* get main domain name */
+		res2 = domain_get_name(res);
+		if (res2){
+			/* if prog names matches main domain name, then success */
+			if (!strcmp(prog, res2)){
+				free2(res2);
+				return res;
+			}
+			free2(res2);
+		}
+		free2(res);
+	}
+	return 0;
+}
+
+
 /* return a new string containing a list of all domain names */
 /* returned value must be freed by caller */
 char *domain_get_list()
@@ -1599,18 +1648,20 @@ int process_get_least_uptime(const char *name)
 }
 
 
-/* return an integer containing the sum of cpu time of all of the same running processes in clock ticks */
+/* return an integer containing the sum of cpu time of all of the same running processes in clock ticks
+ * the flag_clear option decides, whether i reset all processes' cpu time values of the same name,
+ * or just read it out */
 /* return null if no process is running like that */
-int process_get_cpu_time_all(const char *name)
+int process_get_cpu_time_all(const char *name, int flag_clear)
 {
 	DIR *mydir;
 	struct dirent *mydir_entry;
-	char *mydir_name = 0, *mypid = 0;
+	char *mydir_name = 0, *mypid = 0, *list_entry = 0;
+	char *mypid2 = 0, *name2 = 0;
+	int i;
 	/* my uptime value to compare to and find the least one */
 	int mycputime = 0;
-	/* converting jiffies to second, this is from manpage of proc */
-	int jiffies_per_second=sysconf(_SC_CLK_TCK);
-	
+
 	/* open /proc dir */
 	mydir = opendir("/proc/");
 	if (!mydir){ error("error: cannot open /proc/ directory\n"); return 0; }
@@ -1633,8 +1684,8 @@ int process_get_cpu_time_all(const char *name)
 			if (res){
 				/* compare the link to the process name */
 				if (!strcmp(res, name)) {
-					char *pstat, *temp, *ptime;
-					int t;
+					char *pstat, *ptime, *res2, *temp;
+					int t, t2;
 					
 					/* create dirname like /proc/pid/stat */
 					strcpy2(&mydir_name, "/proc/");
@@ -1660,8 +1711,66 @@ int process_get_cpu_time_all(const char *name)
 					ptime = string_get_next_wordn(&temp, 16);
 					t += atoi(ptime);
 					free2(ptime);
+					
+					/* convert cputime integer to string */
+					ptime = string_itos(t);
+					/* create list entries for compare */
+					strcpy2(&list_entry, mypid);
+					strcat2(&list_entry, " ");
+					strcat2(&list_entry, name);
+					strcat2(&list_entry, " ");
+					strcat2(&list_entry, ptime);
+					strcpy2(&mypid2, mypid);
+					strcat2(&mypid2, " ");
+					strcpy2(&name2, mypid2);
+					strcat2(&name2, name);
+					strcat2(&name2, " ");
+
+
+					/* manage domain cpu time list entry
+					 * this list grows with time as new processes appear with new pids,
+					 * but this should stay at a low level */
+					 
+					/* domain cpu time list entry exists? */
+					i = string_search_keyword_first_all(&domain_cputime_list, name2);
+					if (i > -1){
+						if (flag_clear){
+							/* update it by removing old entry and adding new one */
+							res2 = string_remove_line_from_pos(domain_cputime_list, i);
+							domain_cputime_list = res2; free2(res2);
+							strcat2(&domain_cputime_list, list_entry);
+							strcat2(&domain_cputime_list, "\n");
+						}
+						else{
+							/* read out cpu time value */
+							temp = domain_cputime_list + i;
+							res2 = string_get_next_wordn(&temp, 2);
+							/* convert value */
+							t2 = atoi(res2);
+							free2(res2);
+							/* substract value from original t */
+							t -= t2;
+						}
+					}
+					else{
+						/* if whole entry doesn't exist, then check if same pid exists */
+						i = string_search_keyword_first_all(&domain_cputime_list, mypid2);
+						if (i > -1){
+							/* if wrong pid exists, then remove it */
+							res2 = string_remove_line_from_pos(domain_cputime_list, i);
+							domain_cputime_list = res2; free2(res2);
+						}
+						/* if clear flag is set, then add entry */
+						if (flag_clear){
+							strcat2(&domain_cputime_list, list_entry);
+							strcat2(&domain_cputime_list, "\n");
+						}
+					}
+					
+					free2(ptime);
+					
 					/* add the sum of times */
-					mycputime += t / jiffies_per_second;
+					mycputime += t;
 					free2(pstat);
 				}
 				free2(res);
@@ -1672,9 +1781,9 @@ int process_get_cpu_time_all(const char *name)
 
 	free2(mydir_name);
 	free2(mypid);
+	free2(list_entry);
 
 	return mycputime;
-	
 }
 
 
@@ -3061,7 +3170,7 @@ void domain_remove(const char *pattern)
 /* turn back learning mode for all domains with profile 2-3 */
 void domain_set_learn_all()
 {
-	char *res, *temp, *orig;
+	char *res, *res2, *temp, *orig;
 	
 	/* load config files */
 	load();
@@ -3075,6 +3184,10 @@ void domain_set_learn_all()
 		if (!res) break;
 		/* turn domain into learning mode */
 		domain_set_profile(orig, 1);
+		/* reset cpu time counter for prog because of learning mode */
+		res2 = domain_get_name(orig);
+		process_get_cpu_time_all(res2, 1);
+		free2(res2);
 		free2(res);
 	}
 	
@@ -3169,56 +3282,80 @@ void domain_set_enforce_old()
 void domain_check_enforcing(char *domain)
 {
 	char *name, *res, *res2, *temp;
-	int i, d_create, d_change, p_uptime, p_cputime;
+	int i, d_create, d_change, d_rules, p_uptime, p_cputime;
+	int flag_enforcing;
 	
 	/* get main domain name */
 	name = domain_get_name(domain);
+	
+	/* domain's process is running currently? */
+	if(process_running(process_get_pid(name))){
 
-	/* get process uptime of domain */
-	p_uptime = process_get_least_uptime(name);
-	/* get creation time of domain */
-	i = string_search_keyword(domain, myuid_create);
-	if (i > -1){
-		temp = domain + i;
-		/* get my uniq id with the creation time in it */
-		res = string_get_next_line(&temp);
-		/* get epoch time from my uid */
-		res2 = string_get_number_last(res);
-		/* convert epoch string to integer */
-		d_create = time(0) - atoi(res2);
-		
-		free2(res); free2(res2);
+		/* get process uptime of domain */
+		p_uptime = process_get_least_uptime(name);
+		/* get creation time of domain */
+		i = string_search_keyword(domain, myuid_create);
+		if (i > -1){
+			temp = domain + i;
+			/* get my uniq id with the creation time in it */
+			res = string_get_next_line(&temp);
+			/* get epoch time from my uid */
+			res2 = string_get_number_last(res);
+			/* convert epoch string to integer */
+			d_create = time(0) - atoi(res2);
+			
+			free2(res); free2(res2);
 
-		/* is process uptime less than domain creation time?
-		 * if so, then this means there is at least one process of the domain
-		 * that has been restarted since domain creation,
-		 * so this one gives ok to turn it into enforcing mode */
-		if (d_create > p_uptime){
+			/* is process uptime less than domain creation time?
+			 * if so, then this means there is at least one process of the domain
+			 * that has been restarted since domain creation,
+			 * so this one gives ok to turn it into enforcing mode */
+			if (d_create > p_uptime + 1){
 
-			/* get the sum of cpu times of the domain's all processes */
-			p_cputime = process_get_cpu_time_all(name);
-			/* get last change time of domain */
-			i = string_search_keyword(domain, myuid_change);
-			if (i > -1){
-				temp = domain + i;
-				/* get my uniq id with the creation time in it */
-				res = string_get_next_line(&temp);
-				/* get epoch time from my uid */
-				res2 = string_get_number_last(res);
-				/* convert epoch string to integer */
-				d_change = time(0) - atoi(res2);
-				
-				free2(res); free2(res2);
+				/* get the sum of cpu times of the domain's all processes */
+				p_cputime = process_get_cpu_time_all(name, 0);
+				/* get last change time of domain */
+				i = string_search_keyword(domain, myuid_change);
+				if (i > -1){
+					temp = domain + i;
+					/* get my uniq id with the last change time in it */
+					res = string_get_next_line(&temp);
+					/* get epoch time from my uid */
+					res2 = string_get_number_last(res);
+					/* convert epoch string to integer */
+					d_change = time(0) - atoi(res2);
+					/* change time must not be greater than system uptime,
+					 * bacuse if the user turns off the computer immediately and then later back on,
+					 * the change time would be huge without any sense */
+					i = sys_get_uptime();
+					if (d_change > i) d_change = i;
+					
+					free2(res); free2(res2);
 
-printf(" \nname = %s, d_change = %d, p_cputime = %d\n", name, d_change, p_cputime);				
-				/* have the processes' cpu time reached a value compared to the last change time of the domain?
-				 * if so, then i turn the domain into enforcing mode */
-				if (d_change < p_cputime / 100){
+					/* have the processes' cpu time reached a value compared to the complexity
+					 * of the domain? (i measure it by the number of its rules)
+					 * or is the domain's last change time greater than time_max_change?
+					 * if so, then i turn the domain into enforcing mode */
+					flag_enforcing = 0;
+					if (d_change > time_max_change) flag_enforcing = 1;
+					if (!flag_enforcing){
+						/* count complexity of domain by
+						 * counting rules, and then multiplying it
+						 * with a minimum limit */
+						d_rules = string_count_lines(domain);
+						d_rules = d_rules * domain_complexity_factor;
+						if (d_rules < domain_complexity_factor) d_rules = domain_complexity_factor;
+						if (d_rules < p_cputime) flag_enforcing = 1;
+debug(domain_cputime_list); printf("name = %s, d_change = %d, d_rules = %d, p_cputime = %d\n", name, d_change, d_rules, p_cputime);
+					}
+					if (flag_enforcing){
 
-					/* turn domain into enforcing mode */
-					color(name, blue);
-					color(" enforcing mode on\n", purple);
-					domain_set_profile_for_prog(name, 3);
+						/* turn domain into enforcing mode */
+						color(name, blue);
+						color(", ", clr);
+						color("turn enforcing mode on\n", purple);
+						domain_set_profile_for_prog(name, 3);
+					}
 				}
 			}
 		}
@@ -3568,6 +3705,8 @@ void domain_get_log()
 							/* switch domain to learning mode */
 							if (!flag_once){
 								domain_set_profile(res, 1);
+								/* reset cpu time counter for prog because of learning mode */
+								process_get_cpu_time_all(prog, 1);
 								/* do it only once per domain for speed */
 								flag_once = 1;
 							}
@@ -3742,6 +3881,8 @@ void domain_print_mode()
 			strcat2(&tdomf, t);
 			strcat2(&tdomf, "\n");
 			free2(t);
+			/* reset cpu time counter for prog because of learning mode */
+			process_get_cpu_time_all(prog, 1);
 			/* store prog name to know not to turn on enforcing mode for these ones on exit */
 			if(string_search_line(tprogs_learn, prog) == -1){
 				strcat2(&tprogs_learn, prog);
@@ -3767,6 +3908,8 @@ void domain_print_mode()
 				if (!flag_firstrun) newl();
 				/* turn on learning mode for the domain and all its subdomains */
 				domain_set_profile_for_prog(prog, 1);
+				/* reset cpu time counter for prog because of learning mode */
+				process_get_cpu_time_all(prog, 1);
 			}
 
 			/* learning mode */
@@ -5361,10 +5504,10 @@ void domain_reshape_rules()
 }
 
 
-/* update the change time entries in the domains whose rules changed since last time
+/* update the change time entries in the domains whose rules or profile changed since last time
  * i reset last changed time even if it is because of another domain's change,
  * because after turning the domain into enforcing mode,
- * the rules cannot be changed anymore */
+ * the rules cannot be changed anymore (except by user request for temporary learning mode) */
 void domain_update_change_time()
 {
 	char *d1, *d2, *name1, *name2, *res, *temp, *temp2, *temp3;
@@ -5544,7 +5687,7 @@ void check_learn()
 		}
 		else{
 			/* check if 1 hour passed yet */
-			if ((mytime() - t) >= time_maxlearn){
+			if ((mytime() - t) >= time_max_learn){
 				/* clear flag */
 				flag_learn = 0;
 				color("* time ended for temporary learning mode\n", red);
@@ -5886,6 +6029,9 @@ void statistics()
 	color(" rules\n", clr);
 	free2(sd);
 	free2(sr);
+	
+	/* print stat about the min, max and average time of check cycle */
+	printf("cycle times min/avg/max %.2f/%.2f/%.2f sec\n", time_min_cycle, time_avg_cycle / (float)(time_avg_cycle_counter), time_max_cycle);
 }
 
 
@@ -5910,7 +6056,7 @@ void finish()
 	
 	/* print statistics */
 	statistics();
-
+	
 	/* print end time */
 	d = mytime_get_date();
 	color("ended at ", clr); color(d, clr); newl(); free2(d);
@@ -5940,7 +6086,7 @@ void myinit()
 
 int main(int argc, char **argv){
 
-	float t, t2;
+	float t, t2, t3;
 	char *d;
 
 	/* some initializations */
@@ -6034,14 +6180,24 @@ int main(int argc, char **argv){
 		if ((mytime() - t) >= time_check){
 			flag_safe = 0;
 
+			/* store time for speed comparision */			
+			t3 = mytime();
+
 			/* manage policy and rules */
 			check();
+			
+			/* store longest time of cycle */
+			t3 = mytime() - t3;
+			if (time_max_cycle < t3) time_max_cycle = t3;
+			if (time_min_cycle > t3) time_min_cycle = t3;
+			time_avg_cycle += t3;
+			time_avg_cycle_counter++;
 			
 			/* run only once */
 			if (flag_firstrun){
 				flag_firstrun = 0;
-				color("* whole running cycle took ", green);
-				printf("%.2fs\n", mytime());
+				color("* first whole running cycle took ", green);
+				printf("%.2fs\n", t3);
 				if (!opt_once){
 					color("(press q to quit)\n", red);
 				}
