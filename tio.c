@@ -54,16 +54,6 @@ float mytime()
 }
 
 
-/* print elapsed time since last time */
-void mytime_print()
-{
-	static float t = 0;
-	t = mytime() - t;
-	
-	printf("-- time %.2f sec\n", t);
-}
-
-
 /* return a string containing the full date */
 /* returned value must be freed by caller */
 char *mytime_get_date()
@@ -84,6 +74,16 @@ char *mytime_get_date()
 }
 
 
+/* print elapsed time since last time measuring speed */
+void mytime_print()
+{
+	static float t = 0;
+	t = mytime() - t;
+	
+	printf("-- time %.2f sec\n", t);
+}
+
+
 /* get system uptime in seconds */
 int sys_get_uptime()
 {
@@ -92,7 +92,7 @@ int sys_get_uptime()
 	int i;
 	
 	/* read uptime from /proc system */
-	res = file_read(f, 1);
+	res = file_read(f, -1);
 	/* read first number part only */
 	res2 = string_get_number(res);
 	/* convert string number to integer */
@@ -215,7 +215,7 @@ char *file_read(const char *name, long length)
 	 * or the number of read bytes,
 	 * so i have to trick with filling the buffer with zero
 	 * and check the string length at the end */
-	else{
+	else if (length == -1){
 		unsigned long c = 0;
 		len = max_char;
 		buff = memget2(len);
@@ -235,12 +235,16 @@ char *file_read(const char *name, long length)
 		fclose(f);
 		f = fopen(name, "r");
 	}
+	else len = length;
 	
 	/* alloc mem */
 	buff = memget2(len);
 	/* read file */
 	if (len > 0){
-		fread(buff, len, 1, f);
+		unsigned long len2 = fread(buff, len, 1, f);
+		/* store the number of actually read bytes as length, because it can happen
+		 * that the length of file is less than the requested number of bytes */
+		if (length > 0) len = len2;
 	}
 	fclose(f);
 	/* write null to the end of file */
