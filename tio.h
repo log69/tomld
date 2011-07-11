@@ -35,9 +35,9 @@ float mytime();
 
 void mytime_print();
 
-void mytime_print();
-
 char *mytime_get_date();
+
+void mytime_print();
 
 int sys_get_uptime();
 
