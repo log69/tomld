@@ -22,7 +22,9 @@
 
 changelog:
 -----------
-10/07/2011 - tomld v0.36 - empty pid file on exit
+11/07/2011 - tomld v0.36 - fully automatic enforcing mode is half ready
+                         - add ability to accept user request for temporary learning mode for domains with deny logs
+                         - empty pid file on exit
                          - fix some mem leaks
                          - runtime working directory is /var/run/tomld/ from now
                          - add a rule with a uniq id and with time in seconds to every domain to mark the creation of domain
@@ -34,12 +36,12 @@ changelog:
                          - add process_get_cpu_time_all()
                          - add domain_check_enforcing()
                          - add domain_update_change_time()
-                         - fully automatic enforcing mode is half ready
                          - check if tomoyo support is compiled into kernel above version 2.6.36
                          - auto yes for adding denied rules in non-manual mode is disabled
                          - offer terminating already running automatic mode tomld process when running it in manual mode
                          - bugfix in file_read()
                          - some more bugfixes
+                         - print start time and end time of tomld
 29/06/2011 - tomld v0.35 - add SIGQUIT to interrupt signals
                          - use second parameter for allow_create and similar only from kernel 2.6.36 and above
                          - wildcard pipe values too
@@ -248,6 +250,8 @@ char *home = "/home";
 float time_check = 10;
 /* interval of saving configs to disk in seconds */
 float time_save = 300;
+/* interval of maximum time in seconds to wait in temporary learning mode for domains with deny logs */
+float time_maxlearn = 3600;
 
 /* path to my executable */
 char *my_exe_path = 0;
@@ -343,13 +347,16 @@ char *tdomf_bak2 = 0;
 char *tlog	= "/var/log/syslog";
 char *tlogf = 0;
 
-/* this stores the kernel time of the last line of system log */
-/* to identify the end of tomoyo logs and make sure not to read it twice */
+/* kernel time of the last line of system log to identify the end of tomoyo logs
+ * and make sure not to read it twice */
 char *tmark	= "/var/run/tomld/tomld.logmark";
 char *tmarkf = 0;
 /* tomld pid file */
 char *tpid	= "/var/run/tomld/tomld.pid";
 int flag_pid = 0;
+/* file to signal user request for learning mode */
+char *tlearn = "/var/run/tomld/tomld.learn";
+int flag_learn = 0;
 
 
 /* options */
@@ -378,10 +385,8 @@ int flag_check		= 0;
 int flag_check2		= 0;
 int flag_check3		= 0;
 int flag_firstrun	= 1;
-int flag_clock		= 0;
 int flag_safe		= 0;
 int flag_new_proc	= 0;
-int flag_kernel_version = 0;
 
 /* colors */
 char *gray		= "\033[37;48m";
@@ -620,27 +625,32 @@ int choice(const char *text)
 /* print sand clock */
 void sand_clock(int dot)
 {
-	if (dot == 1){
-		if (!flag_firstrun){
-			printf(".");
-			flag_clock = 0;
+	static int flag_clock = 0;
+
+	/* i print these only in manual mode, so it won't fill the log in automatic mode */
+	if (opt_manual){
+		if (dot == 1){
+			if (!flag_firstrun){
+				printf(".");
+				flag_clock = 0;
+			}
 		}
-	}
-	else if (dot){
-		if (!flag_firstrun){
-			printf("+");
-			flag_clock = 0;
+		else if (dot){
+			if (!flag_firstrun){
+				printf("+");
+				flag_clock = 0;
+			}
 		}
+		else{
+			int c = flag_clock % 4;
+			if (c == 0) printf("-\b");
+			if (c == 1) printf("\\\b");
+			if (c == 2) printf("|\b");
+			if (c == 3) printf("/\b");
+			flag_clock += 1;
+		}
+		fflush(stdout);
 	}
-	else{
-		int c = flag_clock % 4;
-		if (c == 0) printf("-\b");
-		if (c == 1) printf("\\\b");
-		if (c == 2) printf("|\b");
-		if (c == 3) printf("/\b");
-		flag_clock += 1;
-	}
-	fflush(stdout);
 }
 
 
@@ -656,7 +666,7 @@ int kernel_version()
 	if (ver) return ver;
 
 	/* read kernel version from /proc in a format as 2.6.32-5-amd64 */
-	buff = file_read(v, 1);
+	buff = file_read(v, -1);
 	c = 0;
 	/* create version numbers */
 	c2 = 100000;
@@ -687,7 +697,7 @@ int tomoyo_version()
 	if (ver) return ver;
 
 	/* read version string */
-	buff = file_read(tverk, 1);
+	buff = file_read(tverk, -1);
 
 	c = 0;
 	/* create version numbers */
@@ -1559,7 +1569,7 @@ int process_get_least_uptime(const char *name)
 					strcat2(&mydir_name, mypid);
 					strcat2(&mydir_name, "/stat");
 					/* read process stat value */
-					pstat = file_read(mydir_name, 1);
+					pstat = file_read(mydir_name, -1);
 					temp = pstat;
 					/* get starttime of process in jiffies */
 					putime = string_get_next_wordn(&temp, 21);
@@ -1631,7 +1641,7 @@ int process_get_cpu_time_all(const char *name)
 					strcat2(&mydir_name, mypid);
 					strcat2(&mydir_name, "/stat");
 					/* read process stat value */
-					pstat = file_read(mydir_name, 1);
+					pstat = file_read(mydir_name, -1);
 					/* get all utime, stime, cutime and cstime of process in seconds */
 					t = 0;
 					temp = pstat;
@@ -1712,7 +1722,7 @@ char *process_get_cmdline(int pid)
 		free2(path); free2(pid2); return 0;
 	}
 	/* load tomld parameters */
-	cmd = file_read(path, 1);
+	cmd = file_read(path, -1);
 	/* convert null chars to new lines except ending null,
 	 * because /proc/pid/cmdline gives back options separated by null char */
 	l = strlen2(&cmd);
@@ -1762,7 +1772,7 @@ void load()
 
 	/* load domain config */
 	free2(tdomf);
-	tdomf = file_read(tdomk, 1);
+	tdomf = file_read(tdomk, -1);
 	
 	/* search for my uniq id in domain policy */
 	if (string_search_keyword(tdomf, myuid) == -1){
@@ -1771,7 +1781,7 @@ void load()
 
 	/* load exception config */
 	free2(texcf);
-	texcf = file_read(texck, 1);
+	texcf = file_read(texck, -1);
 	
 	/* alloc memory for new policy */
 	tdomf_new = memget2(max_char);
@@ -1959,7 +1969,7 @@ void reload()
 	myappend = memget2(max_char);
 
 	/* load old policy from kernel */
-	texcf_old = file_read(texck, 1);
+	texcf_old = file_read(texck, -1);
 	
 	/* load exception policy to kernel too */
 	while(1){
@@ -1976,7 +1986,7 @@ void reload()
 
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
-		texcf_old2 = file_read(texck, 1);
+		texcf_old2 = file_read(texck, -1);
 		if (!strcmp(texcf_old, texcf_old2)){
 			free2(texcf_old2);
 			/* write changes to kernel */
@@ -1993,7 +2003,7 @@ void reload()
 	free2(texcf_old);
 	
 	/* load old policy from kernel */
-	tdomf_old = file_read(tdomk, 1);
+	tdomf_old = file_read(tdomk, -1);
 	
 	/* load domain policy to the kernel */
 	while(1){	
@@ -2139,7 +2149,7 @@ void reload()
 
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started creating the new one */
-		tdomf_old2 = file_read(tdomk, 1);
+		tdomf_old2 = file_read(tdomk, -1);
 		if (!strcmp(tdomf_old, tdomf_old2)){
 			free2(tdomf_old2);
 			/* write changes to kernel */
@@ -2374,7 +2384,7 @@ void create_prof()
 
 	/* load manager.conf from kernel and check if it's the same what i have */
 	/* if identical, then no reload is needed */
-	tmanf_old = file_read(tmank, 1);
+	tmanf_old = file_read(tmank, -1);
 	strcpy2(&tmanf2, tmanf);
 
 	/* add my executable too to the binary list in manager.conf */
@@ -2406,7 +2416,7 @@ void create_prof()
 	
 	/* load profile.conf from kernel and check if it's the same what i have */
 	/* if identical, then no reload is needed */
-	tprof_old = file_read(tprok, 1);
+	tprof_old = file_read(tprok, -1);
 
 	/* sort lines before compare */
 	res = string_sort_uniq_lines(tprof_old);
@@ -2553,7 +2563,7 @@ void check_tomoyo()
 
 	/* check availability of tomoyo system compiled into the kernel above 2.6.36 */
 	if (kernel_version() >= 263600){
-		cmd = file_read("/proc/kallsyms", 1);
+		cmd = file_read("/proc/kallsyms", -1);
 		if (string_search_keyword(cmd, "tomoyo_supervisor") == -1){
 			free2(cmd);
 			error("error: current kernel is not compiled with tomoyo support\n");
@@ -2563,7 +2573,7 @@ void check_tomoyo()
 	}
 
 	/* check kernel command line */
-	cmd = file_read("/proc/cmdline", 1);
+	cmd = file_read("/proc/cmdline", -1);
 	if (string_search_keyword(cmd, " security=tomoyo") == -1){
 		free2(cmd);
 		error("error: tomoyo kernel mode is not activated\n");
@@ -2572,7 +2582,7 @@ void check_tomoyo()
 	free2(cmd);
 
 	/* check mount state of securityfs */
-	cmd = file_read("/proc/mounts", 1);
+	cmd = file_read("/proc/mounts", -1);
 	if (string_search_keyword(cmd, "none /sys/kernel/security securityfs") == -1){
 		int flag_mount = 0;
 		/* mount tomoyo securityfs if not mounted */
@@ -2620,7 +2630,7 @@ void domain_delete_all()
 
 	while(1){
 		/* load old policy from kernel memory */
-		tdomf_old = file_read(tdomk, 1);
+		tdomf_old = file_read(tdomk, -1);
 		
 		/* zero my config */
 		strnull2(&myappend);
@@ -2664,7 +2674,7 @@ void domain_delete_all()
 
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started changing it */
-		tdomf_old2 = file_read(tdomk, 1);
+		tdomf_old2 = file_read(tdomk, -1);
 		if (!strcmp(tdomf_old, tdomf_old2)){
 			free2(tdomf_old2);
 			/* write changes to kernel */
@@ -2694,7 +2704,7 @@ void domain_delete(const char *name)
 
 	while(1){
 		/* load old policy from kernel memory */
-		tdomf_old = file_read(tdomk, 1);
+		tdomf_old = file_read(tdomk, -1);
 		
 		/* zero my config */
 		strnull2(&myappend);
@@ -2741,7 +2751,7 @@ void domain_delete(const char *name)
 
 		/* safety code: load old policy again to check if it hasn't changed
 		 * since i started changing it */
-		tdomf_old2 = file_read(tdomk, 1);
+		tdomf_old2 = file_read(tdomk, -1);
 		if (!strcmp(tdomf_old, tdomf_old2)){
 			free2(tdomf_old2);
 			/* write changes to kernel */
@@ -3500,7 +3510,17 @@ void domain_get_log()
 				}
 			}
 			else{
-				printf("  add rules? (n)\n");
+				/* check if there was a user requested for temporary learning mode,
+				 * and if so, then allow rules from deny logs */
+				if (flag_learn){
+					/* add rules to new rules */
+					strcat2(&prog_rules_new, res);
+					strcat2(&prog_rules_new, "\n");
+					color("  add rules? (y)\n", clr);
+				}
+				else{
+					color("  add rules? (n)\n", clr);
+				}
 			}
 
 			free2(prog);
@@ -3509,6 +3529,9 @@ void domain_get_log()
 		}
 		free2(prog_rules);
 		prog_rules = prog_rules_new;
+		
+		/* clear temporary learning mode flag */
+		flag_learn = 0;
 		
 		/* are there any new rules after confirmation? */
 		if (strlen2(&prog_rules)){
@@ -3526,7 +3549,7 @@ void domain_get_log()
 				/* get subdomian name */
 				res2 = domain_get_name_sub(res);
 				if (res2){
-					int flag_prof = 0;
+					int flag_once = 0;
 					temp2 = prog_rules;
 					strnull2(&rules_new);
 
@@ -3543,10 +3566,10 @@ void domain_get_log()
 							strcat2(&rules_new, rule);
 							strcat2(&rules_new, "\n");
 							/* switch domain to learning mode */
-							if (!flag_prof){
+							if (!flag_once){
 								domain_set_profile(res, 1);
 								/* do it only once per domain for speed */
-								flag_prof = 1;
+								flag_once = 1;
 							}
 						}
 
@@ -5493,9 +5516,54 @@ int check_policy_change(){
 }
 
 
+/* check signal of user request for temporary learning mode for domains with deny logs
+ * this is to take max 1 hour or until only the next deny logs, whichever happens first */
+void check_learn()
+{
+	static int t = 0;
+
+	/* only in automatic mode */
+	if (!opt_manual){
+		/* check global var for temporary learning mode request */
+		if (!flag_learn){
+			if (file_exist(tlearn)){
+				/* read 1 char from signal file */
+				char *f = file_read(tlearn, 3);
+				/* check if length is not null */
+				if (strlen2(&f)){
+					/* set flag for temporary learning mode */
+					flag_learn = 1;
+					/* set starting time */
+					t = mytime();
+					color("* user request for temporary learning mode (max 1 hour)\n", red);
+					/* clear flag file */
+					file_write(tlearn, 0);
+				}
+				free2(f);
+			}
+		}
+		else{
+			/* check if 1 hour passed yet */
+			if ((mytime() - t) >= time_maxlearn){
+				/* clear flag */
+				flag_learn = 0;
+				color("* time ended for temporary learning mode\n", red);
+			}
+		}
+	}
+	else{
+		/* clear flag in manual mode */
+		file_write(tlearn, 0);
+	}
+}
+
+
 /* manage policy and rules */
 void check()
 {
+	/* check signal of user request for learning mode */
+	check_learn();
+	
 	/* load config files */
 	sand_clock(0);
 	load();
@@ -5674,7 +5742,7 @@ void check_processes()
 			char *res, *res2, *res3, *temp, *temp2;
 			if (!netf[i]) break;
 			/* read file */
-			res = file_read(netf[i++], 1);
+			res = file_read(netf[i++], -1);
 			temp = res;
 			/* skip one line */
 			res2 = string_get_next_line(&temp);
@@ -5824,6 +5892,8 @@ void statistics()
 /* save configs and finish program */
 void finish()
 {
+	char *d;
+
 	newl();
 
 	if (flag_safe){
@@ -5840,6 +5910,10 @@ void finish()
 	
 	/* print statistics */
 	statistics();
+
+	/* print end time */
+	d = mytime_get_date();
+	color("ended at ", clr); color(d, clr); newl(); free2(d);
 
 	/* exit and free all my pointers */
 	myexit(0);
@@ -5867,6 +5941,7 @@ void myinit()
 int main(int argc, char **argv){
 
 	float t, t2;
+	char *d;
 
 	/* some initializations */
 	myinit();
@@ -5888,12 +5963,13 @@ int main(int argc, char **argv){
 	/* ----- INIT ----- */
 	/* ---------------- */
 
+	/* print start time */
+	d = mytime_get_date();
+	color("started at ", clr); color(d, clr); newl(); free2(d);
+
 	/* print version info */
 	color("tomld (tomoyo learning daemon) ", clr); color(ver, clr); newl();
 	
-	/* store kernel version */
-	flag_kernel_version = kernel_version();
-
 	/* create profile.conf and manager.conf files */
 	create_prof();
 
@@ -5931,8 +6007,7 @@ int main(int argc, char **argv){
 		myexit(0);
 	}
 
-	/* on --reset option, create backup of config files with tomoyo-savepolicy */
-	/* (tomoyo-savepolicy always creates backup files using timestamp) */
+	/* on --reset option, create backup of config files */
 	if (opt_reset){
 		color("* resetting domain configurations on demand\n", red);
 		if (!choice("are you sure?")) myexit(0);
