@@ -760,7 +760,7 @@ char *string_get_diff(char *new, char *old)
 
 /* search for a keyword from the beginning of a string */
 /* returns true if success */
-int string_search_keyword_first(const char *text, const char *key)
+int string_search_keyword_first(char *text, char *key)
 {
 	char c1, c2;
 	int i = 0;
@@ -774,6 +774,31 @@ int string_search_keyword_first(const char *text, const char *key)
 		if (!c1 || c1 != c2) return 0;
 		i++;
 	}
+}
+
+
+/* search for a keyword from the beginning of the lines in a string */
+/* return char position if success or -1 on fail */
+int string_search_keyword_first_all(char **text, char *key)
+{
+	char *res, *temp, *orig;
+	
+	if (!(*text)) return 0;
+
+	temp = *text;
+	while(1){
+		orig = temp;
+		/* get next line */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		if (string_search_keyword_first(res, key)){
+			free2(res);
+			return (orig - (*text));
+		}
+		free2(res);
+	}
+
+	return -1;
 }
 
 
@@ -899,6 +924,31 @@ char *string_remove_line(char *text, const char *line)
 
 	/* return result */
 	return text_new;
+}
+
+
+/* remove a whole line from a string from a position and return the result */
+/* returned value must be freed by caller */
+char *string_remove_line_from_pos(char *text, unsigned int pos)
+{
+	char *new = 0, *temp;
+
+	if (!text) return 0;
+
+	/* copy original text to new */	
+	strcpy2(&new, text);
+	/* pos is within text? if not, then return whole text */
+	if (pos > strlen(new)) return new;
+
+	/* mark an end at pos */
+	new[pos] = 0;
+	strlenset3(&new, pos);
+	
+	/* move end to pos */
+	temp = text + pos;
+	if (string_jump_next_line(&temp)) strcat2(&new, temp);
+
+	return new;
 }
 
 
