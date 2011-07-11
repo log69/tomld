@@ -99,7 +99,9 @@ char *string_get_last_word(char **text);
 
 char *string_get_diff(char *new, char *old);
 
-int string_search_keyword_first(const char *text, const char *key);
+int string_search_keyword_first(char *text, char *key);
+
+int string_search_keyword_first_all(char **text, char *key);
 
 int string_search_keyword_last(const char *text, const char *key);
 
@@ -108,6 +110,8 @@ int string_search_keyword(const char *text, const char *key);
 int string_search_line(const char *text, const char *line);
 
 char *string_remove_line(char *text, const char *line);
+
+char *string_remove_line_from_pos(char *text, unsigned int pos);
 
 int string_cmp(const void *a, const void *b);
 
