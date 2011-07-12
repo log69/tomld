@@ -3438,6 +3438,7 @@ void domain_check_enforcing(char *domain)
 						d_rules = d_rules * const_domain_complexity_factor;
 						if (d_rules < const_domain_complexity_factor) d_rules = const_domain_complexity_factor;
 						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
+color(name, blue); printf(", changed %d sec ago, %s%d%%%s complete\n", d_change, red, (d_cputime + p_cputime) / d_rules, clr);
 //printf("name = %s, d_change = %d, d_rules = %d, d_cputime = %d, p_cputime = %d, all_cputime = %d\n", name, d_change, d_rules, d_cputime, p_cputime, d_cputime + p_cputime);
 					}
 					if (flag_enforcing){
@@ -5877,7 +5878,7 @@ void check_learn()
 		if (!flag_learn){
 			if (file_exist(tlearn)){
 				/* read 1 char from signal file */
-				char *f = file_read(tlearn, 3);
+				char *f = file_read(tlearn, 1);
 				/* check if length is not null */
 				if (strlen2(&f)){
 					/* set flag for temporary learning mode */
