@@ -249,19 +249,21 @@ char *myuid_cputime = 0;
 char *home = "/home";
 
 /* interval of policy check to run in seconds */
-float time_check = 10;
+float const_time_check = 10;
 /* interval of saving configs to disk in seconds */
-float time_save = 300;
+float const_time_save = 300;
 /* interval of maximum time in seconds to wait in temporary learning mode for domains with deny logs
  * (1 hour) */
-float time_max_learn = 60 * 60;
+float const_time_max_learn = 60 * 60;
 /* interval of maximum time in seconds that needs to pass since last domain change for tomld
  * to automatically turn domain into enforcing mode, otherwise it calculates it to make a decision
  * (1 week) */
-int time_max_change = 60 * 60 * 24 * 7;
+int const_time_max_change = 60 * 60 * 24 * 7;
+/* constant for minimum cputime needed with timeout to turn domain into enforcing mode */
+int const_min_cputime = 100;
 /* constant for measuring the complexity of a domain
  * i multiply the number of rules of the domain by this and compare it to its process' cpu time */
-int domain_complexity_factor = 100;
+int const_domain_complexity_factor = 100;
 
 
 /* path to my executable */
@@ -1778,7 +1780,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 							strcat2(&domain_cputime_list_minus, "\n");
 						}
 					}
-printf("MINUS\n"); debug(domain_cputime_list_minus);
+//printf("MINUS\n"); debug(domain_cputime_list_minus);
 
 					free2(ptime);
 
@@ -1814,7 +1816,7 @@ printf("MINUS\n"); debug(domain_cputime_list_minus);
 							strcat2(&domain_cputime_list_plus, list_entry);
 							strcat2(&domain_cputime_list_plus, "\n");
 						}
-printf("PLUS\n"); debug(domain_cputime_list_plus);
+//printf("PLUS\n"); debug(domain_cputime_list_plus);
 						
 						free2(ptime);
 					}
@@ -3424,17 +3426,17 @@ void domain_check_enforcing(char *domain)
 
 					/* have the processes' cpu time reached a value compared to the complexity
 					 * of the domain? (i measure it by the number of its rules)
-					 * or is the domain's last change time greater than time_max_change?
+					 * or is the domain's last change time greater than const_time_max_change?
 					 * if so, then i turn the domain into enforcing mode */
 					flag_enforcing = 0;
-					if (d_change > time_max_change) flag_enforcing = 1;
+					if (d_change > const_time_max_change && d_cputime + p_cputime > const_min_cputime) flag_enforcing = 1;
 					if (!flag_enforcing){
 						/* count complexity of domain by
 						 * counting rules, and then multiplying it
 						 * with a minimum limit */
 						d_rules = string_count_lines(domain);
-						d_rules = d_rules * domain_complexity_factor;
-						if (d_rules < domain_complexity_factor) d_rules = domain_complexity_factor;
+						d_rules = d_rules * const_domain_complexity_factor;
+						if (d_rules < const_domain_complexity_factor) d_rules = const_domain_complexity_factor;
 						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
 printf("name = %s, d_change = %d, d_rules = %d, d_cputime = %d, p_cputime = %d, all_cputime = %d\n", name, d_change, d_rules, d_cputime, p_cputime, d_cputime + p_cputime);
 					}
@@ -5891,7 +5893,7 @@ void check_learn()
 		}
 		else{
 			/* check if 1 hour passed yet */
-			if ((mytime() - t) >= time_max_learn){
+			if ((mytime() - t) >= const_time_max_learn){
 				/* clear flag */
 				flag_learn = 0;
 				color("* time ended for temporary learning mode\n", red);
@@ -6379,7 +6381,7 @@ int main(int argc, char **argv){
 	check_exceptions();
 
 	/* store negatív reference time for check() function to make check() run at least once */	
-	t  = -time_check;
+	t  = -const_time_check;
 	t2 = 0;
 
 	while(1){
@@ -6388,7 +6390,7 @@ int main(int argc, char **argv){
 		check_processes();
 
 		/* run policy check from time to time */
-		if ((mytime() - t) >= time_check){
+		if ((mytime() - t) >= const_time_check){
 			flag_safe = 0;
 
 			/* store time for speed comparision */			
@@ -6435,7 +6437,7 @@ int main(int argc, char **argv){
 		if (key_get() == 'q') break;
 
 		/* save configs to disk from time to time */
-		if ((mytime() - t2) >= time_save){
+		if ((mytime() - t2) >= const_time_save){
 			/* save configs */
 			save();
 			save_logmark();
