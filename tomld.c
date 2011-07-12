@@ -1670,7 +1670,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 	char *mypid2 = 0, *name2 = 0;
 	char *pstat, *ptime, *res2, *res3, *temp, *temp2;
 	int t, t2;
-	int i;
+	int i, i2;
 	/* my uptime value to compare to and find the least one */
 	int mycputime = 0;
 
@@ -1827,32 +1827,72 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 		}
 	}
 
-	/* collect cpu times for summary of domain */
-	t = 0;
-	temp = domain_cputime_list_plus;
-	while(1){
-		/* get next entry */
-		res2 = string_get_next_line(&temp);
-		if (!res2) break;
-		temp2 = res2;
-		/* get second column (name) */
-		res3 = string_get_next_wordn(&temp2, 1);
-		if (res3){
-			/* is entry for the domain (second column matches name)? */
-			if (!strcmp(res3, name)){
-				/* get third column (cpu time) */
-				ptime = string_get_next_word(&temp2);
-				/* convert it and add it */
-				t += atoi(ptime);
-				free2(ptime);
-			}
-			free2(res3);
-		}
-		free2(res2);
-	}
 	
-	/* sum of times */
-	mycputime = t;
+	if (flag_clear){
+
+		/* reset cpu time in uid of domain too */
+		char *dname = 0;
+
+		/* create full domain name to search for */
+		strcpy2(&dname, "<kernel> ");
+		strcat2(&dname, name);
+		i = string_search_line(tdomf, dname);
+		free2(dname);
+		if (i > -1){
+			/* if match, then search for my uid of cpu time */
+			temp = tdomf + i;
+			i2 = string_search_keyword_first_all(&temp, myuid_cputime);
+			if (i2 > -1){
+				/* if match, then jump to end of line, and rewrite number with null and spaces */
+				temp = tdomf + i + i2;
+				if (string_jump_next_line(&temp)){
+					/* step back 2 chars to last char of former line containing my cpu time uid */
+					temp -= 2;
+					/* write spaces to number places */
+					while(1){
+						char c = *temp;
+						if (c < '0' || c > '9'){
+							temp++;
+							*temp = '0';
+							break;
+						}
+						*temp = ' ';
+						temp--;
+					}
+				}
+			}
+		}
+
+	}
+	else{
+
+		/* collect cpu times for summary of domain */
+		t = 0;
+		temp = domain_cputime_list_plus;
+		while(1){
+			/* get next entry */
+			res2 = string_get_next_line(&temp);
+			if (!res2) break;
+			temp2 = res2;
+			/* get second column (name) */
+			res3 = string_get_next_wordn(&temp2, 1);
+			if (res3){
+				/* is entry for the domain (second column matches name)? */
+				if (!strcmp(res3, name)){
+					/* get third column (cpu time) */
+					ptime = string_get_next_word(&temp2);
+					/* convert it and add it */
+					t += atoi(ptime);
+					free2(ptime);
+				}
+				free2(res3);
+			}
+			free2(res2);
+		}
+		
+		/* sum of times */
+		mycputime = t;
+	}
 
 
 	closedir(mydir);
@@ -3438,8 +3478,8 @@ void domain_check_enforcing(char *domain)
 						d_rules = d_rules * const_domain_complexity_factor;
 						if (d_rules < const_domain_complexity_factor) d_rules = const_domain_complexity_factor;
 						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
-color(name, blue); printf(", changed %d sec ago, %s%d%%%s complete\n", d_change, red, (d_cputime + p_cputime) / d_rules, clr);
-//printf("name = %s, d_change = %d, d_rules = %d, d_cputime = %d, p_cputime = %d, all_cputime = %d\n", name, d_change, d_rules, d_cputime, p_cputime, d_cputime + p_cputime);
+//color(name, blue); printf(", changed %d sec ago, %s%d%%%s complete\n", d_change, red, (d_cputime + p_cputime) / d_rules, clr);
+printf("name = %s, d_change = %d, d_rules = %d, d_cputime = %d, p_cputime = %d, all_cputime = %d\n", name, d_change, d_rules, d_cputime, p_cputime, d_cputime + p_cputime);
 					}
 					if (flag_enforcing){
 
