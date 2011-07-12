@@ -3438,7 +3438,7 @@ void domain_check_enforcing(char *domain)
 						d_rules = d_rules * const_domain_complexity_factor;
 						if (d_rules < const_domain_complexity_factor) d_rules = const_domain_complexity_factor;
 						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
-printf("name = %s, d_change = %d, d_rules = %d, d_cputime = %d, p_cputime = %d, all_cputime = %d\n", name, d_change, d_rules, d_cputime, p_cputime, d_cputime + p_cputime);
+//printf("name = %s, d_change = %d, d_rules = %d, d_cputime = %d, p_cputime = %d, all_cputime = %d\n", name, d_change, d_rules, d_cputime, p_cputime, d_cputime + p_cputime);
 					}
 					if (flag_enforcing){
 
