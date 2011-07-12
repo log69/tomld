@@ -783,7 +783,7 @@ int string_search_keyword_first_all(char **text, char *key)
 {
 	char *res, *temp, *orig;
 	
-	if (!(*text)) return 0;
+	if (!(*text)) return -1;
 
 	temp = *text;
 	while(1){
