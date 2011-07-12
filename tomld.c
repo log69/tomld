@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-11/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
+12/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
                          - fix some mem leaks
@@ -243,6 +243,7 @@ char *ver = "0.36";
 char *myuid = "allow_read /tomld/ed9f8563e922172c855961ff2024a4f7";
 char *myuid_create = 0;
 char *myuid_change = 0;
+char *myuid_cputime = 0;
 
 /* home dir */
 char *home = "/home";
@@ -419,10 +420,15 @@ char *clr		= "\033[0m";
 /* run time */
 float t_start;
 
-/* contains domain names with their cpu times next to them for the case
+/* contains domain names with their cpu times and pids (pid process_binary time) for the case
  * when a domain enters learning mode from enforcing mode for user request
- * and i need to calculate process cpu time compared to this moment */
-char *domain_cputime_list = 0;
+ * and i need to calculate process cpu time compared to the moment when tomld started,
+ * so i everytime substract all running processes' cputimes in this list from the summary later */
+char *domain_cputime_list_minus = 0;
+/* contains domain names with their cpu times and pids (pid process_binary time)
+ * so i can count the formerly terminated processes' cpu times too,
+ * this is a runtime list and i save it to domain policy only from time to time */
+char *domain_cputime_list_plus  = 0;
 
 /* arrays */
 char *tprogs = 0;
@@ -590,6 +596,7 @@ void myfree()
 	free2(spec1);
 	free2(myuid_create);
 	free2(myuid_change);
+	free2(myuid_cputime);
 }
 
 
@@ -1186,12 +1193,12 @@ char *domain_get_next(char **text)
 
 /* return a new string containing the name of the main domain from the domain policy */
 /* returned value must be freed by caller */
-char *domain_get_name(char *text)
+char *domain_get_name(char *domain)
 {
 	char *res, *res2, *temp, *temp2;
 	
 	/* get first line containing the name of the domain */
-	temp = text;
+	temp = domain;
 	res = string_get_next_line(&temp);
 	if (!res) return 0;
 	/* get second word for domain name */
@@ -1204,12 +1211,12 @@ char *domain_get_name(char *text)
 
 /* return a new string containing the name of the subdomain from the domain policy */
 /* returned value must be freed by caller */
-char *domain_get_name_sub(char *text)
+char *domain_get_name_sub(char *domain)
 {
 	char *res, *res2, *temp, *temp2;
 	
 	/* get first line containing the name of the domain */
-	temp = text;
+	temp = domain;
 	res = string_get_next_line(&temp);
 	if (!res) return 0;
 	/* get last word for main or subdomain name */
@@ -1649,6 +1656,7 @@ int process_get_least_uptime(const char *name)
 
 
 /* return an integer containing the sum of cpu time of all of the same running processes in clock ticks
+ * it doesn't add the cpu times of the running processes at the start time of tomld
  * the flag_clear option decides, whether i reset all processes' cpu time values of the same name,
  * or just read it out */
 /* return null if no process is running like that */
@@ -1658,6 +1666,8 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 	struct dirent *mydir_entry;
 	char *mydir_name = 0, *mypid = 0, *list_entry = 0;
 	char *mypid2 = 0, *name2 = 0;
+	char *pstat, *ptime, *res2, *res3, *temp, *temp2;
+	int t, t2;
 	int i;
 	/* my uptime value to compare to and find the least one */
 	int mycputime = 0;
@@ -1684,8 +1694,6 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 			if (res){
 				/* compare the link to the process name */
 				if (!strcmp(res, name)) {
-					char *pstat, *ptime, *res2, *temp;
-					int t, t2;
 					
 					/* create dirname like /proc/pid/stat */
 					strcpy2(&mydir_name, "/proc/");
@@ -1712,6 +1720,13 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					t += atoi(ptime);
 					free2(ptime);
 					
+
+					/* *************************************************
+					 * manage domain cpu time list minus / plus entries
+					 * this list grows with time as new processes appear with new pids,
+					 * but this should stay at a low level
+					 * *************************************************/
+					 
 					/* convert cputime integer to string */
 					ptime = string_itos(t);
 					/* create list entries for compare */
@@ -1726,24 +1741,20 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					strcat2(&name2, name);
 					strcat2(&name2, " ");
 
-
-					/* manage domain cpu time list entry
-					 * this list grows with time as new processes appear with new pids,
-					 * but this should stay at a low level */
-					 
-					/* domain cpu time list entry exists? */
-					i = string_search_keyword_first_all(&domain_cputime_list, name2);
+					/* domain cpu time list minus entry exists? */
+					i = string_search_keyword_first_all(&domain_cputime_list_minus, name2);
 					if (i > -1){
 						if (flag_clear){
 							/* update it by removing old entry and adding new one */
-							res2 = string_remove_line_from_pos(domain_cputime_list, i);
-							domain_cputime_list = res2; free2(res2);
-							strcat2(&domain_cputime_list, list_entry);
-							strcat2(&domain_cputime_list, "\n");
+							res2 = string_remove_line_from_pos(domain_cputime_list_minus, i);
+							free2(domain_cputime_list_minus);
+							domain_cputime_list_minus = res2;
+							strcat2(&domain_cputime_list_minus, list_entry);
+							strcat2(&domain_cputime_list_minus, "\n");
 						}
 						else{
 							/* read out cpu time value */
-							temp = domain_cputime_list + i;
+							temp = domain_cputime_list_minus + i;
 							res2 = string_get_next_wordn(&temp, 2);
 							/* convert value */
 							t2 = atoi(res2);
@@ -1754,31 +1765,95 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					}
 					else{
 						/* if whole entry doesn't exist, then check if same pid exists */
-						i = string_search_keyword_first_all(&domain_cputime_list, mypid2);
+						i = string_search_keyword_first_all(&domain_cputime_list_minus, mypid2);
 						if (i > -1){
 							/* if wrong pid exists, then remove it */
-							res2 = string_remove_line_from_pos(domain_cputime_list, i);
-							domain_cputime_list = res2; free2(res2);
+							res2 = string_remove_line_from_pos(domain_cputime_list_minus, i);
+							free2(domain_cputime_list_minus);
+							domain_cputime_list_minus = res2;
 						}
 						/* if clear flag is set, then add entry */
 						if (flag_clear){
-							strcat2(&domain_cputime_list, list_entry);
-							strcat2(&domain_cputime_list, "\n");
+							strcat2(&domain_cputime_list_minus, list_entry);
+							strcat2(&domain_cputime_list_minus, "\n");
 						}
 					}
-					
+printf("MINUS\n"); debug(domain_cputime_list_minus);
+
 					free2(ptime);
-					
-					/* add the sum of times */
-					mycputime += t;
+
+
+					if (!flag_clear){
+
+						/* convert cputime integer to string */
+						ptime = string_itos(t);
+						/* create list entries for compare */
+						strcpy2(&list_entry, mypid);
+						strcat2(&list_entry, " ");
+						strcat2(&list_entry, name);
+						strcat2(&list_entry, " ");
+						strcat2(&list_entry, ptime);
+						strcpy2(&mypid2, mypid);
+						strcat2(&mypid2, " ");
+						strcpy2(&name2, mypid2);
+						strcat2(&name2, name);
+						strcat2(&name2, " ");
+
+						/* domain cpu time list plus entry exists? */
+						i = string_search_keyword_first_all(&domain_cputime_list_plus, name2);
+						if (i > -1){
+							/* update it by removing old entry and adding new one */
+							res2 = string_remove_line_from_pos(domain_cputime_list_plus, i);
+							free2(domain_cputime_list_plus);
+							domain_cputime_list_plus = res2;
+							strcat2(&domain_cputime_list_plus, list_entry);
+							strcat2(&domain_cputime_list_plus, "\n");
+						}
+						else{
+							/* add entry */
+							strcat2(&domain_cputime_list_plus, list_entry);
+							strcat2(&domain_cputime_list_plus, "\n");
+						}
+printf("PLUS\n"); debug(domain_cputime_list_plus);
+						
+						free2(ptime);
+					}
 					free2(pstat);
 				}
 				free2(res);
 			}
 		}
 	}
-	closedir(mydir);
 
+	/* collect cpu times for summary of domain */
+	t = 0;
+	temp = domain_cputime_list_plus;
+	while(1){
+		/* get next entry */
+		res2 = string_get_next_line(&temp);
+		if (!res2) break;
+		temp2 = res2;
+		/* get second column (name) */
+		res3 = string_get_next_wordn(&temp2, 1);
+		if (res3){
+			/* is entry for the domain (second column matches name)? */
+			if (!strcmp(res3, name)){
+				/* get third column (cpu time) */
+				ptime = string_get_next_word(&temp2);
+				/* convert it and add it */
+				t += atoi(ptime);
+				free2(ptime);
+			}
+			free2(res3);
+		}
+		free2(res2);
+	}
+	
+	/* sum of times */
+	mycputime = t;
+
+
+	closedir(mydir);
 	free2(mydir_name);
 	free2(mypid);
 	free2(list_entry);
@@ -3188,6 +3263,7 @@ void domain_set_learn_all()
 		res2 = domain_get_name(orig);
 		process_get_cpu_time_all(res2, 1);
 		free2(res2);
+
 		free2(res);
 	}
 	
@@ -3282,7 +3358,7 @@ void domain_set_enforce_old()
 void domain_check_enforcing(char *domain)
 {
 	char *name, *res, *res2, *temp;
-	int i, d_create, d_change, d_rules, p_uptime, p_cputime;
+	int i, d_create, d_change, d_rules, d_cputime, p_uptime, p_cputime;
 	int flag_enforcing;
 	
 	/* get main domain name */
@@ -3314,6 +3390,20 @@ void domain_check_enforcing(char *domain)
 
 				/* get the sum of cpu times of the domain's all processes */
 				p_cputime = process_get_cpu_time_all(name, 0);
+				/* get the formerly stored cpu time of domain */
+				d_cputime = 0;
+				i = string_search_keyword(domain, myuid_cputime);
+				if (i > -1){
+					temp = domain + i;
+					/* get my uniq id with the cpu time in it */
+					res = string_get_next_line(&temp);
+					/* get time string from my uid */
+					res2 = string_get_number_last(res);
+					/* convert time string to integer */
+					d_cputime = atoi(res2);
+					free2(res2); free2(res);
+				}
+
 				/* get last change time of domain */
 				i = string_search_keyword(domain, myuid_change);
 				if (i > -1){
@@ -3345,8 +3435,8 @@ void domain_check_enforcing(char *domain)
 						d_rules = string_count_lines(domain);
 						d_rules = d_rules * domain_complexity_factor;
 						if (d_rules < domain_complexity_factor) d_rules = domain_complexity_factor;
-						if (d_rules < p_cputime) flag_enforcing = 1;
-debug(domain_cputime_list); printf("name = %s, d_change = %d, d_rules = %d, p_cputime = %d\n", name, d_change, d_rules, p_cputime);
+						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
+printf("name = %s, d_change = %d, d_rules = %d, d_cputime = %d, p_cputime = %d, all_cputime = %d\n", name, d_change, d_rules, d_cputime, p_cputime, d_cputime + p_cputime);
 					}
 					if (flag_enforcing){
 
@@ -3705,7 +3795,8 @@ void domain_get_log()
 							/* switch domain to learning mode */
 							if (!flag_once){
 								domain_set_profile(res, 1);
-								/* reset cpu time counter for prog because of learning mode */
+								/* reset cpu time counter for prog because of learning mode,
+								 * or else it would switch back to enforcing mode immediately */
 								process_get_cpu_time_all(prog, 1);
 								/* do it only once per domain for speed */
 								flag_once = 1;
@@ -3880,9 +3971,9 @@ void domain_print_mode()
 			strcat2(&tdomf, myuid_change);
 			strcat2(&tdomf, t);
 			strcat2(&tdomf, "\n");
+			strcat2(&tdomf, myuid_cputime);
+			strcat2(&tdomf, "0\n");
 			free2(t);
-			/* reset cpu time counter for prog because of learning mode */
-			process_get_cpu_time_all(prog, 1);
 			/* store prog name to know not to turn on enforcing mode for these ones on exit */
 			if(string_search_line(tprogs_learn, prog) == -1){
 				strcat2(&tprogs_learn, prog);
@@ -3943,7 +4034,12 @@ void domain_print_mode()
 
 		}
 		
-		if (flag_firstrun) newl();
+		if (flag_firstrun){
+			newl();
+
+			/* reset cpu time counter for all progs for first run only */
+			process_get_cpu_time_all(prog, 1);
+		}
 		
 		free2(prog);
 	}
@@ -5505,6 +5601,7 @@ void domain_reshape_rules()
 
 
 /* update the change time entries in the domains whose rules or profile changed since last time
+ * except my uid entries
  * i reset last changed time even if it is because of another domain's change,
  * because after turning the domain into enforcing mode,
  * the rules cannot be changed anymore (except by user request for temporary learning mode) */
@@ -5513,6 +5610,8 @@ void domain_update_change_time()
 	char *d1, *d2, *name1, *name2, *res, *temp, *temp2, *temp3;
 	char *tdomf_new;
 	int flag_match, flag_change;
+/*	char *res1, *res2, *ŧemp1;
+	int i1, i2;*/
 	
 	/* backup policy exists yet? if not, then copy policy */
 	if (!tdomf_bak2){
@@ -5524,6 +5623,7 @@ void domain_update_change_time()
 		/* policy files match? if not, then store it */
 		if (!strcmp(tdomf_bak2, tdomf)) return;
 	}
+
 	
 	/* if backup policy exists but it doesn't match to current policy,
 	 * then update change times in current one and copy it to backup */
@@ -5636,6 +5736,110 @@ void domain_update_change_time()
 
 	/* copy new policy to backup */
 	strcpy2(&tdomf_bak2, tdomf);
+}
+
+
+/* update the cpu time entries of all domains
+ * this must be one of the last operation to run (it's in finish()),
+ * because here i add together the summary of all cpu time values */
+void domain_update_cpu_time_all()
+{
+	char *name, *rule = 0, *ptime;
+	char *res, *res2, *res3;
+	char *temp, *temp2, *temp3;
+	char *tdomf_new;
+	int flag_ok, t;
+	
+	tdomf_new = memget2(max_char);
+	
+	/* update cpu times in all domains */
+	temp = tdomf;
+	while(1){
+		/* get next domain */
+		res = domain_get_next(&temp);
+		if (!res) break;
+		
+		/* get domain name */
+		name = domain_get_name(res);
+		if (name){
+			/* collect entry for domain from domain cpu time list plus */
+			flag_ok = 0;
+			t = 0;
+			temp2 = domain_cputime_list_plus;
+			while(1){
+				/* get next entry */
+				res2 = string_get_next_line(&temp2);
+				if (!res2) break;
+				temp3 = res2;
+				/* get second column (name) */
+				res3 = string_get_next_wordn(&temp3, 1);
+				if (res3){
+					/* is entry for the domain (second column matches name)? */
+					if (!strcmp(res3, name)){
+						flag_ok = 1;
+						/* get third column (cpu time) */
+						ptime = string_get_next_word(&temp3);
+						/* convert it and add it */
+						t += atoi(ptime);
+						free2(ptime);
+					}
+					free2(res3);
+				}
+				free2(res2);
+			}
+			
+			/* if match, then update my uid cpu time rule in domain 1 by 1 */
+			if (flag_ok){
+
+				/* cycle through rules */
+				temp2 = res;
+				while(1){
+					/* get next rule */
+					res2 = string_get_next_line(&temp2);
+					if (!res2) break;
+					
+					/* is rule my uid cpu time entry? */
+					if (string_search_keyword_first(res2, myuid_cputime)){
+						/* if so, then update it by adding together old and new value */
+						/* read old cpu time value */
+						ptime = string_get_number_last(res2);
+						/* add them */
+						t += atoi(ptime);
+						free2(ptime);
+						/* convert new cpu time value */
+						ptime = string_itos(t);
+						/* store it */
+						strcpy2(&rule, myuid_cputime);
+						strcat2(&rule, ptime);
+						/* add my new uid rule to new domain policy */
+						strcat2(&tdomf_new, rule);
+						strcat2(&tdomf_new, "\n");
+						free2(ptime);
+					}
+					else{
+						/* add rule to new domain policy */
+						strcat2(&tdomf_new, res2);
+						strcat2(&tdomf_new, "\n");
+					}
+					
+					free2(res2);
+				}
+			}
+
+			/* if there was no match, then add all domain in one step */
+			else{
+				strcat2(&tdomf_new, res);
+			}
+			
+			free2(name);
+			strcat2(&tdomf_new, "\n");
+		}
+		free2(res);
+	}
+	
+	free2(rule);
+	free2(tdomf);
+	tdomf = tdomf_new;
 }
 
 
@@ -6047,6 +6251,11 @@ void finish()
 		 * but only in manual mode */
 		if (opt_manual) domain_set_enforce_old();
 
+		/* update cpu times of all domains in domain policy */
+		/* this must be one of the last operation to run, because here
+		 * i add together the summary of all cpu time values */
+		domain_update_cpu_time_all();
+
 		/* save configs to disk */
 		save();
 		save_logmark();
@@ -6075,8 +6284,10 @@ void myinit()
 	/* create my uids */
 	strcpy2(&myuid_create, myuid);
 	strcpy2(&myuid_change, myuid);
+	strcpy2(&myuid_cputime, myuid);
 	strcat2(&myuid_create, "/create_time/");
 	strcat2(&myuid_change, "/change_time/");
+	strcat2(&myuid_cputime, "/cpu_time/");
 }
 
 
