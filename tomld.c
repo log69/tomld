@@ -6449,8 +6449,10 @@ int main(int argc, char **argv){
 	/* ---------------- */
 
 	/* print start time */
-	d = mytime_get_date();
-	color("started at ", clr); color(d, clr); newl(); free2(d);
+	if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn){
+		d = mytime_get_date();
+		color("started at ", clr); color(d, clr); newl(); free2(d);
+	}
 
 	/* print version info */
 	color("tomld (tomoyo learning daemon) ", clr); color(ver, clr); newl();
