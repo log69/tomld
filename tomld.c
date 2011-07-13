@@ -4926,7 +4926,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 /* returned value must be freed by caller */
 char *domain_sort_uniq_rules(char *rules)
 {
-	char *res, *res2, *temp, *temp2, *temp3, *old, *new, *rules_new, *rules2, *param1, *param2;
+	char *res, *res2, *temp, *temp2, *temp3, *temp4, *old, *new, *rules_new, *rules2, *param1, *param2;
 	int i1, i2, l1, l2, lo, ln;
 	int c, c1, c2, co, cn;
 
@@ -4971,9 +4971,9 @@ char *domain_sort_uniq_rules(char *rules)
 				/* compare rules containing wildcard */
 				if (compare_rules(res, res2)){
 					/* get params of rule */
-					temp3 = res2;
-					param1 = string_get_next_wordn(&temp3, 1);
-					param2 = string_get_next_word(&temp3);
+					temp4 = res2;
+					param1 = string_get_next_wordn(&temp4, 1);
+					param2 = string_get_next_word(&temp4);
 					/* get length of rule */
 					l2 = strlen2(&res2);
 					/* count wildcards in rule */
@@ -5359,7 +5359,7 @@ void domain_reshape_rules_wildcard_spec()
 		if (!res) break;
 		
 		/* is it a rule starting with "allow_" tag? */
-		if (string_search_keyword_first(res, "allow_")){
+		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ")){
 
 			/* get rule type */
 			temp2 = res;
@@ -5444,7 +5444,7 @@ void domain_reshape_rules_wildcard_spec()
 		if (!res) break;
 		
 		/* is it a rule starting with "allow_" tag? */
-		if (string_search_keyword_first(res, "allow_")){
+		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ")){
 
 			/* get rule type */
 			temp2 = res;
