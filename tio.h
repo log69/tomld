@@ -37,6 +37,8 @@ void mytime_print();
 
 char *mytime_get_date();
 
+char *mytime_get_sec_human();
+
 void mytime_print();
 
 int sys_get_uptime();
