@@ -5606,6 +5606,36 @@ void domain_reshape_rules_wildcard_spec()
 		
 		/* add line to new policy if not a rule */
 		else{
+			int i;
+			
+			/* is it a kernel header or allow_execute rule containing /proc/ ? */
+			i = string_search_keyword(res, " /proc/");
+			if (i > -1){
+				char *res2, *res3, *res4, *res5, *temp6, *temp7;
+				
+				/* if so, then wildcard subdir of proc with numeric wildcard */
+				temp6 = res + i + 1;
+				/* get line from /proc/ string */
+				res2 = string_get_next_line(&temp6);
+				temp7 = res2;
+				/* get only /proc/.. part */
+				res3 = string_get_next_word(&temp7);
+				/* get the rest of the string */
+				res4 = string_get_next_line(&temp7);
+				/* wildcard it */
+				res5 = path_wildcard_proc(res3);
+				strcat2(&res5, " ");
+				strcat2(&res5, res4);
+				/* cut original string */
+				res[i + 1] = 0;
+				strlenset3(&res, i + 1);
+				/* copy back result */
+				strcat2(&res, res5);
+				
+				free2(res2); free2(res3); free2(res4); free2(res5);
+			}
+
+			/* add it to new policy */
 			strcat2(&tdomf_new, res);
 			strcat2(&tdomf_new, "\n");
 		}
