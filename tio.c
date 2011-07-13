@@ -56,7 +56,7 @@ float mytime()
 
 /* return a string containing the full date */
 /* returned value must be freed by caller */
-char *mytime_get_date()
+void mytime_print_date()
 {
 	char *res = 0;
 	long l;
@@ -69,8 +69,9 @@ char *mytime_get_date()
 	if (l > 0) l--;
 	res[l] = 0;
 	strlenset3(&res, l);
-
-	return res;
+	
+	/* print it */
+	printf("at %s", res);
 }
 
 
