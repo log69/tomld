@@ -74,6 +74,30 @@ char *mytime_get_date()
 }
 
 
+/* return a string containing a human readable time converted from seconds */
+/* returned value must be freed by caller */
+char *mytime_get_sec_human(int sec)
+{
+	char *ptime, *t = 0;
+	int s;
+	
+	int day  = sec / 60 / 60 / 24;
+	int hour = sec / 60 / 60;
+	int min  = sec / 60;
+
+	if (day)      { s = day;  strcpy2(&t, " day");  }
+	else if (hour){ s = hour; strcpy2(&t, " hour"); }
+	else if (min) { s = min;  strcpy2(&t, " min");  }
+	else          { s = sec;  strcpy2(&t, " sec");  }
+	
+	ptime = string_itos(s);
+	strcat2(&ptime, t);
+	free2(t);
+
+	return ptime;
+}
+
+
 /* print elapsed time since last time measuring speed */
 void mytime_print()
 {
