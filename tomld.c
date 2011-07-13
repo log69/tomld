@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-12/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
+13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
                          - fix some mem leaks
@@ -431,6 +431,9 @@ char *domain_cputime_list_minus = 0;
  * so i can count the formerly terminated processes' cpu times too,
  * this is a runtime list and i save it to domain policy only from time to time */
 char *domain_cputime_list_plus  = 0;
+/* contains domain names with their cpu times,
+ * this is a runtime list that i use to print domain status, but only if it has changed */
+char *domain_cputime_list_current = 0;
 
 /* arrays */
 char *tprogs = 0;
@@ -458,6 +461,8 @@ char *spec1 = 0;
 
 
 void domain_cleanup();
+
+void domain_update_cpu_time_all();
 
 
 /* print version info */
@@ -599,6 +604,8 @@ void myfree()
 	free2(myuid_create);
 	free2(myuid_change);
 	free2(myuid_cputime);
+	free2(domain_cputime_list_minus);
+	free2(domain_cputime_list_plus);
 }
 
 
@@ -1674,6 +1681,9 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 	/* my uptime value to compare to and find the least one */
 	int mycputime = 0;
 
+
+	if (!name) return 0;
+
 	/* open /proc dir */
 	mydir = opendir("/proc/");
 	if (!mydir){ error("error: cannot open /proc/ directory\n"); return 0; }
@@ -1780,7 +1790,6 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 							strcat2(&domain_cputime_list_minus, "\n");
 						}
 					}
-//printf("MINUS\n"); debug(domain_cputime_list_minus);
 
 					free2(ptime);
 
@@ -1816,7 +1825,6 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 							strcat2(&domain_cputime_list_plus, list_entry);
 							strcat2(&domain_cputime_list_plus, "\n");
 						}
-//printf("PLUS\n"); debug(domain_cputime_list_plus);
 						
 						free2(ptime);
 					}
@@ -1898,6 +1906,8 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 	closedir(mydir);
 	free2(mydir_name);
 	free2(mypid);
+	free2(mypid2);
+	free2(name2);
 	free2(list_entry);
 
 	return mycputime;
@@ -3287,7 +3297,7 @@ void domain_remove(const char *pattern)
 /* turn back learning mode for all domains with profile 2-3 */
 void domain_set_learn_all()
 {
-	char *res, *res2, *temp, *orig;
+	char *res, *name, *name_sub, *temp, *orig;
 	
 	/* load config files */
 	load();
@@ -3302,14 +3312,26 @@ void domain_set_learn_all()
 		/* turn domain into learning mode */
 		domain_set_profile(orig, 1);
 		/* reset cpu time counter for prog because of learning mode */
-		res2 = domain_get_name(orig);
-		process_get_cpu_time_all(res2, 1);
-		free2(res2);
+		/* get domain names */
+		name     = domain_get_name(res);
+		name_sub = domain_get_name_sub(res);
+		/* is it a main domain? */
+		if (name && name_sub){
+			if (!strcmp(name, name_sub)){
+				process_get_cpu_time_all(name, 1);
+			}
+			free2(name);
+			free2(name_sub);
+		}
 
 		free2(res);
 	}
 	
+	/* update cpu times in domain policy too (not only in memory) */
+	domain_update_cpu_time_all();
+
 	/* save config files and load them to kernel */
+	save();
 	reload();
 }
 
@@ -3399,9 +3421,9 @@ void domain_set_enforce_old()
  * and if so, then turn it into enforcing mode */
 void domain_check_enforcing(char *domain)
 {
-	char *name, *res, *res2, *temp;
-	int i, d_create, d_change, d_rules, d_cputime, p_uptime, p_cputime;
-	int flag_enforcing;
+	char *name, *res, *res2, *temp, *ptime, *ptime2;
+	int i, cputime_all_percent, t2, d_create, d_change, d_rules, d_cputime, p_uptime, p_cputime;
+	int flag_enforcing, flag_cputime_change;
 	
 	/* get main domain name */
 	name = domain_get_name(domain);
@@ -3478,8 +3500,58 @@ void domain_check_enforcing(char *domain)
 						d_rules = d_rules * const_domain_complexity_factor;
 						if (d_rules < const_domain_complexity_factor) d_rules = const_domain_complexity_factor;
 						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
-//color(name, blue); printf(", changed %d sec ago, %s%d%%%s complete\n", d_change, red, (d_cputime + p_cputime) / d_rules, clr);
-printf("name = %s, d_change = %d, d_rules = %d, d_cputime = %d, p_cputime = %d, all_cputime = %d\n", name, d_change, d_rules, d_cputime, p_cputime, d_cputime + p_cputime);
+
+
+						/* ***************************************************************
+						 * print domain status on change
+						 * ******************************/
+						flag_cputime_change = 0;
+						cputime_all_percent = (d_cputime + p_cputime) * 100 / d_rules;
+						/* convert cputime integer to string */
+						ptime = string_itos(cputime_all_percent);
+						/* domain cpu time list current entry exists? */
+						i = string_search_keyword_first_all(&domain_cputime_list_current, name);
+						if (i > -1){
+							/* read old value */
+							temp = domain_cputime_list_current + i;
+							ptime2 = string_get_next_wordn(&temp, 1);
+							t2 = atoi(ptime2);
+							free2(ptime2);
+
+							/* old value match new one? */
+							if (t2 != cputime_all_percent){
+								/* if no, then i will print status info */
+								flag_cputime_change = 1;
+								/* update entry by removing old entry and adding new one */
+								res2 = string_remove_line_from_pos(domain_cputime_list_current, i);
+								free2(domain_cputime_list_current);
+								domain_cputime_list_current = res2;
+								/* add entry */
+								strcat2(&domain_cputime_list_current, name);
+								strcat2(&domain_cputime_list_current, " ");
+								strcat2(&domain_cputime_list_current, ptime);
+								strcat2(&domain_cputime_list_current, "\n");
+							}
+						}
+						else{
+							/* add entry */
+							strcat2(&domain_cputime_list_current, name);
+							strcat2(&domain_cputime_list_current, " ");
+							strcat2(&domain_cputime_list_current, ptime);
+							strcat2(&domain_cputime_list_current, "\n");
+						}
+						free2(ptime);
+
+						/* if there was a change in cputime, then print status */
+						if (flag_cputime_change){
+							color(name, blue);
+							/* get human readable seconds */
+							res = mytime_get_sec_human(d_change);
+							printf(", changed %s ago, %s%d%%%s complete\n", res, red, cputime_all_percent, clr);
+							free2(res);
+						}
+
+						/* **************************************************************** */
 					}
 					if (flag_enforcing){
 
@@ -3754,7 +3826,10 @@ void domain_get_log()
 		free2(prog_rules);
 		prog_rules = res;
 
-		if (strlen2(&prog_rules)) color("* adding log messages to policy\n", yellow);
+		if (strlen2(&prog_rules)){
+			color("* access deny log messages", yellow);
+			color(" at ", clr); color(mytime_get_date(), clr); newl();
+		}
 
 		/* cycle through new rules and ask for confirmation to add it to domain policy */
 		temp = prog_rules;
@@ -5787,11 +5862,10 @@ void domain_update_change_time()
  * because here i add together the summary of all cpu time values */
 void domain_update_cpu_time_all()
 {
-	char *name, *rule = 0, *ptime;
+	char *name, *ptime, *tdomf_new;
 	char *res, *res2, *res3;
 	char *temp, *temp2, *temp3;
-	char *tdomf_new;
-	int flag_ok, t;
+	int flag_list_match, flag_rule_match, t;
 	
 	tdomf_new = memget2(max_char);
 	
@@ -5803,10 +5877,10 @@ void domain_update_cpu_time_all()
 		if (!res) break;
 		
 		/* get domain name */
-		name = domain_get_name(res);
+		name = domain_get_name_sub(res);
 		if (name){
 			/* collect entry for domain from domain cpu time list plus */
-			flag_ok = 0;
+			flag_list_match = 0;
 			t = 0;
 			temp2 = domain_cputime_list_plus;
 			while(1){
@@ -5817,9 +5891,9 @@ void domain_update_cpu_time_all()
 				/* get second column (name) */
 				res3 = string_get_next_wordn(&temp3, 1);
 				if (res3){
-					/* is entry for the domain (second column matches name)? */
+					/* does entry match the domain (second column matches name)? */
 					if (!strcmp(res3, name)){
-						flag_ok = 1;
+						flag_list_match = 1;
 						/* get third column (cpu time) */
 						ptime = string_get_next_word(&temp3);
 						/* convert it and add it */
@@ -5832,9 +5906,10 @@ void domain_update_cpu_time_all()
 			}
 			
 			/* if match, then update my uid cpu time rule in domain 1 by 1 */
-			if (flag_ok){
+			if (flag_list_match){
 
 				/* cycle through rules */
+				flag_rule_match = 0;
 				temp2 = res;
 				while(1){
 					/* get next rule */
@@ -5843,6 +5918,7 @@ void domain_update_cpu_time_all()
 					
 					/* is rule my uid cpu time entry? */
 					if (string_search_keyword_first(res2, myuid_cputime)){
+						flag_rule_match = 1;
 						/* if so, then update it by adding together old and new value */
 						/* read old cpu time value */
 						ptime = string_get_number_last(res2);
@@ -5851,11 +5927,9 @@ void domain_update_cpu_time_all()
 						free2(ptime);
 						/* convert new cpu time value */
 						ptime = string_itos(t);
-						/* store it */
-						strcpy2(&rule, myuid_cputime);
-						strcat2(&rule, ptime);
 						/* add my new uid rule to new domain policy */
-						strcat2(&tdomf_new, rule);
+						strcat2(&tdomf_new, myuid_cputime);
+						strcat2(&tdomf_new, ptime);
 						strcat2(&tdomf_new, "\n");
 						free2(ptime);
 					}
@@ -5866,6 +5940,17 @@ void domain_update_cpu_time_all()
 					}
 					
 					free2(res2);
+				}
+				
+				/* if there was no match, then create my uid of cpu time anyway */
+				if (!flag_rule_match){
+					/* convert new cpu time value */
+					ptime = string_itos(t);
+					/* add my new uid rule to new domain policy */
+					strcat2(&tdomf_new, myuid_cputime);
+					strcat2(&tdomf_new, ptime);
+					strcat2(&tdomf_new, "\n");
+					free2(ptime);
 				}
 			}
 
@@ -5880,7 +5965,6 @@ void domain_update_cpu_time_all()
 		free2(res);
 	}
 	
-	free2(rule);
 	free2(tdomf);
 	tdomf = tdomf_new;
 }
@@ -5915,24 +5999,22 @@ void check_learn()
 	/* only in automatic mode */
 	if (!opt_manual){
 		/* check global var for temporary learning mode request */
-		if (!flag_learn){
-			if (file_exist(tlearn)){
-				/* read 1 char from signal file */
-				char *f = file_read(tlearn, 1);
-				/* check if length is not null */
-				if (strlen2(&f)){
-					/* set flag for temporary learning mode */
-					flag_learn = 1;
-					/* set starting time */
-					t = mytime();
-					color("* user request for temporary learning mode (max 1 hour)\n", red);
-					/* clear flag file */
-					file_write(tlearn, 0);
-				}
-				free2(f);
+		if (file_exist(tlearn)){
+			/* read 1 char from signal file */
+			char *f = file_read(tlearn, 1);
+			/* check if length is not null */
+			if (strlen2(&f)){
+				/* set starting time */
+				t = mytime();
+				if (!flag_learn) color("* user request for temporary learning mode (max 1 hour)\n", red);
+				/* clear temporary learning mode flag file */
+				file_write(tlearn, 0);
+				/* set flag for temporary learning mode */
+				flag_learn = 1;
 			}
+			free2(f);
 		}
-		else{
+		if (flag_learn){
 			/* check if 1 hour passed yet */
 			if ((mytime() - t) >= const_time_max_learn){
 				/* clear flag */
@@ -6305,6 +6387,9 @@ void finish()
 		reload();
 	}
 	else if (flag_firstrun) color("* haven't finished to run at least once\n", red);
+
+	/* clear temporary learning mode flag file on exit for security */
+	file_write(tlearn, 0);
 	
 	/* print statistics */
 	statistics();
