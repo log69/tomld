@@ -35,7 +35,7 @@ float mytime();
 
 void mytime_print();
 
-char *mytime_get_date();
+void mytime_print_date();
 
 char *mytime_get_sec_human();
 
