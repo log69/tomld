@@ -2195,7 +2195,7 @@ void load()
 void reload()
 {
 	char *myappend;
-	char *res, *res2, *res3, *res4, *temp, *temp2, *temp3, *temp4;
+	char *res, *res2, *res3, *res4, *temp, *temp2, *temp3, *temp4, *temp5;
 	char *tdomf_old, *tdomf_old2, *texcf_old, *texcf_old2;
 	char *name1, *name2, *rules = 0, *rules_old = 0, *profile = 0;
 	char *domain_names_active = 0;
@@ -2302,8 +2302,8 @@ void reload()
 					strcpy2(&rules, temp2);
 					/* get the old domain */
 					i = string_search_line(tdomf_old, name1);
-					temp3 = tdomf_old + i;
-					res3 = domain_get_next(&temp3);
+					temp5 = tdomf_old + i;
+					res3 = domain_get_next(&temp5);
 					/* jump to domain's rules */
 					temp4 = res3;
 					string_jump_next_line(&temp4);
@@ -2351,8 +2351,8 @@ void reload()
 								if (!strcmp(name1 + 8, name2 + 8 + l2 - l1)){
 									/* get the old domain */
 									i = string_search_line(tdomf_old, name2);
-									temp3 = tdomf_old + i;
-									res3 = domain_get_next(&temp3);
+									temp5 = tdomf_old + i;
+									res3 = domain_get_next(&temp5);
 									/* jump to domain's rules */
 									temp4 = res3;
 									string_jump_next_line(&temp4);
