@@ -370,6 +370,8 @@ int flag_pid = 0;
 /* file to signal user request for learning mode */
 char *tlearn = "/var/run/tomld/tomld.learn";
 int flag_learn = 0;
+/* buffer to hold the names of domains temporarily turned into learning mode */
+char *tprogs_learn_auto = 0;
 
 
 /* options */
@@ -1757,7 +1759,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					i = string_search_keyword_first_all(&domain_cputime_list_minus, name2);
 					if (i > -1){
 						if (flag_clear){
-							/* update it by removing old entry and adding new one */
+							/* update it by removing old entry and adding current one */
 							res2 = string_remove_line_from_pos(domain_cputime_list_minus, i);
 							free2(domain_cputime_list_minus);
 							domain_cputime_list_minus = res2;
@@ -1794,40 +1796,43 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					free2(ptime);
 
 
-					if (!flag_clear){
+					/* convert cputime integer to string */
+					ptime = string_itos(t);
+					/* create list entries for compare */
+					strcpy2(&list_entry, mypid);
+					strcat2(&list_entry, " ");
+					strcat2(&list_entry, name);
+					strcat2(&list_entry, " ");
+					strcat2(&list_entry, ptime);
+					strcpy2(&mypid2, mypid);
+					strcat2(&mypid2, " ");
+					strcpy2(&name2, mypid2);
+					strcat2(&name2, name);
+					strcat2(&name2, " ");
 
-						/* convert cputime integer to string */
-						ptime = string_itos(t);
-						/* create list entries for compare */
-						strcpy2(&list_entry, mypid);
-						strcat2(&list_entry, " ");
-						strcat2(&list_entry, name);
-						strcat2(&list_entry, " ");
-						strcat2(&list_entry, ptime);
-						strcpy2(&mypid2, mypid);
-						strcat2(&mypid2, " ");
-						strcpy2(&name2, mypid2);
-						strcat2(&name2, name);
-						strcat2(&name2, " ");
-
-						/* domain cpu time list plus entry exists? */
-						i = string_search_keyword_first_all(&domain_cputime_list_plus, name2);
-						if (i > -1){
-							/* update it by removing old entry and adding new one */
-							res2 = string_remove_line_from_pos(domain_cputime_list_plus, i);
-							free2(domain_cputime_list_plus);
-							domain_cputime_list_plus = res2;
+					/* domain cpu time list plus entry exists? */
+					i = string_search_keyword_first_all(&domain_cputime_list_plus, name2);
+					if (i > -1){
+						/* update it by removing old entry and adding new one */
+						res2 = string_remove_line_from_pos(domain_cputime_list_plus, i);
+						free2(domain_cputime_list_plus);
+						domain_cputime_list_plus = res2;
+						if (!flag_clear){
+							/* odd only if clear flag not set */
 							strcat2(&domain_cputime_list_plus, list_entry);
 							strcat2(&domain_cputime_list_plus, "\n");
 						}
-						else{
+					}
+					else{
+						if (!flag_clear){
 							/* add entry */
 							strcat2(&domain_cputime_list_plus, list_entry);
 							strcat2(&domain_cputime_list_plus, "\n");
 						}
-						
-						free2(ptime);
 					}
+					
+					free2(ptime);
+
 					free2(pstat);
 				}
 				free2(res);
@@ -1836,9 +1841,8 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 	}
 
 	
+	/* reset cpu time in uid of domain too if clear flag set */
 	if (flag_clear){
-
-		/* reset cpu time in uid of domain too */
 		char *dname = 0;
 
 		/* create full domain name to search for */
@@ -1872,9 +1876,10 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 		}
 
 	}
+
+	/* collect cpu times for summary of domain */
 	else{
 
-		/* collect cpu times for summary of domain */
 		t = 0;
 		temp = domain_cputime_list_plus;
 		while(1){
@@ -3339,80 +3344,135 @@ void domain_set_learn_all()
 /* turn on enforcing mode for old domains only with profile 1-2 */
 void domain_set_enforce_old()
 {
-	char *res, *prog, *prog_sub, *temp, *orig;
+	char *res, *res2, *prog, *prog_sub, *temp, *orig;
 	int m;
 	int flag_old = 0;
 	int flag_turned = 0;
 
 	/* is --keep option on? */
 	if (!opt_keep){
-
-		/* load config files */
-		load();
-
-		/* check if there are old domains with enforcing mode */
-		temp = tdomf;
-		while(1){
-			/* get next domain */
-			orig = temp;
-			res = domain_get_next(&temp);
-			if (!res) break;
-			free2(res);
-			/* get domain profile */
-			m = domain_get_profile(orig);
-			/* there are old enforcing mode domains, i have the answer, so quit */
-			if (m == 3){ flag_old = 1; break; }
-		}
-
-		/* turn old domains into enforcing mode */
-		temp = tdomf;
-		while(1){
-			/* get next domain */
-			orig = temp;
-			res = domain_get_next(&temp);
-			if (!res) break;
-			/* get domain profile */
-			m = domain_get_profile(orig);
-			/* is domain in mode 1 or 2? */
-			if (m == 1 || m == 2){
-				/* get domain name */
-				prog = domain_get_name(res);
-				prog_sub = domain_get_name_sub(res);
-
-				/* check if it's not a newly created domain */
-				if (string_search_line(tprogs_learn, prog_sub) == -1){
-					int i = string_search_line(tprogs_exc, prog_sub);
-					/* check if not an exception domain */
-					/* or if an exception domain, check if it's not a main domain */
-					if ((i == -1) || (i != -1 && !domain_main_exist(prog))){
-
-						/* print info once */
-						if (!flag_turned){
-							flag_turned = 1;
-							color("* turn on enforcing mode for old domains\n", green);
-						}
-						/* turn enforcing mode on for domain and all its subdomains */
-						color(prog, blue); newl();
-						domain_set_profile_for_prog(prog, 3);
-					}
-				}
-				free2(prog);
-				free2(prog_sub);
-			}
-			free2(res);
-		}
-
-		/* save config files to disk and load them to kernel */		
-		reload();
 		
-		/* did i turn any old domains into enforcing mode? */
-		if (!flag_turned){
-			if (flag_old) color("* all old domains in enforcing mode already\n", green);
-			else color("* no domains in enforcing mode currently\n", green);
+		if (opt_manual){
+
+			/* load config files */
+			load();
+
+			/* check if there are old domains with enforcing mode */
+			temp = tdomf;
+			while(1){
+				/* get next domain */
+				orig = temp;
+				res = domain_get_next(&temp);
+				if (!res) break;
+				free2(res);
+				/* get domain profile */
+				m = domain_get_profile(orig);
+				/* there are old enforcing mode domains, i have the answer, so quit */
+				if (m == 3){ flag_old = 1; break; }
+			}
+
+			/* turn old domains into enforcing mode */
+			temp = tdomf;
+			while(1){
+				/* get next domain */
+				orig = temp;
+				res = domain_get_next(&temp);
+				if (!res) break;
+				/* get domain profile */
+				m = domain_get_profile(orig);
+				/* is domain in mode 1 or 2? */
+				if (m == 1 || m == 2){
+					/* get domain name */
+					prog = domain_get_name(res);
+					prog_sub = domain_get_name_sub(res);
+
+					/* check if it's not a newly created domain */
+					if (string_search_line(tprogs_learn, prog_sub) == -1){
+						int i = string_search_line(tprogs_exc, prog_sub);
+						/* check if not an exception domain */
+						/* or if an exception domain, check if it's not a main domain */
+						if ((i == -1) || (i != -1 && !domain_main_exist(prog))){
+
+							/* print info once */
+							if (!flag_turned){
+								flag_turned = 1;
+								color("* turn back enforcing mode for old domains\n", red);
+							}
+							/* turn on enforcing mode for domain and all its subdomains */
+							color(prog, blue); newl();
+							domain_set_profile_for_prog(prog, 3);
+						}
+					}
+					free2(prog);
+					free2(prog_sub);
+				}
+				free2(res);
+			}
+
+			/* reload them to kernel */		
+			reload();
+			
+			/* did i turn any old domains into enforcing mode? */
+			if (!flag_turned){
+				if (flag_old) color("* all old domains in enforcing mode already\n", green);
+				else color("* no domains in enforcing mode currently\n", green);
+			}
+		}
+		/* auto mode */
+		else{
+			/* turn temporary learning mode domains back into enforcing mode */
+			temp = tdomf;
+			while(1){
+				/* get next domain */
+				orig = temp;
+				res = domain_get_next(&temp);
+				if (!res) break;
+				/* get domain profile */
+				m = domain_get_profile(orig);
+				/* is domain in mode 1 or 2? */
+				if (m == 1 || m == 2){
+					/* get domain name */
+					prog = domain_get_name(res);
+					prog_sub = domain_get_name_sub(res);
+					if (prog && prog_sub){
+
+						/* is it a main domain? */
+						if (!strcmp(prog, prog_sub)){
+							/* is domain in temporary list? */
+							if (string_search_line(tprogs_learn_auto, prog) > -1){
+								/* check if not an exception domain */
+								if (string_search_line(tprogs_exc, prog_sub) == -1){
+
+									/* print info once */
+									if (!flag_turned){
+										flag_turned = 1;
+										color("* turn back enforcing mode for temporary domains\n", red);
+									}
+									/* turn on enforcing mode for domain and all its subdomains */
+									color(prog, blue); color(", ", clr);
+									color("turn on enforcing mode\n", purple);
+									domain_set_profile_for_prog(prog, 3);
+									
+									/* remove domain from temporary list */
+									res2 = string_remove_line(tprogs_learn_auto, prog);
+									free2(tprogs_learn_auto);
+									tprogs_learn_auto = res2;
+								}
+							}
+						}
+					}
+					free2(prog);
+					free2(prog_sub);
+				}
+				free2(res);
+			}
+
+			/* reload them to kernel */		
+			reload();
 		}
 	}
 	else{
-		color("keep domains unchanged for now on demand\n", red);
+		color("keep domains unchanged for now on demand\n", green);
 	}
 }
 
@@ -3547,7 +3607,8 @@ void domain_check_enforcing(char *domain)
 							color(name, blue);
 							/* get human readable seconds */
 							res = mytime_get_sec_human(d_change);
-							printf(", changed %s ago, %s%d%%%s complete\n", res, red, cputime_all_percent, clr);
+							if (opt_color) printf(", changed %s ago, %s%d%%%s complete\n", res, red, cputime_all_percent, clr);
+							else           printf(", changed %s ago, %s%d%%%s complete\n", res, clr, cputime_all_percent, clr);
 							free2(res);
 						}
 
@@ -3558,7 +3619,7 @@ void domain_check_enforcing(char *domain)
 						/* turn domain into enforcing mode */
 						color(name, blue);
 						color(", ", clr);
-						color("turn enforcing mode on\n", purple);
+						color("turn on enforcing mode\n", purple);
 						domain_set_profile_for_prog(name, 3);
 					}
 				}
@@ -3827,8 +3888,8 @@ void domain_get_log()
 		prog_rules = res;
 
 		if (strlen2(&prog_rules)){
-			color("* access deny log messages", yellow);
-			color(" at ", clr); color(mytime_get_date(), clr); newl();
+			color("* access deny log messages ", yellow);
+			mytime_print_date(); newl();
 		}
 
 		/* cycle through new rules and ask for confirmation to add it to domain policy */
@@ -3875,9 +3936,6 @@ void domain_get_log()
 		free2(prog_rules);
 		prog_rules = prog_rules_new;
 		
-		/* clear temporary learning mode flag */
-		flag_learn = 0;
-		
 		/* are there any new rules after confirmation? */
 		if (strlen2(&prog_rules)){
 
@@ -3916,6 +3974,11 @@ void domain_get_log()
 								/* reset cpu time counter for prog because of learning mode,
 								 * or else it would switch back to enforcing mode immediately */
 								process_get_cpu_time_all(prog, 1);
+								/* add domain to temporary list */
+								if(string_search_line(tprogs_learn_auto, prog) == -1){
+									strcat2(&tprogs_learn_auto, prog);
+									strcat2(&tprogs_learn_auto, "\n");
+								}
 								/* do it only once per domain for speed */
 								flag_once = 1;
 							}
@@ -3935,7 +3998,7 @@ void domain_get_log()
 			}
 			free2(rules_new);
 			
-			color("learning mode turned on for domains with new rules\n", red);
+			color("* learning mode turned on for domains with new rules\n", red);
 
 			/* replace old policy with new one */
 			free2(tdomf);
@@ -6028,30 +6091,38 @@ void check_learn()
 
 	/* only in automatic mode */
 	if (!opt_manual){
-		/* check global var for temporary learning mode request */
-		if (file_exist(tlearn)){
-			/* read 1 char from signal file */
-			char *f = file_read(tlearn, 1);
-			/* check if length is not null */
-			if (strlen2(&f)){
-				/* set starting time */
-				t = mytime();
-				if (!flag_learn) color("* user request for temporary learning mode (max 1 hour)\n", red);
-				/* clear temporary learning mode flag file */
-				file_write(tlearn, 0);
-				/* set flag for temporary learning mode */
-				flag_learn = 1;
+
+		if (!flag_learn){
+			/* check global var for temporary learning mode request */
+			if (file_exist(tlearn)){
+				/* read 1 char from signal file */
+				char *f = file_read(tlearn, 1);
+				/* check if length is not null */
+				if (strlen2(&f)){
+					/* set starting time */
+					t = mytime();
+					color("* user request for temporary learning mode (max 1 hour) ", yellow);
+					mytime_print_date(); newl();
+					/* clear temporary learning mode flag file */
+					file_write(tlearn, 0);
+					/* set flag for temporary learning mode */
+					flag_learn = 1;
+				}
+				free2(f);
 			}
-			free2(f);
 		}
-		if (flag_learn){
+		else{
 			/* check if 1 hour passed yet */
 			if ((mytime() - t) >= const_time_max_learn){
 				/* clear flag */
 				flag_learn = 0;
-				color("* time ended for temporary learning mode\n", red);
+				color("* time ended for temporary learning mode ", yellow);
+				mytime_print_date(); newl();
+				/* switch back to enforcing mode */
+				domain_set_enforce_old();
 			}
 		}
+
 	}
 	else{
 		/* clear flag in manual mode */
@@ -6397,14 +6468,12 @@ void statistics()
 /* save configs and finish program */
 void finish()
 {
-	char *d;
-
 	newl();
 
 	if (flag_safe){
-		/* turn on enforcing mode for all old domains before exiting
-		 * but only in manual mode */
-		if (opt_manual) domain_set_enforce_old();
+		/* turn on enforcing mode for all old domains (manual mode) or
+		 * temporary learning mode domains (auto mode) before exiting */
+		domain_set_enforce_old();
 
 		/* update cpu times of all domains in domain policy */
 		/* this must be one of the last operation to run, because here
@@ -6425,8 +6494,7 @@ void finish()
 	statistics();
 	
 	/* print end time */
-	d = mytime_get_date();
-	color("ended at ", clr); color(d, clr); newl(); free2(d);
+	color("ended ", clr); mytime_print_date(); newl();
 
 	/* exit and free all my pointers */
 	myexit(0);
@@ -6453,10 +6521,9 @@ void myinit()
 /* ------------ MAIN PART ------------ */
 /* ----------------------------------- */
 
-int main(int argc, char **argv){
-
+int main(int argc, char **argv)
+{
 	float t, t2, t3;
-	char *d;
 
 	/* some initializations */
 	myinit();
@@ -6480,8 +6547,7 @@ int main(int argc, char **argv){
 
 	/* print start time */
 	if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn){
-		d = mytime_get_date();
-		color("started at ", clr); color(d, clr); newl(); free2(d);
+		color("started ", clr); mytime_print_date(); newl();
 	}
 
 	/* print version info */
