@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+14/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -234,13 +235,13 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.36";
+char *ver = "0.37";
 
 /* my uniq id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
  * and when the domain was created */
-/* echo $(echo "tomld" | openssl md5) $ver | openssl md5 */
-char *myuid = "allow_read /tomld/ed9f8563e922172c855961ff2024a4f7";
+/* echo $(echo "tomld" | openssl md5) "$ver" | openssl md5 */
+char *myuid = "allow_read /tomld/8c2537b34c2b0549b7342f5aea1db92d";
 char *myuid_create = 0;
 char *myuid_change = 0;
 char *myuid_cputime = 0;
@@ -928,8 +929,9 @@ char *path_wildcard_lib(char *path)
 }
 
 
-/* wildcard /proc/$PID/ numbers
- * and replace all subdirs that consist of only numbers with numeric wildcard */
+/* change /proc/$PID/exe to /proc/PID/exe (for aggregator), and
+ * the rest of /proc/$PID/ to /proc/\$/ wildcard
+ * and replace subdir that consist of only numbers with numeric wildcard */
 /* returned value must be freed by caller */
 char *path_wildcard_proc(char *path)
 {
@@ -1215,6 +1217,25 @@ char *domain_get_name(char *domain)
 	/* get second word for domain name */
 	temp2 = res;
 	res2 = string_get_next_wordn(&temp2, 1);
+	free2(res);
+	return res2;
+}
+
+
+/* return a new string containing the full name of the domain from the domain policy */
+/* returned value must be freed by caller */
+char *domain_get_name_full(char *domain)
+{
+	char *res, *res2, *temp, *temp2;
+	
+	/* get first line containing the name of the domain */
+	temp = domain;
+	res = string_get_next_line(&temp);
+	if (!res) return 0;
+	/* get everything except first word for domain name */
+	temp2 = res;
+	res2 = string_get_next_word(&temp2); free2(res2);
+	res2 = string_get_next_line(&temp2);
 	free2(res);
 	return res2;
 }
@@ -3021,6 +3042,7 @@ void clear()
 	strcat2(&tdomf, "\n");
 
 	strcpy2(&texcf, "initialize_domain /sbin/init\n");
+	strcat2(&texcf, "aggregator /proc/\\$/exe /proc/PID/exe\n");
 	/* write config files */
 	file_write(texc, texcf);
 	file_write(tdom, tdomf);
@@ -3319,7 +3341,7 @@ void domain_set_learn_all()
 		/* reset cpu time counter for prog because of learning mode */
 		/* get domain names */
 		name     = domain_get_name(res);
-		name_sub = domain_get_name_sub(res);
+		name_sub = domain_get_name_full(res);
 		/* is it a main domain? */
 		if (name && name_sub){
 			if (!strcmp(name, name_sub)){
@@ -3433,7 +3455,7 @@ void domain_set_enforce_old()
 				if (m == 1 || m == 2){
 					/* get domain name */
 					prog = domain_get_name(res);
-					prog_sub = domain_get_name_sub(res);
+					prog_sub = domain_get_name_full(res);
 					if (prog && prog_sub){
 
 						/* is it a main domain? */
@@ -3949,7 +3971,7 @@ void domain_get_log()
 				/* get next domain policy */
 				res = domain_get_next(&temp);
 				if (!res) break;
-				/* get subdomian name */
+				/* get subdomain name */
 				res2 = domain_get_name_sub(res);
 				if (res2){
 					int flag_once = 0;
@@ -5294,6 +5316,74 @@ void domain_cleanup()
 }
 
 
+/* merge together domains of the same names */
+void domain_merge_same()
+{
+	char *d1, *d2, *temp1, *temp2, *temp3;
+	char *name1, *name2, *tdomf_new, *list = 0;
+	
+	/* get mem for new policy */
+	tdomf_new = memget2(max_char);
+	
+	/* cycle through domains */
+	temp1 = tdomf;
+	while(1){
+		/* get next doman */
+		d1 = domain_get_next(&temp1);
+		if (!d1) break;
+		/* get domain's full name */
+		name1 = domain_get_name_full(d1);
+		
+		/* is this domain in the list yet? if so, then skip it
+		 * this list is to filter out same domain names and use domain only once */
+		if (string_search_line(list, name1) == -1){
+			
+			/* add domain to new policy */
+			strcat2(&tdomf_new, d1);
+
+			/* cycle through domains and compare each to themselves */
+			/* search domains starting only from behind the main one */
+			temp2 = temp1;
+			while(1){
+				/* get next doman */
+				d2 = domain_get_next(&temp2);
+				if (!d2) break;
+				/* get domain's full name */
+				name2 = domain_get_name_full(d2);
+				
+				/* domains match? */
+				if (name1 && name2){
+					if (!strcmp(name1, name2)){
+						/* add this domain's rules too to the domain in main cycle */
+						temp3 = d2;
+						if (string_jump_next_line(&temp3) && string_jump_next_line(&temp3)){
+							strcat2(&tdomf_new, temp3);
+						}
+					}
+				}
+
+				free2(name2);
+				free2(d2);
+			}
+
+			/* new line to new policy */
+			strcat2(&tdomf_new, "\n");
+
+			/* add domain to the list */
+			strcat2(&list, name1);
+			strcat2(&list, "\n");
+		}
+
+		free2(name1);
+		free2(d1);
+	}
+	
+	/* store new policy */
+	free2(tdomf);
+	tdomf = tdomf_new;
+}
+
+
 /* add rules with wildcarded recursive dirs to all domain policy rules if they contain any */
 void domain_reshape_rules_recursive_dirs()
 {
@@ -5667,38 +5757,8 @@ void domain_reshape_rules_wildcard_spec()
 			}
 		}
 		
-		/* add line to new policy if not a rule */
+		/* add line to new policy */
 		else{
-			int i;
-			
-			/* is it a kernel header or allow_execute rule containing /proc/ ? */
-			i = string_search_keyword(res, " /proc/");
-			if (i > -1){
-				char *res2, *res3, *res4, *res5, *temp6, *temp7;
-				
-				/* if so, then wildcard subdir of proc with numeric wildcard */
-				temp6 = res + i + 1;
-				/* get line from /proc/ string */
-				res2 = string_get_next_line(&temp6);
-				temp7 = res2;
-				/* get only /proc/.. part */
-				res3 = string_get_next_word(&temp7);
-				/* get the rest of the string */
-				res4 = string_get_next_line(&temp7);
-				/* wildcard it */
-				res5 = path_wildcard_proc(res3);
-				strcat2(&res5, " ");
-				strcat2(&res5, res4);
-				/* cut original string */
-				res[i + 1] = 0;
-				strlenset3(&res, i + 1);
-				/* copy back result */
-				strcat2(&res, res5);
-				
-				free2(res2); free2(res3); free2(res4); free2(res5);
-			}
-
-			/* add it to new policy */
 			strcat2(&tdomf_new, res);
 			strcat2(&tdomf_new, "\n");
 		}
@@ -5850,7 +5910,7 @@ void domain_update_change_time()
 		flag_change = 0;
 
 		/* get domain name */
-		name1 = domain_get_name_sub(d1);
+		name1 = domain_get_name_full(d1);
 		if (name1){
 			
 			temp2 = tdomf_bak2;
@@ -5859,7 +5919,7 @@ void domain_update_change_time()
 				d2 = domain_get_next(&temp2);
 				if (!d2) break;
 				/* get domain name */
-				name2 = domain_get_name_sub(d2);
+				name2 = domain_get_name_full(d2);
 				if (name2){
 					
 					/* compare backup domain to current one */
@@ -5970,7 +6030,7 @@ void domain_update_cpu_time_all()
 		if (!res) break;
 		
 		/* get domain name */
-		name = domain_get_name_sub(res);
+		name = domain_get_name_full(res);
 		if (name){
 			/* collect entry for domain from domain cpu time list plus */
 			flag_list_match = 0;
