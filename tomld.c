@@ -22,7 +22,9 @@
 
 changelog:
 -----------
-14/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
+15/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
+                         - fix some warnings during compile time (thanks to Andy Booth for reporting it)
+                         - update documentation with better english (thanks to Andy Booth for clarifying it)
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -173,40 +175,33 @@ flow chart:
 
 	1)	init
 	2)	search for new processes using network
-	3)	sleep short
-	3)	while counter-- goto 2 (means long sleep for check)
-	4)	load policy
-	5)	check prolicy for domain and all its subdomains
-		if disabled mode
-			turn on learning mode
-		if learning mode
-			no change
-		if permissive mode
-			no change
-		if enforcing mode
-			no change
-	6)	get recent log
-	7)	convert logs to rules and add them to policy (confirm)
-	8)	switch back domains with access deny from enforcing to learning mode until exit
-	9)	reshape policy rules:
-			domain config cleanup (sort and unique)
-			wildcard subdirs of recursive dirs (if any)
-			collect dir names of create rules (that are not in exception list)
-			collect dir names to mkdir (that are not in exception list)
-			wildcard formerly collected dir names (only leaf file or dir name)
-			wildcard collected mkdir names' leaf and one parent dir too
-			wildcard library files version numbers
-			wildcard pid number in /proc/number/ dirs
-			wildcard user name in /home/user/ dirs
-			domain config cleanup (sort and unique)
-			wildcard files and dirs with changing names that are not wildcarded yet
-				(this means dirs in the exception list)
-			domain config cleanup (sort and unique)
-			readd every create rule as unlink, read/write etc. too
-			domain config cleanup (sort and unique)
-	10)	save policy
-	11) goto 2
-	12) on exit, turn all old domains with profile 1-2 into enforcing mode
+	3)	sleep 1 sec, 10 cycles reached?
+	4)	check policy (cycle through all processes)
+	5)		load policy
+	6)		domain exists?
+				if no, then create one
+				if disabled mode, then turn on learning mode
+				if learning mode, then check if enforcing mode is necessary
+					(see domain_check_enforcing() procedure)
+					if so, then turn on enforcing mode
+				if permissive mode, do nothing
+				if enforcing mode, do nothing
+	7)	get recent deny logs
+	8)	convert logs to rules
+	9)	add rules to policy if ok
+	10)	policy changed since last time?
+			if not, then goto 2
+	11)	reshape rules
+			reshape by recursive dirs
+			reshape by special collected dirs
+			reshape by doubling create rules
+			domain cleanup
+			reload new policy to kernel
+	12)	hitting q key or SIGINT / SIGTERM / SIGQUIT?
+			if no, then check if 5 min passed yet?
+				if so, then save policy to disk
+				goto 2
+			if yes, then save new policy and exit
 
 */
 
@@ -470,9 +465,9 @@ void domain_update_cpu_time_all();
 
 /* print version info */
 void version() {
-	printf ("tomld (tomoyo learning daemon) "); printf(ver); printf("\n");
+	printf ("tomld (tomoyo learning daemon) %s\n", ver);
 	printf ("Copyright (C) 2011 Andras Horvath\n");
-	printf ("E-mail: mail@log69.com - suggestions & feedbacks are welcome\n");
+	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
 	printf ("\n");
 	printf ("LICENSE:\n");
@@ -495,19 +490,19 @@ void version() {
 /* print help info */
 void help() {
 	printf ("DESCRIPTION:\n");
-	printf ("tomld (tomoyo learning daemon) is an extension to the Tomoyo security module ");
-	printf ("to ease and automate the setup process of a MAC (Mandatory Access Control) aware system ");
-	printf ("to increase security by closing applications and services into a domain with their rules. ");
-	printf ("It helps the user harden his system easily. ");
-	printf ("Starts domains in learning mode, collects rules, then later changes these rules and enforces the policy.\n");
+	printf ("Tomld (tomoyo learning daemon) is an extension to the Tomoyo security framework system. ");
+	printf ("Tomoyo increases security by confining applications and services into domains using rules. ");
+	printf ("Tomld automates this process helping users harden their systems more easily. ");
+	printf ("To do this tomld starts in learning mode, creates tomoyo domains, collects rules, ");
+	printf ("changes them and once the rules appear to be complete tomld enforces the policy.\n");
 	printf ("\n");
-	printf ("Tomoyo module contains already the learning ability to automatically setup rules ");
-	printf ("while the processes are running in learning mode. Only, there are continously changing ");
-	printf ("files and directory names that the processes use, so those have to be replaced with wildcarded rules. ");
-	printf ("This needs a rather advanced knowledge of the system.\n");
+	printf ("The Tomoyo framework already has a learning mode which automatically sets up rules while ");
+	printf ("processes are running. The problem for the user is that these processes use continuously ");
+	printf ("changing files and directory names which have to be replaced by wildcarded rules. ");
+	printf ("This requires an advanced knowledge of the system.\n");
 	printf ("\n");
-	printf ("This tool tries to fully automate the MAC setup, hoping the average users ");
-	printf ("would be able to use a much more secure system on their own with minimal efforts.\n");
+	printf ("Tomld tries to fully automate the MAC set up, allowing the average user to have ");
+	printf ("a much more secure system with minimal effort.\n");
 	printf ("\n");
 	printf ("Tomoyo security module is part of the mainline Linux kernel since version 2.6.30. ");
 	printf ("Currently this solution targets Linux systems only.\n");
@@ -517,7 +512,6 @@ void help() {
 	printf ("LINKS:\n");
 	printf ("http://tomoyo.sourceforge.jp\n");
 	printf ("http://tomoyo.sourceforge.jp/documentation.html.en\n");
-	printf ("http://tomoyo.sourceforge.jp/2.2/index.html.en\n");
 	printf ("http://en.wikipedia.org/wiki/Mandatory_access_control\n");
 	printf ("\n");
 	printf ("USAGE: tomld [options] [executables]\n");
@@ -525,7 +519,7 @@ void help() {
 	printf ("The following options are supported:\n");
 	printf ("    -h   --help             print this help\n");
 	printf ("    -v   --version          print version information\n");
-	printf ("    -c   --color            colorized output\n");
+	printf ("    -c   --color            colorize output\n");
 	printf ("         --clear            clear domain configurations\n");
 	printf ("         --reset            reinitialize domain configurations\n");
 	printf ("                            (all previously learnt rules will be backed up)\n");
@@ -535,7 +529,7 @@ void help() {
 	printf ("    -m   --manual           exiting from tomld for the second time turns\n");
 	printf ("                            all old learning mode domains into enforcing mode\n");
 	printf ("    -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards\n");
-	printf ("    -k   --keep             don't change domain's mode for this run\n");
+	printf ("    -k   --keep             don't change domain's mode for this session\n");
 	printf ("                            (learning mode domains will stay so on exit)\n");
 	printf ("    -l   --learn            turn learning mode back for all domains\n");
 	printf ("                            (this is not advised, only for correction purposes)\n");
@@ -543,42 +537,11 @@ void help() {
 	printf ("                            (might be useful for scripts)\n");
 	printf ("         --yes              auto confirm everything with yes\n");
 	printf ("\n");
-	printf ("*executables are additonal programs to create domains for\n");
+	printf ("*executables are additional programs to create domains for\n");
 	printf ("\n");
-	printf ("requirements: Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)\n");
+	printf ("requirements: Tomoyo enabled kernel (v2.6.30 - 2.6.39) and tomoyo-tools (v2.2.x - 2.3.x)\n");
 	printf ("\n");
-	printf ("REMARKS:\n");
-	printf ("- user space tool for Tomoyo developed in C\n");
-	printf ("- the program assumes to be run in a fully trusted environment\n");
-	printf ("- it is advised to start with new rules instead of keeping any manually created ones\n");
-	printf ("- processes in the domains should run in learning mode for quite some time to collect ");
-	printf ("all the necessary rules to avoid malfunctioning by access deny later\n");
-	printf ("- before reboot, the rules should be stored manually by running \"tomoyo-savepolicy\" ");
-	printf ("or \"tomld -k -1\" as root if there are still domains in learning mode, ");
-	printf ("because Tomoyo forgets the learned rules on system restart\n");
-	printf ("- enforcing mode should never be switched back off for security reason\n");
-	printf ("- exception domains means programs with no rules at all\n");
-	printf ("- programs should be used in a maximum possible way during the learning phase ");
-	printf ("to force a rule for all kinds of behave\n");
-	printf ("- on --reset switch the config files will be backed up and the former log entries ");
-	printf ("still won't be considered, so it really means a new start\n");
-	printf ("- the program can be stopped any time by pressing q whereafter all old domains (learning and permissive) ");
-	printf ("are turned into enforcing mode\n");
-	printf ("- tomld files: "); printf (tmark); printf (" (this contains a mark to identify the end of the recently read message logs), ");
-	printf (tpid); printf(" (pid file to avoid multpiple instances of the program to be running at the same time)\n");
-	printf ("- in case a software or its settings change with a new version, the rules can be regenerated easily\n");
-	printf ("- the running processes need to be restarted on newly created domains\n");
-	printf ("\n");
-	printf ("HOW TO USE:\n");
-	printf ("- download, move it to a directory that root owns only (for security), change its owner to root, ");
-	printf ("change writeable only by root, make it executable, and run it as root\n");
-	printf ("- run it the 1st time, now it will offer to install all missing packages and setup grub with kernel parameter\n");
-	printf ("- system reboot is necessary now\n");
-	printf ("- run it the 2nd time, now it will create domains for the processes automatically with learning mode\n");
-	printf ("- stop it now, cause the domains will stay in learning mode and the tomoyo module will collect all rules\n");
-	printf ("- reboot the system or at least all the services and applications that have domains now\n");
-	printf ("- hours or days later let's run it the 3rd time, now the access denied logs will be converted to rules, ");
-	printf ("and on exit all remaining domains will be turned into enforcing mode\n");
+	printf ("For full documentation and FAQ, see the manual or website: http://log69.com\n");
 	printf ("\n");
 }
 
@@ -646,12 +609,12 @@ int choice(const char *text)
 	
 	/* is auto yes on? */
 	if (opt_yes){
-		printf(text);
+		printf("%s", text);
 		printf(" (y)\n");
 	}
 	else{
 		/* ask question and wait for user input */
-		printf(text);
+		printf("%s", text);
 		printf(" [y/N]");
 		c = getchar();
 		if (c == '\n') return 0;
@@ -2639,6 +2602,7 @@ void check_instance(){
 void create_prof()
 {
 	char *tmanf_old, *tmanf, *tmanf2 = 0, *tprof_old, *tprof, *tprof2, *res;
+	int ret = 0;
 	
 	/* check tomoyo version */
 	if (tomoyo_version() <= 2299){ tmanf = tmanf22; tprof = tprof22; }
@@ -2672,7 +2636,7 @@ void create_prof()
 		 * because only the external tomoyo-loadpolicy had the right to
 		 * upload my new manager.conf config to the kernel,
 		 * but from now on i have the right too to change policy through /sys */
-		system(comm);
+		ret = system(comm);
 		free2(comm);
 	}
 	
