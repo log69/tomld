@@ -171,6 +171,7 @@ char key_get()
 char *pipe_read(const char *comm, long length)
 {
 	char *buff;
+	int ret = 0;
 	
 	/* open pipe for reading */
 	FILE *p = popen(comm, "r");
@@ -184,7 +185,7 @@ char *pipe_read(const char *comm, long length)
 	buff = memget2(length);
 	memset(buff, 0, length);
 	/* read pipe */
-	fread(buff, length, 1, p);
+	ret = fread(buff, length, 1, p);
 	pclose(p);
 	/* set dynamic string length */
 	strlenset2(&buff);
@@ -292,7 +293,7 @@ void file_write(const char *name, const char *buff)
 		exit(1);
 	}
 	/* write contents if not null */
-	if (buff) fprintf(f, buff);
+	if (buff) fprintf(f, "%s", buff);
 	fclose(f);
 }
 
@@ -335,7 +336,7 @@ char *which(const char *name)
 {
 	char *path_bin[] = {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin", 0};
 
-	char *res, *full;
+	char *res, *full, *ret;
 	int i;
 	
 	/* name starts with "/" char? */
@@ -351,7 +352,7 @@ char *which(const char *name)
 	full = memget2(max_char);
 
 	/* fle exists in the current dir? */
-	getcwd(full, max_char);
+	ret = getcwd(full, max_char);
 	strcat2(&full, "/");
 	strcat2(&full, name);
 	if (file_exist(full)){
