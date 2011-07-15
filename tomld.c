@@ -539,7 +539,7 @@ void help() {
 	printf ("\n");
 	printf ("*executables are additional programs to create domains for\n");
 	printf ("\n");
-	printf ("requirements: Tomoyo enabled kernel (v2.6.30 - 2.6.39) and tomoyo-tools (v2.2.x - 2.3.x)\n");
+	printf ("requirements: Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)\n");
 	printf ("\n");
 	printf ("For full documentation and FAQ, see the manual or website: http://log69.com\n");
 	printf ("\n");
