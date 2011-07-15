@@ -490,7 +490,7 @@ void version() {
 /* print help info */
 void help() {
 	printf ("DESCRIPTION:\n");
-	printf ("Tomld (tomoyo learning daemon) is an extension to the Tomoyo security framework system. ");
+	printf ("Tomld (tomoyo learning daemon) is an extension to the Tomoyo security framework. ");
 	printf ("Tomoyo increases security by confining applications and services into domains using rules. ");
 	printf ("Tomld automates this process helping users harden their systems more easily. ");
 	printf ("To do this tomld starts in learning mode, creates Tomoyo domains, collects rules, ");
