@@ -67,8 +67,8 @@ The following options are supported:
 
 *executables are additional programs to create domains for
 
-requirements: Tomoyo enabled kernel (v2.6.30 - 2.6.39) and tomoyo-tools (v2.2.x 
-- 2.3.x)
+requirements: Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 
+and above)
 
 For full documentation and FAQ, see the manual or website: http://log69.com
 
