@@ -365,7 +365,11 @@ char *tpid	= "/var/run/tomld/tomld.pid";
 int flag_pid = 0;
 /* file to signal user request for learning mode */
 char *tlearn = "/var/run/tomld/tomld.learn";
-int flag_learn = 0;
+/* flags to signal temporary learning mode
+ * flag is to signal if there was a deny log already since user requested temporary learning mode
+ * flag2 is to signal if the 1 hour interval of temporary learning mode is still on or ended already */
+int flag_learn  = 0;
+int flag_learn2 = 0;
 /* buffer to hold the names of domains temporarily turned into learning mode */
 char *tprogs_learn_auto = 0;
 
@@ -3925,6 +3929,11 @@ void domain_get_log()
 		free2(prog_rules);
 		prog_rules = prog_rules_new;
 		
+		/* clear learn flag, because i want to allow temporary learning mode only for those domains,
+		 * that had access deny logs just now,
+		 * the rest of the enforcing mode domains should stay as the are for security reasons */
+		flag_learn = 0;
+		
 		/* are there any new rules after confirmation? */
 		if (strlen2(&prog_rules)){
 
@@ -6119,7 +6128,7 @@ void check_learn()
 	/* only in automatic mode */
 	if (!opt_manual){
 
-		if (!flag_learn){
+		if (!flag_learn2){
 			/* check global var for temporary learning mode request */
 			if (file_exist(tlearn)){
 				/* read 1 char from signal file */
@@ -6133,7 +6142,8 @@ void check_learn()
 					/* clear temporary learning mode flag file */
 					file_write(tlearn, 0);
 					/* set flag for temporary learning mode */
-					flag_learn = 1;
+					flag_learn  = 1;
+					flag_learn2 = 1;
 				}
 				free2(f);
 			}
@@ -6142,7 +6152,8 @@ void check_learn()
 			/* check if 1 hour passed yet */
 			if ((mytime() - t) >= const_time_max_learn){
 				/* clear flag */
-				flag_learn = 0;
+				flag_learn  = 0;
+				flag_learn2 = 0;
 				color("* time ended for temporary learning mode ", yellow);
 				mytime_print_date(); newl();
 				/* switch back to enforcing mode */
