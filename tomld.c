@@ -23,6 +23,7 @@
 changelog:
 -----------
 15/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
+                         - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
                          - update documentation with better english (thanks to Andy Booth for clarifying it)
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
