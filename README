@@ -59,7 +59,10 @@ The following options are supported:
     -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards
     -k   --keep             don't change domain's mode for this session
                             (learning mode domains will stay so on exit)
-    -l   --learn            turn learning mode back for all domains
+    -l   --learn            request temporary learning mode
+                            (this is the recommended way if some domains need 
+it)
+         --learn-all        turn learning mode back for all domains
                             (this is not advised, only for correction purposes)
     -1   --once             quit after first cycle
                             (might be useful for scripts)
