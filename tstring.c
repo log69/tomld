@@ -72,10 +72,10 @@ void debug(const char *text)
 		c = string_count_lines(text);
 		/* print text and info */
 		printf("--\n");
-		printf(text);
+		printf("%s", text);
 		/* print newline if missing from the end of string */
 		if (text[l-1] != '\n') newl();
-		printf("-- debug bytes %ld and ", strlen(text));
+		printf("-- debug bytes %ld and ", (long) strlen(text));
 		printf("lines %ld\n", c);
 	}
 	else printf("-- null pointer\n");
