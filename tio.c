@@ -72,6 +72,7 @@ void mytime_print_date()
 	
 	/* print it */
 	printf("at %s", res);
+	free2(res);
 }
 
 
