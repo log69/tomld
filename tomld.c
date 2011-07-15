@@ -26,6 +26,7 @@ changelog:
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
                          - update documentation with better english (thanks to Andy Booth for clarifying it)
+                         - change --learn option switch to --learn-all and make --learn function for temporary learning mode
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -380,6 +381,7 @@ int opt_version		= 0;
 int opt_help		= 0;
 int opt_color		= 0;
 int opt_learn		= 0;
+int opt_learn_all	= 0;
 int opt_manual		= 0;
 int opt_clear		= 0;
 int opt_reset		= 0;
@@ -536,7 +538,9 @@ void help() {
 	printf ("    -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards\n");
 	printf ("    -k   --keep             don't change domain's mode for this session\n");
 	printf ("                            (learning mode domains will stay so on exit)\n");
-	printf ("    -l   --learn            turn learning mode back for all domains\n");
+	printf ("    -l   --learn            request temporary learning mode\n");
+	printf ("                            (this is the recommended way if some domains need it)\n");
+	printf ("         --learn-all        turn learning mode back for all domains\n");
 	printf ("                            (this is not advised, only for correction purposes)\n");
 	printf ("    -1   --once             quit after first cycle\n");
 	printf ("                            (might be useful for scripts)\n");
@@ -2475,7 +2479,7 @@ void check_instance(){
 	/* get pid list of the same running processes */
 	pid_list = process_get_pid_list(my_exe_path);
 	if (!pid_list){
-		error("error: zero instance of tomld seem to be running\n");
+		error("error: unknown problem, zero instance of tomld seem to be running\n");
 		myexit(1);
 	}
 
@@ -2540,11 +2544,23 @@ void check_instance(){
 
 	/* if second tomld is in automatic mode, then always fail */
 	if (!opt_manual){
-		error("error: tomld is already running\n");
-		free2(mypid); free(pid_list);
-		myexit(1);
-	}
 
+		/* there are 2 tomld processes running here and
+		 * on --learn, set temporary learning mode form this tomld process
+		 * for the other running automatic mode tomld */
+		if (opt_learn){
+			/* set temporary learning mode flag */
+			file_write(tlearn, "1");
+			color("* sent user request to running daemon for temporary learning mode\n", green);
+			myexit(0);
+		}
+		else{
+			error("error: tomld is already running\n");
+			free2(mypid); free(pid_list);
+			myexit(1);
+		}
+	}
+	
 	/* check if first tomld process has been started in manual mode or not */
 	/* get the other tomld process' pid */
 	p = getpid();
@@ -2695,10 +2711,10 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "-v") || !strcmp(myarg, "--verson"))	{ opt_version = 1;	flag_ok = 1; }
 			if (!strcmp(myarg, "-h") || !strcmp(myarg, "--help"  ))	{ opt_help    = 1;	flag_ok = 1; }
 			
-			if (!strcmp(myarg, "-1") || !strcmp(myarg, "--once" ))	{ opt_once   = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color  = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "-k") || !strcmp(myarg, "--keep" ))	{ opt_keep   = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	{ opt_learn  = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "-1") || !strcmp(myarg, "--once" ))	{ opt_once    = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color   = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "-k") || !strcmp(myarg, "--keep" ))	{ opt_keep    = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	{ opt_learn   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "-m") || !strcmp(myarg, "--manual"))	{ opt_manual  = 1; flag_ok = 1; }
 
 			if (!strcmp(myarg, "-i") || !strcmp(myarg, "--info"     ))	{ opt_info       = 1; flag_ok = 2; }
@@ -2708,6 +2724,7 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
+			if (!strcmp(myarg, "--learn-all"))	{ opt_learn_all = 1; flag_ok = 1; }
 
 			/* store option type if it was any of --info, --remove or --recursive */
 			/* so if the next argument is not an option, then i know which former one it belongs to */
@@ -6585,7 +6602,7 @@ int main(int argc, char **argv)
 	/* ---------------- */
 
 	/* print start time */
-	if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn){
+	if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn_all){
 		color("started ", clr); mytime_print_date(); newl();
 	}
 
@@ -6601,10 +6618,24 @@ int main(int argc, char **argv)
 		myexit(0);
 	}
 
-	/* on --learn, turn all domains into learning mode */
+	/* this is a single tomld process here and
+	 * on --learn, request temporary learning mode for this process */
 	if (opt_learn){
+		/* set temporary learning mode flag */
+		file_write(tlearn, "1");
+	}
+	else{
+		/* clear temporary learning mode flag file on start */
+		file_write(tlearn, 0);
+	}
+
+	/* on --learn-all, turn all domains into learning mode */
+	if (opt_learn_all){
 		color("* turning all domains into learning mode on demand\n", red);
-		if (!choice("are you sure?")) myexit(0);
+		if (!choice("are you sure?")){
+			color("no change\n", green);
+			myexit(0);
+		}
 		backup();
 		color("policy file backups created\n", green);
 		domain_set_learn_all();
@@ -6621,7 +6652,10 @@ int main(int argc, char **argv)
 	/* on --clear, empty configuration files */
 	if (!opt_reset && opt_clear){
 		color("* clearing domain configurations on demand\n", red);
-		if (!choice("are you sure?")) myexit(0);
+		if (!choice("are you sure?")){
+			color("no change\n", green);
+			myexit(0);
+		}
 		backup();
 		color("policy file backups created\n", green);
 		clear();
@@ -6632,7 +6666,10 @@ int main(int argc, char **argv)
 	/* on --reset option, create backup of config files */
 	if (opt_reset){
 		color("* resetting domain configurations on demand\n", red);
-		if (!choice("are you sure?")) myexit(0);
+		if (!choice("are you sure?")){
+			color("no change\n", green);
+			myexit(0);
+		}
 		backup();
 		color("policy file backups created\n", green);
 	}
