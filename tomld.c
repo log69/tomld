@@ -2001,8 +2001,8 @@ void load()
 	
 	/* search for my unique id in domain policy */
 	if (string_search_keyword(tdomf, myuid) == -1){
-		error("error: tomoyo config is not made by tomld or not compatible with this version and a new one needs to be created\n");
-		error("please run tomld with --reset option and if error message comes up again it means Tomoyo is not active yet, so reboot system too");
+		error("error: tomoyo config is not made by tomld or not compatible with this version and a new one needs to be created with --reset option\n");
+		error("if error persists it means Tomoyo is not active or wasn't initialized correctly, so reboot system too\n");
 		myexit(1);
 	}
 
