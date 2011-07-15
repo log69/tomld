@@ -30,7 +30,7 @@ changelog:
                          - empty pid file on exit
                          - fix some mem leaks
                          - runtime working directory is /var/run/tomld/ from now
-                         - add a rule with a uniq id and with time in seconds to every domain to mark the creation of domain
+                         - add a rule with a unique id and with time in seconds to every domain to mark the creation of domain
                            this is to determine from the uptime of process belonging to the domain
                            if it is restarted at least once and so entered its new domain
                            and also this is to determine if the config was created by tomld
@@ -232,7 +232,7 @@ flow chart:
 /* program version */
 char *ver = "0.37";
 
-/* my uniq id for version compatibility */
+/* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
  * and when the domain was created */
 /* echo $(echo "tomld" | openssl md5) "$ver" | openssl md5 */
@@ -1302,7 +1302,7 @@ char *domain_get_list()
 		free2(res);
 	}
 	
-	/* sort and uniq list because there many same entries because of subdomains */
+	/* sort and unique list because there many same entries because of subdomains */
 	if (strlen2(&list)){
 		list2 = string_sort_uniq_lines(list);
 		free2(list);
@@ -1999,9 +1999,12 @@ void load()
 	free2(tdomf);
 	tdomf = file_read(tdomk, -1);
 	
-	/* search for my uniq id in domain policy */
+	/* search for my unique id in domain policy */
 	if (string_search_keyword(tdomf, myuid) == -1){
-		error("error: tomoyo config is not made by tomld or not compatible with this version and a new one needs to be created\n"); myexit(1); }
+		error("error: tomoyo config is not made by tomld or not compatible with this version and a new one needs to be created\n");
+		error("please run tomld with --reset option and if error message comes up again it means Tomoyo is not active yet, so reboot system too");
+		myexit(1);
+	}
 
 
 	/* load exception config */
@@ -2426,7 +2429,7 @@ void backup()
 	/* convert long integer to string */
 	num = string_ltos(t.tv_sec);
 
-	/* create new uniqe names to config files */
+	/* create new unique names to config files */
 	strcpy2(&tdom2, tdom);
 	strcat2(&tdom2, ".backup.");
 	strcat2(&tdom2, num);
@@ -3000,16 +3003,16 @@ void clear()
 	strnull2(&tdomf);
 	strnull2(&texcf);
 
+	strcpy2(&texcf, "initialize_domain /sbin/init\n");
+	strcat2(&texcf, "aggregator /proc/\\$/exe /proc/PID/exe\n");
+
 	strcpy2(&tdomf, "<kernel>\nuse_profile 0\n");
-	/* add a rule with my uniq id too */
+	/* add a rule with my unique id too */
 	strcat2(&tdomf, myuid);
 	strcat2(&tdomf, "\n");
 
-	strcpy2(&texcf, "initialize_domain /sbin/init\n");
-	strcat2(&texcf, "aggregator /proc/\\$/exe /proc/PID/exe\n");
 	/* write config files */
-	file_write(texc, texcf);
-	file_write(tdom, tdomf);
+	save();
 	
 	/* delete all other domains from memory too */
 	domain_delete_all();
@@ -3483,7 +3486,7 @@ void domain_check_enforcing(char *domain)
 		i = string_search_keyword(domain, myuid_create);
 		if (i > -1){
 			temp = domain + i;
-			/* get my uniq id with the creation time in it */
+			/* get my unique id with the creation time in it */
 			res = string_get_next_line(&temp);
 			/* get epoch time from my uid */
 			res2 = string_get_number_last(res);
@@ -3505,7 +3508,7 @@ void domain_check_enforcing(char *domain)
 				i = string_search_keyword(domain, myuid_cputime);
 				if (i > -1){
 					temp = domain + i;
-					/* get my uniq id with the cpu time in it */
+					/* get my unique id with the cpu time in it */
 					res = string_get_next_line(&temp);
 					/* get time string from my uid */
 					res2 = string_get_number_last(res);
@@ -3518,7 +3521,7 @@ void domain_check_enforcing(char *domain)
 				i = string_search_keyword(domain, myuid_change);
 				if (i > -1){
 					temp = domain + i;
-					/* get my uniq id with the last change time in it */
+					/* get my unique id with the last change time in it */
 					res = string_get_next_line(&temp);
 					/* get epoch time from my uid */
 					res2 = string_get_number_last(res);
@@ -3868,7 +3871,7 @@ void domain_get_log()
 	if (prog_rules){
 		char *tdomf_new, *prog, *rule, *rules_new = 0, *orig, *prog_rules_new = 0;
 
-		/* sort and uniq rules */
+		/* sort and unique rules */
 		res = string_sort_uniq_lines(prog_rules);
 		free2(prog_rules);
 		prog_rules = res;
@@ -4127,7 +4130,7 @@ void domain_print_mode()
 			strcat2(&tdomf, "<kernel> ");
 			strcat2(&tdomf, prog);
 			strcat2(&tdomf, "\nuse_profile 1\n");
-			/* add a rule with my uniq id and the time in seconds
+			/* add a rule with my unique id and the time in seconds
 			 * to know when i created this domain and when it changed last time
 			 * so i will know from the uptime of the process
 			 * if it was restarted at least once since domain creation */
@@ -4971,7 +4974,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 }
 
 
-/* sort and uniq rules of the same types in a specific way */
+/* sort and unique rules of the same types in a specific way */
 /* returned value must be freed by caller */
 char *domain_sort_uniq_rules(char *rules)
 {
@@ -5102,7 +5105,7 @@ void domain_cleanup()
 	/* alloc mem for sorted rules */
 	rules = memget2(max_char);
 	
-	/* cycle through domains and sort and make uniq the rules of each */
+	/* cycle through domains and sort and make unique the rules of each */
 	temp = tdomf;
 	while(1){
 		/* get next domain policy */
@@ -5161,7 +5164,7 @@ void domain_cleanup()
 	rules_temp = memget2(max_char);
 	rule_type = memget2(max_char);
 
-	/* cycle through domains and sort and make uniq the rules within the same type */
+	/* cycle through domains and sort and make unique the rules within the same type */
 	temp = tdomf;
 	while(1){
 		/* get next domain policy */
@@ -5183,7 +5186,7 @@ void domain_cleanup()
 				strcat2(&tdomf_new, "\n");
 				free2(res2);
 				
-				/* get only same type of rules and sort and uniq them in a specific way */
+				/* get only same type of rules and sort and unique them in a specific way */
 				c = 0;
 				strnull2(&rules_temp);
 				while(1){
@@ -5940,9 +5943,9 @@ void domain_update_change_time()
 						res = string_get_next_line(&temp3);
 						if (!res) break;
 
-						/* check if rule is my uniq id */
+						/* check if rule is my unique id */
 						if (string_search_keyword_first(res, myuid_change)){
-							/* copy my uniq id of change time with the new time */
+							/* copy my unique id of change time with the new time */
 							char *t = string_ltos(time(0));
 							strcat2(&tdomf_new, myuid_change);
 							strcat2(&tdomf_new, t);
