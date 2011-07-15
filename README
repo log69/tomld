@@ -1,6 +1,6 @@
 tomld (tomoyo learning daemon) 0.37
 Copyright (C) 2011 Andras Horvath
-E-mail: mail@log69.com - suggestions & feedbacks are welcome
+E-mail: mail@log69.com - suggestions & feedback are welcome
 URL: http://log69.com - the official site
 
 LICENSE:
@@ -17,21 +17,20 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <http://www.gnu.org/licenses/>.
 
 DESCRIPTION:
-tomld (tomoyo learning daemon) is an extension to the Tomoyo security module to 
-ease and automate the setup process of a MAC (Mandatory Access Control) aware 
-system to increase security by closing applications and services into a domain 
-with their rules. It helps the user harden his system easily. Starts domains in 
-learning mode, collects rules, then later changes these rules and enforces the 
-policy.
+Tomld (tomoyo learning daemon) is an extension to the Tomoyo security framework 
+system. Tomoyo increases security by confining applications and services into 
+domains using rules. Tomld automates this process helping users harden their 
+systems more easily. To do this tomld starts in learning mode, creates tomoyo 
+domains, collects rules, changes them and once the rules appear to be complete 
+tomld enforces the policy.
 
-Tomoyo module contains already the learning ability to automatically setup 
-rules while the processes are running in learning mode. Only, there are 
-continously changing files and directory names that the processes use, so those 
-have to be replaced with wildcarded rules. This needs a rather advanced 
-knowledge of the system.
+The Tomoyo framework already has a learning mode which automatically sets up 
+rules while processes are running. The problem for the user is that these 
+processes use continuously changing files and directory names which have to be 
+replaced by wildcarded rules. This requires an advanced knowledge of the system.
 
-This tool tries to fully automate the MAC setup, hoping the average users would 
-be able to use a much more secure system on their own with minimal efforts.
+Tomld tries to fully automate the MAC set up, allowing the average user to have 
+a much more secure system with minimal effort.
 
 Tomoyo security module is part of the mainline Linux kernel since version 
 2.6.30. Currently this solution targets Linux systems only.
@@ -41,7 +40,6 @@ Tomoyo security module is part of the mainline Linux kernel since version
 LINKS:
 http://tomoyo.sourceforge.jp
 http://tomoyo.sourceforge.jp/documentation.html.en
-http://tomoyo.sourceforge.jp/2.2/index.html.en
 http://en.wikipedia.org/wiki/Mandatory_access_control
 
 USAGE: tomld [options] [executables]
@@ -49,7 +47,7 @@ USAGE: tomld [options] [executables]
 The following options are supported:
     -h   --help             print this help
     -v   --version          print version information
-    -c   --color            colorized output
+    -c   --color            colorize output
          --clear            clear domain configurations
          --reset            reinitialize domain configurations
                             (all previously learnt rules will be backed up)
@@ -59,7 +57,7 @@ The following options are supported:
     -m   --manual           exiting from tomld for the second time turns
                             all old learning mode domains into enforcing mode
     -R   --recursive [dirs] replace subdirs of dirs in rules with wildcards
-    -k   --keep             don't change domain's mode for this run
+    -k   --keep             don't change domain's mode for this session
                             (learning mode domains will stay so on exit)
     -l   --learn            turn learning mode back for all domains
                             (this is not advised, only for correction purposes)
@@ -67,50 +65,10 @@ The following options are supported:
                             (might be useful for scripts)
          --yes              auto confirm everything with yes
 
-*executables are additonal programs to create domains for
+*executables are additional programs to create domains for
 
-requirements: Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 
-and above)
+requirements: Tomoyo enabled kernel (v2.6.30 - 2.6.39) and tomoyo-tools (v2.2.x 
+- 2.3.x)
 
-REMARKS:
-- user space tool for Tomoyo developed in C
-- the program assumes to be run in a fully trusted environment
-- it is advised to start with new rules instead of keeping any manually created 
-ones
-- processes in the domains should run in learning mode for quite some time to 
-collect all the necessary rules to avoid malfunctioning by access deny later
-- before reboot, the rules should be stored manually by running 
-"tomoyo-savepolicy" or "tomld -k -1" as root if there are still domains in 
-learning mode, because Tomoyo forgets the learned rules on system restart
-- enforcing mode should never be switched back off for security reason
-- exception domains means programs with no rules at all
-- programs should be used in a maximum possible way during the learning phase 
-to force a rule for all kinds of behave
-- on --reset switch the config files will be backed up and the former log 
-entries still won't be considered, so it really means a new start
-- the program can be stopped any time by pressing q whereafter all old domains 
-(learning and permissive) are turned into enforcing mode
-- tomld files: /var/run/tomld/tomld.logmark (this contains a mark to identify 
-the end of the recently read message logs), /var/run/tomld/tomld.pid (pid file 
-to avoid multpiple instances of the program to be running at the same time)
-- in case a software or its settings change with a new version, the rules can 
-be regenerated easily
-- the running processes need to be restarted on newly created domains
-
-HOW TO USE:
-- download, move it to a directory that root owns only (for security), change 
-its owner to root, change writeable only by root, make it executable, and run 
-it as root
-- run it the 1st time, now it will offer to install all missing packages and 
-setup grub with kernel parameter
-- system reboot is necessary now
-- run it the 2nd time, now it will create domains for the processes 
-automatically with learning mode
-- stop it now, cause the domains will stay in learning mode and the tomoyo 
-module will collect all rules
-- reboot the system or at least all the services and applications that have 
-domains now
-- hours or days later let's run it the 3rd time, now the access denied logs 
-will be converted to rules, and on exit all remaining domains will be turned 
-into enforcing mode
+For full documentation and FAQ, see the manual or website: http://log69.com
 
