@@ -213,7 +213,7 @@ void pipe_write(const char *comm, const char *buff)
 }
 
 
-/* open file and read content with given length if length is greater than 1,
+/* open file and read content with given length if length is greater than 0,
  * or if length is null, check length from file descriptor,
  * or if length is -1, check length from read file */
 /* returned value must be freed by caller */
