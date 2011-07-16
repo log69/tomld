@@ -64,6 +64,7 @@ The following options are supported:
 it)
          --learn-all        turn learning mode back for all domains
                             (this is not advised, only for correction purposes)
+         --mail      [user] send mail to user with recent deny logs
     -1   --once             quit after first cycle
                             (might be useful for scripts)
          --yes              auto confirm everything with yes
