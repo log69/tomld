@@ -30,6 +30,7 @@ changelog:
                          - add --mail option to send user a mail with the recent deny logs
                          - run whole check() once more on exit, so rules gathered since last check() won't be lost
                          - fix mem leaks
+                         - store more chars in logmark from syslog to avoid accidental match because of similar entries
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -3671,7 +3672,7 @@ void domain_check_enforcing(char *domain)
 void domain_get_log()
 {
 	/* vars */
-	char *res, *res2, *temp, *temp2, *orig, *dlist;
+	char *res, *res2, *temp, *temp2, *temp3, *orig, *dlist;
 	char *start, *tlogf2 = 0, *tlogf3 = 0;
 	char *rules = 0, *prog_rules = 0;
 	char *key = 0;
@@ -3775,13 +3776,22 @@ void domain_get_log()
 
 	/* temp2 shows the beginning of the line of the last kernel message */
 	if (temp2){
-		i = string_search_keyword(temp2, "kernel: [");
-		i2 = string_search_keyword(temp2 + i, "]");
-		if (i > 1 && i2 > -1){
-			/* set tmarkf to the last kernel messages' time stamp */
-			strcpy2(&tmarkf, temp2 + i);
-			tmarkf[i2 + 1] = 0;
-			strlenset3(&tmarkf, i2 + 1);
+		/* get 1 line only */
+		temp3 = temp2;
+		res = string_get_next_line(&temp3);
+		if (res){
+			/* search for kernel entry */
+			i = string_search_keyword(res, "kernel: [");
+			i2 = string_search_keyword(res + i, "]");
+			if (i > -1 && i2 > -1){
+				/* set tmarkf to the last kernel messages' time stamp */
+				/* copy line */
+				strcpy2(&tmarkf, res);
+				i = i + i2 + 1;
+				tmarkf[i] = 0;
+				strlenset3(&tmarkf, i);
+			}
+			free2(res);
 		}
 	}
 	/* clear tmarkf if no kernel messages */
@@ -3983,24 +3993,22 @@ void domain_get_log()
 		/* on --mail, send mail to user if there were deny logs */
 		if (mail_body){
 			if (opt_mail){
-				if (file_exist(mail_mta)){
-					char *comm = 0;
-					char *text = 0;
+				char *comm = 0;
+				char *text = 0;
 
-					/* create message */
-					strcat2(&text, "Subject: deny logs from tomld\n");
-					strcat2(&text, mail_body);
+				/* create message */
+				strcat2(&text, "Subject: deny logs from tomld\n");
+				strcat2(&text, mail_body);
 
-					/* create command */
-					strcat2(&comm, mail_mta);
-					strcat2(&comm, " ");
-					strcat2(&comm, mail_users);
-					
-					/* mail binary exists? */
-					pipe_write(comm, text);
-					free2(comm);
-					free2(text);
-				}
+				/* create command */
+				strcat2(&comm, mail_mta);
+				strcat2(&comm, " ");
+				strcat2(&comm, mail_users);
+				
+				/* mail binary exists? */
+				pipe_write(comm, text);
+				free2(comm);
+				free2(text);
 			}
 			free2(mail_body);
 		}
@@ -6673,6 +6681,22 @@ int main(int argc, char **argv)
 	/* create profile.conf and manager.conf files */
 	create_prof();
 
+	/* check if mta binary exists */
+	if (opt_mail){
+		if (file_exist(mail_mta)){
+			color("* mail requested to following reciepents: ", yellow);
+			color(mail_users, yellow);
+			newl();
+		}
+		else{
+			color("* mail requested but binary ", red);
+			color(mail_mta, red);
+			color(" missing\n", red);
+			/* clear mail option because of missing mta binary */
+			opt_mail = 0;
+		}
+	}
+	
 	/* on --info, print domain information */
 	if (opt_info){
 		domain_info(opt_info2);
