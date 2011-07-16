@@ -22,11 +22,14 @@
 
 changelog:
 -----------
-15/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
+16/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
                          - update documentation with better english (thanks to Andy Booth for clarifying it)
                          - change --learn option switch to --learn-all and make --learn function for temporary learning mode
+                         - add --mail option to send user a mail with the recent deny logs
+                         - run whole check() once more on exit, so rules gathered since last check() won't be lost
+                         - fix mem leaks
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -246,6 +249,11 @@ char *myuid_cputime = 0;
 /* home dir */
 char *home = "/home";
 
+/* mail vars */
+char *mail_mta = "/usr/sbin/sendmail";
+char *mail_users = 0;
+
+
 /* interval of policy check to run in seconds */
 float const_time_check = 10;
 /* interval of saving configs to disk in seconds */
@@ -391,6 +399,7 @@ int opt_yes			= 0;
 int opt_keep		= 0;
 int opt_recursive	= 0;
 int opt_once		= 0;
+int opt_mail		= 0;
 
 char *opt_info2		= 0;
 char *opt_remove2	= 0;
@@ -542,6 +551,7 @@ void help() {
 	printf ("                            (this is the recommended way if some domains need it)\n");
 	printf ("         --learn-all        turn learning mode back for all domains\n");
 	printf ("                            (this is not advised, only for correction purposes)\n");
+	printf ("         --mail      [user] send mail to user with recent deny logs\n");
 	printf ("    -1   --once             quit after first cycle\n");
 	printf ("                            (might be useful for scripts)\n");
 	printf ("         --yes              auto confirm everything with yes\n");
@@ -581,6 +591,7 @@ void myfree()
 	free2(myuid_cputime);
 	free2(domain_cputime_list_minus);
 	free2(domain_cputime_list_plus);
+	free2(mail_users);
 }
 
 
@@ -2721,6 +2732,7 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "-r") || !strcmp(myarg, "--remove"   ))	{ opt_remove     = 1; flag_ok = 3; }
 			if (!strcmp(myarg, "-R") || !strcmp(myarg, "--recursive"))	{ opt_recursive  = 1; flag_ok = 4; }
 
+			if (!strcmp(myarg, "--mail" ))	{ opt_mail  = 1; flag_ok = 5; }
 			if (!strcmp(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
@@ -2768,6 +2780,17 @@ void check_options(int argc, char **argv){
 					strcat2(&dirs_recursive, myarg);
 					strcat2(&dirs_recursive, "\n");
 				}
+				/* if last option arg was --mail, then this belongs to it */
+				if (flag_type == 5){
+					/* if former arg was an option, then it belongs to it */
+					if (flag_last){
+						/* store as --mail parameter */
+						strcat2(&mail_users, myarg);
+						strcat2(&mail_users, " ");
+					}
+					/* it belongs to the extra executables, so store it */
+					else flag_progs = 1;
+				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (!flag_type || flag_progs){
 					/* search for name in paths and check if file exists */
@@ -2797,7 +2820,9 @@ void check_options(int argc, char **argv){
 		}
 
 		/* fail if no arguments for --remove option */
-		if (opt_remove && !strlen2(&opt_remove2)){ error("error: argument missing for --remove option\n"); myexit(1); }
+		if (opt_remove && !opt_remove2){ error("error: argument missing for --remove option\n"); myexit(1); }
+		/* fail if no arguments for --mail option */
+		if (opt_mail && !mail_users){ error("error: argument missing for --mail option\n"); myexit(1); }
 		/* fail if no arguments for --recursive option */
 		if (opt_recursive && !dirs_recursive){ error("error: argument missing for --recursive option\n"); myexit(1); }
 
@@ -3883,6 +3908,7 @@ void domain_get_log()
 		free2(res);
 	}
 
+	free2(rules);
 	free2(dlist);
 
 
@@ -3892,6 +3918,7 @@ void domain_get_log()
 
 	if (prog_rules){
 		char *tdomf_new, *prog, *rule, *rules_new = 0, *orig, *prog_rules_new = 0;
+		char *mail_body = 0;
 
 		/* sort and unique rules */
 		res = string_sort_uniq_lines(prog_rules);
@@ -3937,6 +3964,12 @@ void domain_get_log()
 				}
 				else{
 					color("  add rules? (n)\n", clr);
+
+					/* store deny logs for mail */
+					if (opt_mail){
+						strcat2(&mail_body, res);
+						strcat2(&mail_body, "\n");
+					}
 				}
 			}
 
@@ -3946,6 +3979,31 @@ void domain_get_log()
 		}
 		free2(prog_rules);
 		prog_rules = prog_rules_new;
+		
+		/* on --mail, send mail to user if there were deny logs */
+		if (mail_body){
+			if (opt_mail){
+				if (file_exist(mail_mta)){
+					char *comm = 0;
+					char *text = 0;
+
+					/* create message */
+					strcat2(&text, "Subject: deny logs from tomld\n");
+					strcat2(&text, mail_body);
+
+					/* create command */
+					strcat2(&comm, mail_mta);
+					strcat2(&comm, " ");
+					strcat2(&comm, mail_users);
+					
+					/* mail binary exists? */
+					pipe_write(comm, text);
+					free2(comm);
+					free2(text);
+				}
+			}
+			free2(mail_body);
+		}
 		
 		/* clear learn flag, because i want to allow temporary learning mode only for those domains,
 		 * that had access deny logs just now,
@@ -6527,6 +6585,9 @@ void finish()
 	newl();
 
 	if (flag_safe){
+		/* run check for the last time */
+		check();
+
 		/* turn on enforcing mode for all old domains (manual mode) or
 		 * temporary learning mode domains (auto mode) before exiting */
 		domain_set_enforce_old();
