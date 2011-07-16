@@ -34,6 +34,7 @@ changelog:
                          - when specifying recursive dirs, the new rules will now be based on the old rule,
                            and not the specified dirs
                          - bugfix in domain_get_rules_with_recursive_dirs()
+                         - load tomld config from /etc/tomld/tomld.conf if it exists for customization
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -253,10 +254,6 @@ char *myuid_cputime = 0;
 /* home dir */
 char *home = "/home";
 
-/* mail vars */
-char *mail_mta = "/usr/sbin/sendmail";
-char *mail_users = 0;
-
 
 /* interval of policy check to run in seconds */
 float const_time_check = 10;
@@ -453,6 +450,11 @@ char *domain_cputime_list_plus  = 0;
  * this is a runtime list that i use to print domain status, but only if it has changed */
 char *domain_cputime_list_current = 0;
 
+/* mail */
+char *mail_mta  = "/usr/sbin/sendmail";
+char *mail_mta2 = 0;
+char *mail_users = 0;
+
 /* arrays */
 char *tprogs = 0;
 char *tprogs_exc = 0;
@@ -462,15 +464,20 @@ char *tprogs_learn = 0;
 char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6", 0};
 
 char *tshell = "/etc/shells";
-char *tshellf = 0;
-char *tshellf2[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbash", "/bin/sh",
+char *tshellf[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbash", "/bin/sh",
 "/bin/tcsh", "/usr/bin/es", "/usr/bin/esh", "/usr/bin/fish", "/usr/bin/ksh", "/usr/bin/rc",
 "/usr/bin/screen", 0};
+char *tshellf2 = 0;
 
+char *tspec = "/etc/tomld/tomld.conf";
+char *tspecf = 0;
 char *spec_exception[] = {"/", "/dev/", "/etc/", "/home/\\*/", "/root/", 0};
-char *spec[] = {"/home/\\{\\*\\}/", "/usr/share/\\{\\*\\}/", "/etc/fonts/\\{\\*\\}/", "/var/cache/\\{\\*\\}/", "/dev/pts/", 0};
-char *spec_ex = 0;
-char *spec1 = 0;
+char *spec_wildcard[] = {"/home/\\{\\*\\}/", "/usr/share/\\{\\*\\}/", "/etc/fonts/\\{\\*\\}/",
+                "/var/cache/\\{\\*\\}/", "/dev/pts/", 0};
+char *spec_replace[] = {"/var/run/gdm/auth-for-\\*/", 0};
+char *spec_exception2 = 0;
+char *spec_wildcard2 = 0;
+char *spec_replace2 = 0;
 
 
 /* ----------------------------------- */
@@ -575,7 +582,7 @@ void myfree()
 	free2(my_exe_path);
 	free2(tdomf);
 	free2(texcf);
-	free2(tshellf);
+	free2(tshellf2);
 	free2(tprogs);
 	free2(tprogs_exc);
 	free2(tprogs_learn);
@@ -588,13 +595,15 @@ void myfree()
 	free2(tlogf);
 	free2(tdomf_bak);
 	free2(tdomf_bak2);
-	free2(spec_ex);
-	free2(spec1);
 	free2(myuid_create);
 	free2(myuid_change);
 	free2(myuid_cputime);
 	free2(domain_cputime_list_minus);
 	free2(domain_cputime_list_plus);
+	free2(spec_exception2);
+	free2(spec_wildcard2);
+	free2(spec_replace2);
+	free2(mail_mta2);
 	free2(mail_users);
 }
 
@@ -2898,6 +2907,54 @@ void check_tomoyo()
 	mydir = path_get_parent_dir(tmark);
 	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
 	free2(mydir);
+	
+	/* load tomld config of special dirs */
+	if (file_exist(tspec)){
+		char *res, *res2, *temp, *temp2;
+		int flag_spec = 0;
+		
+		/* read file */
+		tspecf = file_read(tspec, 0);
+		/* cycle through config and sort it out */
+		temp = tspecf;
+		while(1){
+			/* read 1 line */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			/* skip lines starting with "#" char or empty ones */
+			temp2 = res;
+			res2 = string_get_next_word(&temp2);
+			if (res2){
+				if (res2[0] != '#'){
+					int flag_ok = 1;
+
+					/* found tag? */
+					if (string_search_keyword_first(res2, "[exception]")){ flag_spec = 1; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[wildcard]")){  flag_spec = 2; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[replace]")){   flag_spec = 3; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[mta]")){       flag_spec = 4; flag_ok = 0; }
+					
+					/* place line containing dirs to appropriate array */
+					if (flag_ok){
+						if (flag_spec == 1){ strcat2(&spec_exception2, res); strcat2(&spec_exception2, "\n"); }
+						if (flag_spec == 2){ strcat2(&spec_wildcard2,  res); strcat2(&spec_wildcard2,  "\n"); }
+						if (flag_spec == 3){ strcat2(&spec_replace2,   res); strcat2(&spec_replace2,   "\n"); }
+						if (flag_spec == 4){ strcpy2(&mail_mta2,       res); }
+					}
+				}
+				free2(res2);
+			}
+			free2(res);
+		}
+		
+		/* initialize special dir lists if no loadable config file found */
+		if (!spec_exception2) spec_exception2 = array_copy_to_string_list(spec_exception);
+		if (!spec_wildcard2)  spec_wildcard2  = array_copy_to_string_list(spec_wildcard);
+		if (!spec_replace2)   spec_replace2   = array_copy_to_string_list(spec_replace);
+		if (!mail_mta2)       strcpy2(&mail_mta2, mail_mta);
+
+		free2(tspecf);
+	}
 }
 
 
@@ -4004,7 +4061,7 @@ void domain_get_log()
 				strcat2(&text, mail_body);
 
 				/* create command */
-				strcat2(&comm, mail_mta);
+				strcat2(&comm, mail_mta2);
 				strcat2(&comm, " ");
 				strcat2(&comm, mail_users);
 				
@@ -4760,6 +4817,43 @@ int compare_path_search_dir_in_list(char *list, char *dir)
 		if (compare_paths(res, dir)){ free2(res); return 1; }
 		free2(res);
 	}
+	
+	return 0;
+}
+
+
+/* search for dir in a list of dirs comparing only the beginnings of paths
+ * and return path with all wildcards taken from both paths on match */
+/* returned value must be freed by caller */
+char *compare_path_search_dir_in_list_first_subdirs(char *list, char *dir)
+{
+	char *res, *res2, *temp;
+	int c;
+
+	/* search for the dir in the list by wildcarded compare */
+	temp = list;
+	while(1){
+		res = string_get_next_line(&temp);
+		if (!res) return 0;
+		c = path_count_subdirs_name(res);
+		res2 = path_get_subdirs_name(dir, c);
+		if (compare_paths(res, res2)){
+
+			/* merge together the 2 paths subdir by subdir
+			 * prefering the one from the list
+			 * or the one with wildcard in it */
+			c = l2; c2 = 0;
+			while(c--) if (res2[c] == '*') c2++;
+			
+			
+			free2(res);
+			return res2;
+		}
+		free2(res);
+		free2(res2);
+	}
+	
+	return 0;
 }
 
 
@@ -5565,9 +5659,6 @@ void domain_reshape_rules_wildcard_spec()
 	 * more info on kernel differences: http://tomoyo.sourceforge.jp/comparison.html */
 	char *cre4[] = {"allow_create", "allow_mkdir", "allow_mkfifo", "allow_mksock", "allow_chmod", 0};
 	
-	/* initialize special dir lists */
-	if (!spec_ex) spec_ex = array_copy_to_string_list(spec_exception);
-	if (!spec1)   spec1   = array_copy_to_string_list(spec);
 
 	/* cycle through rules of all domains and collect more special dirs (that will be wildcarded) */
 	temp = tdomf;
@@ -5746,11 +5837,11 @@ void domain_reshape_rules_wildcard_spec()
 						if (param[0] == '/'){
 
 							/* check dir in exception */
-							if (compare_path_search_dir_in_list(spec_ex, pdir)) flag_ex = 1;
+							if (compare_path_search_dir_in_list(spec_exception2, pdir)) flag_ex = 1;
 							
-							/* is it in spec? */
+							/* is it in spec_wildcard? */
 							if (!flag_ex){
-								if (compare_path_search_dir_in_list(spec1, pdir)) flag = 1;
+								if (compare_path_search_dir_in_list(spec_wildcard2, pdir)) flag = 1;
 							}
 
 							/* is it in spec2? */
@@ -5764,14 +5855,22 @@ void domain_reshape_rules_wildcard_spec()
 							if (!flag_ex){
 								/* isn't parent dir in special excluded dir? */
 								res2 = path_get_parent_dir(pdir);
-								if (!compare_path_search_dir_in_list(spec_ex, res2)){
+								if (!compare_path_search_dir_in_list(spec_exception2, res2)){
 									/* is dir in mkdir list? */
 									if (compare_path_search_dir_in_list(spec3_mkdir, pdir)) flag3 = 1;
 								}
 								free2(res2);
 							}
+
+							/* replace dir with the one in spec_replace if any */
+							res2 = compare_path_search_dir_in_list_first_subdirs(spec_replace2, param);
+							if (res2){
+								free2(param);
+								param = res2;
+debug(param);
+							}
 							
-							/* path is in spec or spec_ex */
+							/* path is in spec_ex */
 							if (flag_ex){
 								res2 = path_wildcard_dir_temp(param);
 								free2(param); param = res2;
@@ -6309,22 +6408,22 @@ void check_exceptions()
 
 	/* load /etc/shells if exists */
 	if (file_exist(tshell)){
-		tshellf = file_read(tshell, 0);
+		tshellf2 = file_read(tshell, 0);
 	}
 	/* if not, get shell names from defined list */
 	else{
 		int i = 0;
 		while(1){
-			char *res = tshellf2[i++];
+			char *res = tshellf[i++];
 			if (!res) break;
-			strcpy2(&tshellf, res);
-			strcat2(&tshellf, "\n");
+			strcpy2(&tshellf2, res);
+			strcat2(&tshellf2, "\n");
 		}
 	}
 	
 	/* add shells to exceptions */
-	if (strlen2(&tshellf)){
-		temp = tshellf;
+	if (strlen2(&tshellf2)){
+		temp = tshellf2;
 		while(1){
 			res = string_get_next_line(&temp);
 			if (!res) break;
@@ -6688,14 +6787,14 @@ int main(int argc, char **argv)
 
 	/* check if mta binary exists */
 	if (opt_mail){
-		if (file_exist(mail_mta)){
+		if (file_exist(mail_mta2)){
 			color("* mail requested to following reciepents: ", yellow);
 			color(mail_users, yellow);
 			newl();
 		}
 		else{
 			color("* mail requested but binary ", red);
-			color(mail_mta, red);
+			color(mail_mta2, red);
 			color(" missing\n", red);
 			/* clear mail option because of missing mta binary */
 			opt_mail = 0;
