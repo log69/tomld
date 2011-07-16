@@ -31,6 +31,9 @@ changelog:
                          - run whole check() once more on exit, so rules gathered since last check() won't be lost
                          - fix mem leaks
                          - store more chars in logmark from syslog to avoid accidental match because of similar entries
+                         - when specifying recursive dirs, the new rules will now be based on the old rule,
+                           and not the specified dirs
+                         - bugfix in domain_get_rules_with_recursive_dirs()
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -4760,7 +4763,7 @@ int compare_path_search_dir_in_list(char *list, char *dir)
 }
 
 
-/* return new rules based on the input rule with wildcards of matching recursive dirs */
+/* return new list of rules based on the input rule with wildcards of matching recursive dirs */
 /* returned value must be freed by caller */
 char *domain_get_rules_with_recursive_dirs(char *rule)
 {
@@ -4770,8 +4773,9 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 	int i, count1, count2;
 	int c = 0;
 
-	/* return null if input rule is null */
+	/* return null if input rule is null or "quota_exceeded" */
 	if (!rule) return 0;
+	if (!strcmp(rule, "quota_exceeded")) return 0;
 
 	/* are there any recursive dirs specified? */
 	if (!dirs_recursive) return 0;
@@ -4814,7 +4818,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 		/* compare them */
 		if (compare_paths(res, res2)){
 			/* success, store it on match and exit */
-			strcpy2(&path_new1, res);
+			strcpy2(&path_new1, res2);
 
 			/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
 			 * to recursive dirs, so i have to calculate dir depth */
@@ -4863,7 +4867,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 			/* compare them */
 			if (compare_paths(res, res2)){
 				/* success, store it on match and exit */
-				strcpy2(&path_new2, res);
+				strcpy2(&path_new2, res2);
 
 				/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
 				 * to recursive dirs, so i have to calculate dir depth */
@@ -5450,6 +5454,7 @@ void domain_reshape_rules_recursive_dirs()
 	/* vars */
 	char *res, *res2, *res3, *temp, *temp2;
 	char *orig, *tdomf_new, *rules, *rules2;
+
 
 	/* do the whole check if there are any recursive dirs at all, or else exit */	
 	if (!dirs_recursive) return;
