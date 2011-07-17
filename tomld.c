@@ -1632,7 +1632,7 @@ int process_get_least_uptime(const char *name)
 	
 	/* open /proc dir */
 	mydir = opendir("/proc/");
-	if (!mydir){ error("error: cannot open /proc/ directory\n"); return 0; }
+	if (!mydir){ error("error: cannot open /proc/ directory\n"); myexit(1); }
 
 	/* cycle through dirs in /proc */
 	while((mydir_entry = readdir(mydir))) {
@@ -1712,7 +1712,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 
 	/* open /proc dir */
 	mydir = opendir("/proc/");
-	if (!mydir){ error("error: cannot open /proc/ directory\n"); return 0; }
+	if (!mydir){ error("error: cannot open /proc/ directory\n"); myexit(1); }
 
 	/* cycle through dirs in /proc */
 	while((mydir_entry = readdir(mydir))) {
@@ -2781,7 +2781,7 @@ void check_options(int argc, char **argv){
 					if (!strcmp(myarg, "/")){ error("error: root directory is not allowed"); free2(myarg); myexit(1); }
 					/* check if dir name exist */
 					if (!dir_exist(myarg)){
-						error("error: no such directory: "); error(myarg); newl(); free2(myarg); myexit(1); }
+						error("error: no such directory: "); error(myarg); newl_(); free2(myarg); myexit(1); }
 					/* expand recursive dir names with "/" char if missing */
 					l = strlen2(&myarg);
 					if (myarg[l-1] != '/'){ myarg[l] = '/'; myarg[l+1] = 0; }
@@ -2798,13 +2798,13 @@ void check_options(int argc, char **argv){
 				if (flag_type == 1 || flag_type == 99){
 					char *res;
 					if (myarg[0] == '-' && flag_type != 99){
-						error("error: wrong argument: "); error(myarg); newl();
+						error("error: wrong argument: "); error(myarg); newl_();
 						free2(myarg); myexit(1);
 					}
 					/* search for name in paths and check if file exists */
 					res = which(myarg);
 					if(!res){
-						error("error: no such file: "); error(myarg); newl();
+						error("error: no such file: "); error(myarg); newl_();
 						free2(myarg); myexit(1);
 					}
 					/* if file exists, store it as extra executables */
@@ -3229,7 +3229,7 @@ void domain_info(const char *pattern)
 			else            color(" domains)\n", clr);
 			free2(res);
 		}
-		else error("error: no domains found\n");
+		else color("error: no domains found\n", clr);
 	}
 
 	/* list domain names only */	
@@ -3391,7 +3391,7 @@ void domain_remove(const char *pattern)
 			}
 			else color("no domain was removed\n\n", green);
 		}
-		else error("error: no domains found\n");
+		else color("error: no domains found\n", clr);
 	}
 }
 
