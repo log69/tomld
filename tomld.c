@@ -539,7 +539,7 @@ void help() {
 	printf ("a much more secure system with minimal effort. ");
 	printf ("Currently this solution targets Linux systems only.\n");
 	printf ("\n");
-	printf ("Tomoyo security module is part of the mainline Linux kernel since version 2.6.30. ");
+	printf ("Tomoyo security module is part of the mainline Linux kernel since version 2.6.30.\n");
 	printf ("\n");
 	printf ("*TOMOYO(r) is a registered trademark of NTT DATA Corporation\n");
 	printf ("\n");
