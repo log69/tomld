@@ -1,0 +1,135 @@
+.\" Man page for tomld
+
+.TH TOMLD "1" "2011" "tomld" "tomld"
+
+.SH NAME
+tomld - tomoyo learning daemon, fully automatic MAC configuration
+
+.SH SYNOPSYS
+tomld [option[s]] [executable[s]]
+
+.SH DESCRIPTION
+
+Tomld (tomoyo learning daemon) is an extension to the Tomoyo security 
+framework. Tomoyo increases security by confining applications and services 
+into domains using rules. Tomld automates this process helping users harden 
+their systems more easily. To do this tomld starts in learning mode, creates 
+Tomoyo domains, collects rules, changes them and once the rules appear to be 
+complete tomld enforces the policy.
+.br
+
+The Tomoyo framework already has a learning mode which automatically sets up 
+rules while processes are running. The problem for the user is that these 
+processes use continuously changing files and directory names which have to be 
+replaced by wildcarded rules. This requires an advanced knowledge of the system.
+.br
+
+Tomld fully automates the MAC set up, allowing the average user to have 
+a much more secure system with minimal effort. Currently this solution targets
+Linux systems only.
+.br
+
+Tomoyo security module is part of the mainline Linux kernel since version 
+2.6.30.
+.br
+
+*TOMOYO(r) is a registered trademark of NTT DATA Corporation
+.br
+
+.SH LINKS
+http://log69.com
+.br
+http://tomoyo.sourceforge.jp
+.br
+http://en.wikipedia.org/wiki/Mandatory_access_control
+.br
+
+.SH OPTIONS
+The following options are supported:
+.TP
+\fB\-h\fR   \fB\-\-help\fR
+print this help
+.TP
+\fB\-v\fR   \fB\-\-version\fR
+print version information
+.TP
+\fB\-c\fR   \fB\-\-color\fR
+colorize output
+.TP
+     \fB\-\-clear\fR
+reinitialize domain configurations
+.br
+(all previously learnt rules will be backed up)
+.TP
+     \fB\-\-reset\fR
+reinitialize domain configurations and run
+.br
+(all previously learnt rules will be backed up)
+.TP
+\fB\-i\fR   \fB\-\-info [pattern]\fR
+print domains' rules by pattern
+.br
+(without pattern, print a list of main domains)
+.TP
+\fB\-r\fR   \fB\-\-remove [pattern]\fR
+remove domains by pattern
+.TP
+\fB\-R\fR   \fB\-\-recursive [dirs]\fR
+replace subdirs of dirs with wildcards in rules
+.TP
+\fB\-m\fR   \fB\-\-manual\fR
+exiting from tomld for the second time turns
+.br
+all old learning mode domains into enforcing mode
+.TP
+\fB\-k\fR   \fB\-\-keep\fR
+don't change domain's mode for this session
+.br
+(learning mode domains will stay so on exit)
+.TP
+\fB\-l\fR   \fB\-\-learn\fR
+request temporary learning mode
+.br
+(this is the recommended way if still necessary)
+.TP
+     \fB\-\-learn-all\fR
+turn learning mode back for all domains
+.br
+(this is not advised, only for correction purposes)
+.TP
+     \fB\-\-mail [user]\fR
+send mail to user with recent deny logs
+.TP
+\fB\-1\fR   \fB\-\-once\fR
+quit after first cycle
+.TP
+     \fB\-\-yes\fR
+auto confirm everything with yes
+
+.TP
+*executables are additional programs to create domains for
+
+.SH AUTHORS
+.br
+tomoyo learning daemon
+.br
+Copyright (C) 2011 Andras Horvath
+.br
+E\-mail: mail@log69.com \- suggestions & feedback are welcome
+.br
+URL: http://log69.com \- the official site
+.br
+
+.SH LICENSE
+This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.
+.br
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+.br
+You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+.SH REQUIREMENTS
+Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 
+and above)
+
+.SH "SEE ALSO"
+The full documentation for \fBtomld\fR is available on the website: \fBhttp://log69.com\fR
