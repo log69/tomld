@@ -274,9 +274,8 @@ int const_time_max_change = 60 * 60 * 24 * 7;
 int const_min_cputime = 100;
 /* constant for measuring the complexity of a domain
  * i raise the number of rules of the domain to the power of 2 and
- * divide it by the div factor and compare it to its processes' cpu time */
-int const_domain_complexity_factor_min = 200;
-int const_domain_complexity_factor_div = 1;
+ * multiply it by this factor and compare it to its processes' cpu time */
+int const_domain_complexity_factor = 2;
 
 
 /* path to my executable */
@@ -3654,10 +3653,10 @@ void domain_check_enforcing(char *domain)
 							d_cputime = 0;
 						}
 						/* count complexity of domain by counting rules, then
-						 * raising it to the power of 2 and dividing it by another factor (4),
+						 * raising it to the power of 2 and multiplying it by another factor,
 						 * and it has to have a minimum limit too */
 						d_rules = string_count_lines(domain) + 10;
-						d_rules = d_rules * d_rules / const_domain_complexity_factor_div;
+						d_rules = d_rules * d_rules * const_domain_complexity_factor;
 						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
 
 
