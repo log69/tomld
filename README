@@ -34,7 +34,8 @@ more secure system with minimal effort. Currently this solution targets Linux
 systems only.
 
 Tomoyo security module is part of the mainline Linux kernel since version 
-2.6.30. 
+2.6.30.
+
 *TOMOYO(r) is a registered trademark of NTT DATA Corporation
 
 LINKS:
