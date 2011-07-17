@@ -9,18 +9,18 @@ KILLALL=/usr/bin/killall
 case $1 in
 	start)
 		echo "Starting tomld"
-		test -x $DAEMON && $DAEMON >> $LOGFILE &
+		$DAEMON >> $LOGFILE &
 		;;
 	stop)
 		echo "Stopping tomld"
-		test -x $KILLALL && $KILLALL -w tomld
+		$KILLALL -w tomld
 		;;
 	restart)
 		$0 stop
 		$0 start
 		;;
 	learn)
-		test -x $DAEMON && $DAEMON --learn
+		$DAEMON --learn
 		;;
 	*)
 		echo "Usage: $0 {start|stop|restart|learn}"
