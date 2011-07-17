@@ -3656,9 +3656,8 @@ void domain_check_enforcing(char *domain)
 						/* count complexity of domain by counting rules, then
 						 * raising it to the power of 2 and dividing it by another factor (4),
 						 * and it has to have a minimum limit too */
-						d_rules = string_count_lines(domain);
+						d_rules = string_count_lines(domain) + 10;
 						d_rules = d_rules * d_rules / const_domain_complexity_factor_div;
-						if (d_rules < const_domain_complexity_factor_min) d_rules = const_domain_complexity_factor_min;
 						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
 
 
