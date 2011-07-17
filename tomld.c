@@ -2925,14 +2925,20 @@ void check_tomoyo()
 					if (string_search_keyword_first(res2, "[exception]")){ flag_spec = 1; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[wildcard]")){  flag_spec = 2; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[replace]")){   flag_spec = 3; flag_ok = 0; }
-					if (string_search_keyword_first(res2, "[mta]")){       flag_spec = 4; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[recursive]")){ flag_spec = 4; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[mta]")){       flag_spec = 5; flag_ok = 0; }
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
+						/* add "/" char to the end of dirs if missing */
+						long l = strlen2(&res);
+						if (l > 0){ if (res[l - 1] != '/') strcat2(&res, "/"); }
+						/* store line */
 						if (flag_spec == 1){ strcat2(&spec_exception2, res); strcat2(&spec_exception2, "\n"); }
 						if (flag_spec == 2){ strcat2(&spec_wildcard2,  res); strcat2(&spec_wildcard2,  "\n"); }
 						if (flag_spec == 3){ strcat2(&spec_replace2,   res); strcat2(&spec_replace2,   "\n"); }
-						if (flag_spec == 4){ strcpy2(&mail_mta2,       res); }
+						if (flag_spec == 4){ strcat2(&dirs_recursive,  res); strcat2(&dirs_recursive,  "\n"); }
+						if (flag_spec == 5){ strcpy2(&mail_mta2,       res); }
 					}
 				}
 				free2(res2);
@@ -2944,6 +2950,7 @@ void check_tomoyo()
 		if (!spec_exception2) spec_exception2 = array_copy_to_string_list(spec_exception);
 		if (!spec_wildcard2)  spec_wildcard2  = array_copy_to_string_list(spec_wildcard);
 		if (!spec_replace2)   spec_replace2   = array_copy_to_string_list(spec_replace);
+		if (dirs_recursive)   opt_recursive   = 1;
 		if (!mail_mta2)       strcpy2(&mail_mta2, mail_mta);
 
 		free2(tspecf);
@@ -3644,7 +3651,7 @@ void domain_check_enforcing(char *domain)
 					flag_enforcing = 0;
 					if (d_change > const_time_max_change && d_cputime + p_cputime > const_min_cputime) flag_enforcing = 1;
 					if (!flag_enforcing){
-						/* a minimum tim has to pass since last domain change to let the
+						/* a minimum time has to pass since last domain change to let the
 						 * completness of domain grow, or else i reset cpu time of processes
 						 * but if it is after reboot, then take uptime into account too
 						 * i calculate min time from time of check constant because this is the
@@ -3660,6 +3667,8 @@ void domain_check_enforcing(char *domain)
 						 * and it has to have a minimum limit too */
 						d_rules = string_count_lines(domain) + 10;
 						d_rules = d_rules * d_rules * const_domain_complexity_factor;
+						/* if a particular cpu time has grown compared to the domain complexity
+						 * since the last time of domain change, then i turn domain into enforcing mode */
 						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
 
 
