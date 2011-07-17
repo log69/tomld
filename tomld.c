@@ -3572,7 +3572,8 @@ void domain_set_enforce_old()
 void domain_check_enforcing(char *domain)
 {
 	char *name, *res, *res2, *temp, *ptime, *ptime2;
-	int i, cputime_all_percent, t2, d_create, d_change, d_rules, d_cputime, p_uptime, p_cputime;
+	int s_uptime, cputime_all_percent, t2, i;
+	int d_create, d_change, d_rules, d_cputime, p_uptime, p_cputime;
 	int flag_enforcing, flag_cputime_change;
 	
 	/* get main domain name */
@@ -3631,8 +3632,8 @@ void domain_check_enforcing(char *domain)
 					/* change time must not be greater than system uptime,
 					 * bacuse if the user turns off the computer immediately and then later back on,
 					 * the change time would be huge without any sense */
-					i = sys_get_uptime();
-					if (d_change > i) d_change = i;
+					s_uptime = sys_get_uptime();
+					if (d_change > s_uptime) d_change = s_uptime;
 					
 					free2(res); free2(res2);
 
@@ -3645,9 +3646,10 @@ void domain_check_enforcing(char *domain)
 					if (!flag_enforcing){
 						/* a minimum tim has to pass since last domain change to let the
 						 * completness of domain grow, or else i reset cpu time of processes
+						 * but if it is after reboot, then take uptime into account too
 						 * i calculate min time from time of check constant because this is the
 						 * intervall to check if domain has changed */
-						if (d_change < const_time_check * 2){
+						if (s_uptime > const_time_check * 2 && d_change < const_time_check * 2){
 							/* reset cpu times */
 							process_get_cpu_time_all(name, 1);
 							p_cputime = 0;
