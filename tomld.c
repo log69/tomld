@@ -39,6 +39,7 @@ changelog:
                          - bugfix in option handling
                          - add -- option to mark the end of option list
                          - change domain complexity from liner to exponential, so more complex domians will need more time
+                         - change working directory for logmark
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -374,7 +375,7 @@ char *tlogf = 0;
 
 /* kernel time of the last line of system log to identify the end of tomoyo logs
  * and make sure not to read it twice */
-char *tmark	= "/var/run/tomld/tomld.logmark";
+char *tmark	= "/var/local/tomld/tomld.logmark";
 char *tmarkf = 0;
 /* tomld pid file */
 char *tpid	= "/var/run/tomld/tomld.pid";
@@ -2892,7 +2893,7 @@ void check_tomoyo()
 	/* create tomoyo dir if it doesn't exist yet */
 	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
 
-	/* create tomld dir "/var/run/tomld" if it doesn't exist yet */
+	/* create tomld dirs if they don't exist yet */
 	mydir = path_get_parent_dir(tpid);
 	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
 	free2(mydir);
