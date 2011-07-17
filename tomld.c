@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-16/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
+17/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
                          - update documentation with better english (thanks to Andy Booth for clarifying it)
@@ -35,6 +35,10 @@ changelog:
                            and not the specified dirs
                          - bugfix in domain_get_rules_with_recursive_dirs()
                          - load tomld config from /etc/tomld/tomld.conf if it exists for customization
+                         - add ability to wildcard functions to replace dirs with manually wildcarded ones
+                         - bugfix in option handling
+                         - add -- option to mark the end of option list
+                         - change domain complexity from liner to exponential, so more complex domians will need more time
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -263,14 +267,16 @@ float const_time_save = 300;
  * (1 hour) */
 float const_time_max_learn = 60 * 60;
 /* interval of maximum time in seconds that needs to pass since last domain change for tomld
- * to automatically turn domain into enforcing mode, otherwise it calculates it to make a decision
- * (1 week) */
+ * to automatically turn domain into enforcing mode, otherwise it calculates it
+ * to make a decision (1 week) */
 int const_time_max_change = 60 * 60 * 24 * 7;
 /* constant for minimum cputime needed with timeout to turn domain into enforcing mode */
 int const_min_cputime = 100;
 /* constant for measuring the complexity of a domain
- * i multiply the number of rules of the domain by this and compare it to its process' cpu time */
-int const_domain_complexity_factor = 100;
+ * i raise the number of rules of the domain to the power of 2 and
+ * divide it by the div factor and compare it to its processes' cpu time */
+int const_domain_complexity_factor_min = 200;
+int const_domain_complexity_factor_div = 1;
 
 
 /* path to my executable */
@@ -386,6 +392,7 @@ char *tprogs_learn_auto = 0;
 
 
 /* options */
+int opt_dashdash	= 0;
 int opt_version		= 0;
 int opt_help		= 0;
 int opt_color		= 0;
@@ -2722,16 +2729,17 @@ void check_options(int argc, char **argv){
 	/* don't count the first argument that is the executable name itself */
 	int argc2 = argc - 1;
 	if (argc2 > 0) {
-		int flag_type = 0;
-		int flag_last = 0;
 		int c = 1;
 		char *myarg = 0;
+		int flag_type = 0;
 		
 		/* cycle through the arguments */
 		while (argc2--){
 			int flag_ok = 0;
 			strcpy2(&myarg, argv[c]);
 			
+			if (!strcmp(myarg, "--"))	{ opt_dashdash = 1;	flag_ok = 1; }
+
 			if (!strcmp(myarg, "-v") || !strcmp(myarg, "--verson"))	{ opt_version = 1;	flag_ok = 1; }
 			if (!strcmp(myarg, "-h") || !strcmp(myarg, "--help"  ))	{ opt_help    = 1;	flag_ok = 1; }
 			
@@ -2751,36 +2759,24 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
 			if (!strcmp(myarg, "--learn-all"))	{ opt_learn_all = 1; flag_ok = 1; }
 
-			/* store option type if it was any of --info, --remove or --recursive */
-			/* so if the next argument is not an option, then i know which former one it belongs to */
-			if (flag_ok > 1) flag_type = flag_ok;
-			/* if argument doesn't start with "-" char */
-			if (myarg[0] != '-'){
-				int flag_progs = 0;
+			/* after -- option everything belongs to exebutables */
+			if (flag_type == 99) flag_ok = 0;
+			else{
+				/* else store option type */
+				if (flag_ok) flag_type = flag_ok;
+				/* after -- option nothing counts as an option but as a file */
+				if (opt_dashdash){ flag_type = 99; }
+			}
+
+			/* if this is an argument, and not an option */
+			if (!flag_ok){
 				/* if last option arg was --info, then this belongs to it */
-				if (flag_type == 2){
-					/* if former arg was an option, then it belongs to it */
-					if (flag_last){
-						/* store as --info parameter */
-						strcpy2(&opt_info2, myarg);
-					}
-					/* it belongs to the extra executables, so store it */
-					else flag_progs = 1;
-				}
+				if (flag_type == 2) strcpy2(&opt_info2, myarg);
 				/* if last option arg was --remove, then this belongs to it */
-				if (flag_type == 3){
-					/* if former arg was an option, then it belongs to it */
-					if (flag_last){
-						/* store as --remove parameter */
-						strcpy2(&opt_remove2, myarg);
-					}
-					/* it belongs to the extra executables, so store it */
-					else flag_progs = 1;
-				}
+				if (flag_type == 3) strcpy2(&opt_remove2, myarg);
 				/* if last option arg was --recursive, then this belongs to it */
 				if (flag_type == 4){
 					int l;
-					flag_progs = 0;
 					/* root "/" dir not allowed */
 					if (!strcmp(myarg, "/")){ error("error: root directory is not allowed"); free2(myarg); myexit(1); }
 					/* check if dir name exist */
@@ -2795,38 +2791,35 @@ void check_options(int argc, char **argv){
 				}
 				/* if last option arg was --mail, then this belongs to it */
 				if (flag_type == 5){
-					/* if former arg was an option, then it belongs to it */
-					if (flag_last){
-						/* store as --mail parameter */
-						strcat2(&mail_users, myarg);
-						strcat2(&mail_users, " ");
-					}
-					/* it belongs to the extra executables, so store it */
-					else flag_progs = 1;
+					strcat2(&mail_users, myarg);
+					strcat2(&mail_users, " ");
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
-				if (!flag_type || flag_progs){
+				if (flag_type == 1 || flag_type == 99){
+					char *res;
+					if (myarg[0] == '-' && flag_type != 99){
+						error("error: wrong argument: "); error(myarg); newl();
+						free2(myarg); myexit(1);
+					}
 					/* search for name in paths and check if file exists */
-					char *res = which(myarg);
+					res = which(myarg);
 					if(!res){
-						error("error: no such file: "); error(myarg); newl(); free2(myarg); myexit(1); }
+						error("error: no such file: "); error(myarg); newl();
+						free2(myarg); myexit(1);
+					}
 					/* if file exists, store it as extra executables */
 					strcat2(&tprogs, res);
 					strcat2(&tprogs, "\n");
 					free2(res);
 				}
 			}
-
-			/* store the last option type */
-			flag_last = flag_ok;
-
 			c++;
 		}
 		
 		free2(myarg);
 
 		/* exit after --version or --help option */
-		if (opt_version || opt_help){
+		if (flag_type != 99 && (opt_version || opt_help)){
 			if (opt_version) version();
 			if (opt_help)    help();
 			myexit(0);
@@ -3650,12 +3643,22 @@ void domain_check_enforcing(char *domain)
 					flag_enforcing = 0;
 					if (d_change > const_time_max_change && d_cputime + p_cputime > const_min_cputime) flag_enforcing = 1;
 					if (!flag_enforcing){
-						/* count complexity of domain by
-						 * counting rules, and then multiplying it
-						 * with a minimum limit */
+						/* a minimum tim has to pass since last domain change to let the
+						 * completness of domain grow, or else i reset cpu time of processes
+						 * i calculate min time from time of check constant because this is the
+						 * intervall to check if domain has changed */
+						if (d_change < const_time_check * 2){
+							/* reset cpu times */
+							process_get_cpu_time_all(name, 1);
+							p_cputime = 0;
+							d_cputime = 0;
+						}
+						/* count complexity of domain by counting rules, then
+						 * raising it to the power of 2 and dividing it by another factor (4),
+						 * and it has to have a minimum limit too */
 						d_rules = string_count_lines(domain);
-						d_rules = d_rules * const_domain_complexity_factor;
-						if (d_rules < const_domain_complexity_factor) d_rules = const_domain_complexity_factor;
+						d_rules = d_rules * d_rules / const_domain_complexity_factor_div;
+						if (d_rules < const_domain_complexity_factor_min) d_rules = const_domain_complexity_factor_min;
 						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
 
 
@@ -4113,7 +4116,7 @@ void domain_get_log()
 							/* switch domain to learning mode */
 							if (!flag_once){
 								domain_set_profile(res, 1);
-								/* reset cpu time counter for prog because of learning mode,
+								/* reset cpu time counter for prog because of switching it into learning mode,
 								 * or else it would switch back to enforcing mode immediately */
 								process_get_cpu_time_all(prog, 1);
 								/* add domain to temporary list */
@@ -4322,7 +4325,7 @@ void domain_print_mode()
 				if (!flag_firstrun) newl();
 				/* turn on learning mode for the domain and all its subdomains */
 				domain_set_profile_for_prog(prog, 1);
-				/* reset cpu time counter for prog because of learning mode */
+				/* reset cpu time counter for prog because of switching it into learning mode */
 				process_get_cpu_time_all(prog, 1);
 			}
 
@@ -4357,12 +4360,7 @@ void domain_print_mode()
 
 		}
 		
-		if (flag_firstrun){
-			newl();
-
-			/* reset cpu time counter for all progs for first run only */
-			process_get_cpu_time_all(prog, 1);
-		}
+		if (flag_firstrun) newl();
 		
 		free2(prog);
 	}
@@ -4828,7 +4826,9 @@ int compare_path_search_dir_in_list(char *list, char *dir)
 char *compare_path_search_dir_in_list_first_subdirs(char *list, char *dir)
 {
 	char *res, *res2, *temp;
-	int c;
+	int c, c1, c2, i1, i2, in, in1, in2;
+	int flag1, flag2;
+	long l1, l2;
 
 	/* search for the dir in the list by wildcarded compare */
 	temp = list;
@@ -4842,12 +4842,72 @@ char *compare_path_search_dir_in_list_first_subdirs(char *list, char *dir)
 			/* merge together the 2 paths subdir by subdir
 			 * prefering the one from the list
 			 * or the one with wildcard in it */
-			c = l2; c2 = 0;
-			while(c--) if (res2[c] == '*') c2++;
-			
-			
+			char *path1 = res;
+			char *path2 = dir;
+			char *new, *new1, *new2;
+			l1 = strlen2(&path1);
+			l2 = strlen2(&path2);
+			new  = memget2((l1 + l2) * 2);
+			/* paths not null? */
+			if (l1 && l2){
+				new1 = memget2(l1 * 2);
+				new2 = memget2(l2 * 2);
+				in = 0; i1 = 0; i2 = 0;
+				c1 = 0; c2 = 0;
+
+				/* merge paths */
+				while(1){
+					/* get subdir from path1 */
+					flag1 = 0;
+					in1 = 0;
+					while(1){
+						c1 = path1[i1];
+						if (c1 == '*') flag1 = 1;
+						new1[in1] = c1;
+						if (!c1 || c1 == '/'){
+							if (c1){ in1++; i1++; }
+							break;
+						}
+						in1++;
+						i1++;
+					}
+					new1[in1] = 0;
+					strlenset3(&new1, in1);
+					
+					/* get subdir from path2 */
+					flag2 = 0;
+					in2 = 0;
+					while(1){
+						c2 = path2[i2];
+						if (c2 == '*') flag2 = 1;
+						new2[in2] = c2;
+						if (!c2 || c2 == '/'){
+							if (c2){ in2++; i2++; }
+							break;
+						}
+						in2++;
+						i2++;
+					}
+					new2[in2] = 0;
+					strlenset3(&new2, in2);
+					
+					/* compare subnames */
+					/* if both contain wildcard, then i prefer the one from list (path1)
+					 * or the one that is not null */
+					if (flag1)               strcat2(&new, new1);
+					else if (flag2)          strcat2(&new, new2);
+					else if (strlen2(&new1)) strcat2(&new, new1);
+					else                     strcat2(&new, new2);
+					
+					/* exit if both paths reached end */
+					if (!c1 && !c2) break;
+				}
+				free2(new1);
+				free2(new2);
+			}
 			free2(res);
-			return res2;
+			free2(res2);
+			return new;
 		}
 		free2(res);
 		free2(res2);
@@ -5867,7 +5927,6 @@ void domain_reshape_rules_wildcard_spec()
 							if (res2){
 								free2(param);
 								param = res2;
-debug(param);
 							}
 							
 							/* path is in spec_ex */
@@ -6753,7 +6812,7 @@ void myinit()
 int main(int argc, char **argv)
 {
 	float t, t2, t3;
-
+	
 	/* some initializations */
 	myinit();
 
