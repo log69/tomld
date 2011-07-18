@@ -89,8 +89,11 @@ char *mytime_get_sec_human(int sec)
 
 	if (day)      { s = day;  strcpy2(&t, " day");  }
 	else if (hour){ s = hour; strcpy2(&t, " hour"); }
-	else if (min) { s = min;  strcpy2(&t, " min");  }
-	else          { s = sec;  strcpy2(&t, " sec");  }
+	else if (min) { s = min;  strcpy2(&t, " minute");  }
+	else          { s = sec;  strcpy2(&t, " second");  }
+	
+	/* plural */
+	if (s > 1) strcat2(&t, "s");
 	
 	ptime = string_itos(s);
 	strcat2(&ptime, t);
