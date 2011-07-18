@@ -2946,16 +2946,15 @@ void check_tomoyo()
 			}
 			free2(res);
 		}
-		
-		/* initialize special dir lists if no loadable config file found */
-		if (!spec_exception2) spec_exception2 = array_copy_to_string_list(spec_exception);
-		if (!spec_wildcard2)  spec_wildcard2  = array_copy_to_string_list(spec_wildcard);
-		if (!spec_replace2)   spec_replace2   = array_copy_to_string_list(spec_replace);
-		if (dirs_recursive)   opt_recursive   = 1;
-		if (!mail_mta2)       strcpy2(&mail_mta2, mail_mta);
-
 		free2(tspecf);
 	}
+
+	/* initialize special dir lists with default value that have no tag in config file */
+	if (!spec_exception2) spec_exception2 = array_copy_to_string_list(spec_exception);
+	if (!spec_wildcard2)  spec_wildcard2  = array_copy_to_string_list(spec_wildcard);
+	if (!spec_replace2)   spec_replace2   = array_copy_to_string_list(spec_replace);
+	if (dirs_recursive)   opt_recursive   = 1;
+	if (!mail_mta2)       strcpy2(&mail_mta2, mail_mta);
 }
 
 
