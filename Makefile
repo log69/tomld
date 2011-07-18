@@ -1,5 +1,5 @@
 CC = cc
-CFLAGS = -O2 -Wall -pedantic -Wcomment -Wextra
+CFLAGS = -O2 -Wall -pedantic -Wcomment -Wextra -g
 LDFLAGS = 
 OBJS = tomld.o tio.o tpath.o tstring.o
 PREFIX=/usr/local
