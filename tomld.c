@@ -42,6 +42,7 @@ changelog:
                          - change working directory for logmark
                          - print statistics about used cpu time, peak of virtual memory and peak of resident memory
                          - bugfix in domain_reshape_rules_create_double()
+                         - check on every restart of tomld whether any of the domains still need restart and print info about it
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -3604,10 +3605,9 @@ void domain_check_enforcing(char *domain)
 			
 			free2(res); free2(res2);
 
-			/* is process uptime less than domain creation time?
-			 * if so, then this means there is at least one process of the domain
-			 * that has been restarted since domain creation,
-			 * so this one gives ok to turn it into enforcing mode */
+			/* are all processes' uptime greater than the time passed since domain creation time?
+			 * if so, then this means that none of the domain's processes has been restarted since then
+			 * so this one blocks turning it into enforcing mode */
 			if (d_create > p_uptime + 1){
 
 				/* get the sum of cpu times of the domain's all processes */
@@ -4266,8 +4266,42 @@ void domain_print_mode()
 		strcat2(&s, prog);
 		if (string_search_line(texcf, s) > -1){
 			if (flag_firstrun){
+				int i, p_uptime, d_create;
+				char *res, *res2, *temp, *domain;
+				
 				color(prog, blue);
 				color(", domain exists", clr);
+
+				/* **************************************
+				 * check if restart is still needed,
+				 * this happens when the uptime of process is greater than
+				 * the time passed since domain creation */
+
+				/* get process uptime of domain */
+				p_uptime = process_get_least_uptime(prog);
+				/* get creation time of domain */
+				domain = domain_get(prog);
+				if (domain){
+					i = string_search_keyword(domain, myuid_create);
+					if (i > -1){
+						temp = domain + i;
+						/* get my unique id with the creation time in it */
+						res = string_get_next_line(&temp);
+						/* get epoch time from my uid */
+						res2 = string_get_number_last(res);
+						/* convert epoch string to integer */
+						d_create = time(0) - atoi(res2);
+						
+						free2(res); free2(res2);
+
+						/* are all processes' uptime greater than the time passed since domain creation time?
+						 * if so, then this means that none of the domain's processes has been restarted since then
+						 * so this one blocks turning it into enforcing mode */
+						if (d_create < p_uptime + 1) color(" (restart needed)", red);
+					}
+					free2(domain);
+				}
+
 				flag_check3 = 1;
 			}
 		}
