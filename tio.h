@@ -57,6 +57,8 @@ char *file_read(const char *name, long length);
 
 void file_write(const char *name, const char *buff);
 
+void file_writea(const char *name, const char *buff);
+
 int dir_exist(const char *name);
 
 int file_exist(const char *name);
