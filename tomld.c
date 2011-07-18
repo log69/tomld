@@ -41,6 +41,7 @@ changelog:
                          - change domain complexity from liner to exponential, so more complex domians will need more time
                          - change working directory for logmark
                          - print statistics about used cpu time, peak of virtual memory and peak of resident memory
+                         - bugfix in domain_reshape_rules_create_double()
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -6046,10 +6047,15 @@ void domain_reshape_rules_create_double()
 			/* allow_create can have second parameter from kernel 2.6.36 and above */
 			strcat2(&tdomf_new, "allow_create ");
 			strcat2(&tdomf_new, param1);
-			strcat2(&tdomf_new, " ");
-			if (param2) strcat2(&tdomf_new, param2);
+			if (param2){
+				strcat2(&tdomf_new, param2);
+				strcat2(&tdomf_new, " ");
+			}
 			else{
-				if (kernel_version() >= 263600) strcat2(&tdomf_new, "0-0xFFFF");
+				if (kernel_version() >= 263600){
+					strcat2(&tdomf_new, " ");
+					strcat2(&tdomf_new, "0-0xFFFF");
+				}
 			}
 			strcat2(&tdomf_new, "\n");
 
