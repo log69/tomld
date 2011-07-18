@@ -91,6 +91,8 @@ int string_next_line_len(const char *text);
 
 int string_jump_next_line(char **text);
 
+int string_jump_next_linen(char **text, int count);
+
 char *string_get_next_word(char **text);
 
 char *string_get_next_wordn(char **text, int num);
