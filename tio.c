@@ -226,7 +226,7 @@ char *file_read(const char *name, long length)
 	unsigned long len = 0;
 	
 	/* open file for reading */
-	FILE *f = fopen(name, "r");
+	FILE *f = fopen(name, "rb");
 	if (!f){
 		error("error: cannot read file ");
 		error(name); newl_();
@@ -264,7 +264,7 @@ char *file_read(const char *name, long length)
 		len += c * max_char;
 		free2(buff);
 		fclose(f);
-		f = fopen(name, "r");
+		f = fopen(name, "rb");
 	}
 	else len = length;
 	
@@ -290,14 +290,33 @@ char *file_read(const char *name, long length)
 /* open file and write content */
 void file_write(const char *name, const char *buff)
 {
-	FILE *f = fopen(name, "w");
+	FILE *f = fopen(name, "wb");
 	if (!f){
 		error("error: cannot write file ");
 		error(name); newl_();
 		exit(1);
 	}
 	/* write contents if not null */
-	if (buff) fprintf(f, "%s", buff);
+	if (buff){
+		fprintf(f, "%s", buff);
+	}
+	fclose(f);
+}
+
+
+/* open file and write content in append mode */
+void file_writea(const char *name, const char *buff)
+{
+	FILE *f = fopen(name, "ab");
+	if (!f){
+		error("error: cannot write file ");
+		error(name); newl_();
+		exit(1);
+	}
+	/* write contents if not null */
+	if (buff){
+		fprintf(f, "%s", buff);
+	}
 	fclose(f);
 }
 
@@ -318,13 +337,13 @@ int file_exist(const char *name)
 	FILE *f;
 	int res = 0;
 
-	f = fopen(name, "r+");
+	f = fopen(name, "rb+");
 	if (f){
 		res = 1;
 		fclose(f);
 	}
 
-	f = fopen(name, "r");
+	f = fopen(name, "rb");
 	if (f){
 		res = 1;
 		fclose(f);
