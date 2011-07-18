@@ -537,6 +537,18 @@ int string_jump_next_line(char **text)
 }
 
 
+/* move pointer to the beginning of next line in a string and jump count of lines more */
+/* return null on fail */
+int string_jump_next_linen(char **text, int count)
+{
+	int res = 0;
+	int c = count;
+	while((--c) >= 0) res = string_jump_next_line(text);
+	
+	return res;
+}
+
+
 /* return a new string containing the next word in a string and move the pointer to the beginning of the next word */
 /* check only the current line, not the whole string */
 /* returned value must be freed by caller */
