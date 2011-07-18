@@ -2236,7 +2236,7 @@ void reload()
 	char *name1, *name2, *rules = 0, *rules_old = 0, *profile = 0;
 	char *domain_names_active = 0;
 	int i;
-	
+
 	/* alloc mem for transitions */
 	myappend = memget2(max_char);
 
@@ -2252,7 +2252,6 @@ void reload()
 		res = string_get_diff(texcf, texcf_old);
 		if (res){
 			strcat2(&myappend, res);
-			strcat2(&myappend, "\n");
 			free2(res);
 		}
 
@@ -2260,9 +2259,9 @@ void reload()
 		 * since i started creating the new one */
 		texcf_old2 = file_read(texck, -1);
 		if (!strcmp(texcf_old, texcf_old2)){
-			free2(texcf_old2);
 			/* write changes to kernel */
-			file_write(texck, myappend);
+			if (strlen2(&myappend)) file_write(texck, myappend);
+			free2(texcf_old2);
 			break;
 		}
 		else{
@@ -2356,7 +2355,6 @@ void reload()
 					strcat2(&myappend, "\n");
 					/* add the diff of my new rules to the list */
 					strcat2(&myappend, res2);
-					strcat2(&myappend, "\n");
 					free2(res2);
 					free2(res3);
 				}
@@ -2405,7 +2403,6 @@ void reload()
 									strcat2(&myappend, "\n");
 									/* add the diff of my new rules to the list */
 									strcat2(&myappend, res2);
-									strcat2(&myappend, "\n");
 									free2(res2);
 									free2(res3);
 								}
@@ -2423,9 +2420,9 @@ void reload()
 		 * since i started creating the new one */
 		tdomf_old2 = file_read(tdomk, -1);
 		if (!strcmp(tdomf_old, tdomf_old2)){
-			free2(tdomf_old2);
 			/* write changes to kernel */
-			file_write(tdomk, myappend);
+			if (strlen2(&myappend)) file_write(tdomk, myappend);
+			free2(tdomf_old2);
 			break;
 		}
 		else{
@@ -6736,6 +6733,7 @@ void statistics()
 	int d = 0, r = 0;
 	char *mypid, *mydir_name = 0, *pstat, *ptime;
 	int t, t2;
+	float tt;
 	/* converting jiffies to second, this is from manpage of proc */
 	int jiffies_per_second=sysconf(_SC_CLK_TCK);
 	
@@ -6810,7 +6808,9 @@ void statistics()
 	
 	/* calculate cpu usage of process in percentage
 	 * process_cpu_time / process_uptime * 100 */
-	printf("used cpu %.2f %%, ", (float)(t) * 100 / (float)(t2));
+	tt = 0;
+	if (t2) tt = (float)(t) * 100 / (float)(t2);
+	printf("used cpu %.2f %%, ", tt);
 	
 
 	/* create dirname like /proc/pid/status */
@@ -6907,7 +6907,7 @@ void myinit()
 int main(int argc, char **argv)
 {
 	float t, t2, t3;
-	
+
 	/* some initializations */
 	myinit();
 
