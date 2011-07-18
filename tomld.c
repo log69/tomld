@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-17/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
+18/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
                          - update documentation with better english (thanks to Andy Booth for clarifying it)
@@ -40,6 +40,7 @@ changelog:
                          - add -- option to mark the end of option list
                          - change domain complexity from liner to exponential, so more complex domians will need more time
                          - change working directory for logmark
+                         - print statistics about used cpu time, peak of virtual memory and peak of resident memory
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -608,6 +609,7 @@ void myfree()
 	free2(myuid_cputime);
 	free2(domain_cputime_list_minus);
 	free2(domain_cputime_list_plus);
+	free2(domain_cputime_list_current);
 	free2(spec_exception2);
 	free2(spec_wildcard2);
 	free2(spec_replace2);
@@ -1740,7 +1742,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					strcat2(&mydir_name, "/stat");
 					/* read process stat value */
 					pstat = file_read(mydir_name, -1);
-					/* get all utime, stime, cutime and cstime of process in seconds */
+					/* get all utime, stime, cutime and cstime of process in ticks */
 					t = 0;
 					temp = pstat;
 					ptime = string_get_next_wordn(&temp, 13);
@@ -6724,9 +6726,12 @@ void check_processes()
 /* print statistics about domains */
 void statistics()
 {
-	char *res, *temp, *sd, *sr;
-	int d = 0;
-	int r = 0;
+	char *res, *temp, *temp2, *sd, *sr;
+	int d = 0, r = 0;
+	char *mypid, *mydir_name = 0, *pstat, *ptime;
+	int t, t2;
+	/* converting jiffies to second, this is from manpage of proc */
+	int jiffies_per_second=sysconf(_SC_CLK_TCK);
 	
 	/* count domains */
 	temp = tdomf;
@@ -6758,6 +6763,79 @@ void statistics()
 	
 	/* print stat about the min, max and average time of check cycle */
 	printf("cycle times min/avg/max %.2f/%.2f/%.2f sec\n", time_min_cycle, time_avg_cycle / (float)(time_avg_cycle_counter), time_max_cycle);
+
+	/* create dirname like /proc/pid/stat */
+	mypid = string_itos(getpid());
+	strcpy2(&mydir_name, "/proc/");
+	strcat2(&mydir_name, mypid);
+	strcat2(&mydir_name, "/stat");
+	/* read process stat value */
+	pstat = file_read(mydir_name, -1);
+
+	/* get all utime, stime, cutime and cstime of process in seconds */
+	t = 0;
+	temp = pstat;
+	ptime = string_get_next_wordn(&temp, 13);
+	t += atoi(ptime);
+	free2(ptime);
+	temp = pstat;
+	ptime = string_get_next_wordn(&temp, 14);
+	t += atoi(ptime);
+	free2(ptime);
+	temp = pstat;
+	ptime = string_get_next_wordn(&temp, 15);
+	t += atoi(ptime);
+	free2(ptime);
+	temp = pstat;
+	ptime = string_get_next_wordn(&temp, 16);
+	t += atoi(ptime);
+	free2(ptime);
+	/* convert clock ticks to seconds */
+	t = t / jiffies_per_second;
+	
+	/* get uptime of process */
+	temp = pstat;
+	/* get starttime of process in jiffies */
+	ptime = string_get_next_wordn(&temp, 21);
+	/* calculate process uptime in sec */
+	t2 = sys_get_uptime() - atoi(ptime) / jiffies_per_second;
+	free2(ptime);
+	free2(pstat);
+	
+	/* calculate cpu usage of process in percentage
+	 * process_cpu_time / process_uptime * 100 */
+	printf("used cpu %.2f %%, ", (float)(t) * 100 / (float)(t2));
+	
+
+	/* create dirname like /proc/pid/status */
+	strcpy2(&mydir_name, "/proc/");
+	strcat2(&mydir_name, mypid);
+	strcat2(&mydir_name, "/status");
+	/* read process stat value */
+	pstat = file_read(mydir_name, -1);
+	
+	/* get virtual and resident peak of memory usage */
+	/* get VM peak */
+	temp = pstat;
+	string_jump_next_linen(&temp, 10);
+	temp2 = temp;
+	res = string_get_next_wordn(&temp2, 1);
+	t = atoi(res);
+	free2(res);
+	/* get RSS peak */
+	temp = pstat;
+	string_jump_next_linen(&temp, 13);
+	temp2 = temp;
+	res = string_get_next_wordn(&temp2, 1);
+	t2 = atoi(res);
+	free2(res);
+	
+	/* calculate values to MB and print them */
+	printf("vm peak %.1f MB, rss peak %.1f MB\n", (float)(t) / 1024, (float)(t2) / 1024);
+
+	free2(mydir_name);
+	free2(mypid);
+	free2(pstat);
 }
 
 
