@@ -45,6 +45,7 @@ changelog:
                          - check on every restart of tomld whether any of the domains still need restart and print info about it
                          - reducing load by saving config files only if their content have changed
                          - reducing load by checking system log only if its modification time has changed
+                         - print more info when turning a domain back into learning mode
 13/07/2011 - tomld v0.36 - fully automatic enforcing mode is ready, needs a lot of testing though
                          - add ability to accept user request for temporary learning mode for domains with deny logs
                          - empty pid file on exit
@@ -4185,8 +4186,8 @@ void domain_get_log()
 								/* if match, add rule to domain policy */
 								strcat2(&rules_new, rule);
 								strcat2(&rules_new, "\n");
-								/* switch domain to learning mode */
 								if (!flag_once){
+									/* switch domain to learning mode */
 									domain_set_profile(res, 1);
 									/* reset cpu time counter for prog because of switching it into learning mode,
 									 * or else it would switch back to enforcing mode immediately */
@@ -4198,6 +4199,9 @@ void domain_get_log()
 									}
 									/* do it only once per domain for speed */
 									flag_once = 1;
+									/* print info */
+									color(prog, blue); color(", ", clr);
+									color("turn on learning mode\n", clr);
 								}
 							}
 
