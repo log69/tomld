@@ -3,8 +3,11 @@
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 DAEMON=/usr/local/sbin/tomld
+DAEMON2=/usr/sbin/tomld
 LOGFILE=/var/log/tomld.log
 KILLALL=/usr/bin/killall
+
+test -x $DAEMON || DAEMON=$DAEMON2
 
 case $1 in
 	start)
