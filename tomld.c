@@ -275,8 +275,8 @@ float const_time_save = 300;
 float const_time_max_learn = 60 * 60;
 /* interval of maximum time in seconds that needs to pass since last domain change for tomld
  * to automatically turn domain into enforcing mode, otherwise it calculates it
- * to make a decision (1 week) */
-int const_time_max_change = 60 * 60 * 24 * 7;
+ * to make a decision (2 weeks) */
+int const_time_max_change = 60 * 60 * 24 * 14;
 /* constant for minimum cputime needed with timeout to turn domain into enforcing mode */
 int const_min_cputime = 100;
 /* constant for measuring the complexity of a domain
