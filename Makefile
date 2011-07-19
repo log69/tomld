@@ -1,8 +1,8 @@
 CC = cc
-CFLAGS = -O2 -Wall -pedantic -Wcomment -Wextra -g
+CFLAGS = -O2 -Wall -pedantic -Wcomment -Wextra
 LDFLAGS = 
 OBJS = tomld.o tio.o tpath.o tstring.o
-PREFIX=/usr/local
+PREFIX=/usr
 
 tomld: $(OBJS)
 	$(CC) $(CFLAGS) -o tomld $(LDFLAGS) $(OBJS)
@@ -16,5 +16,7 @@ install:
 	test -d $(PREFIX)/share          || mkdir $(PREFIX)/share
 	test -d $(PREFIX)/share/man      || mkdir $(PREFIX)/share/man
 	test -d $(PREFIX)/share/man/man1 || mkdir $(PREFIX)/share/man/man1
+	test -d /etc/tomld               || mkdir /etc/tomld
 	install --mode 0755 tomld $(PREFIX)/sbin
+	install --mode 0644 tomld.conf /etc/tomld/
 	install --mode 0644 tomld.manual $(PREFIX)/share/man/man1/tomld.1
