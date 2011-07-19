@@ -321,6 +321,23 @@ void file_writea(const char *name, const char *buff)
 }
 
 
+/* return modification time of file */
+int file_get_mod_time(const char *name)
+{
+	int mod = 0;
+	struct stat buff;
+	if (stat(name, &buff) == -1){
+		error("error: cannot stat file ");
+		error(name); newl_();
+		exit(1);
+	}
+	
+	mod = buff.st_mtime;
+	
+	return mod;
+}
+
+
 /* check if dir exists */
 int dir_exist(const char *name)
 {
