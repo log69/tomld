@@ -375,6 +375,7 @@ char *tdomf_bak  = 0;
 char *tdomf_bak2 = 0;
 char *tdomf_bak3 = 0;
 char *texcf_bak3 = 0;
+char *tmarkf_bak3 = 0;
 
 /* system log */
 char *tlog	= "/var/log/syslog";
@@ -613,6 +614,7 @@ void myfree()
 	free2(tdomf_bak2);
 	free2(tdomf_bak3);
 	free2(texcf_bak3);
+	free2(tmarkf_bak3);
 	free2(myuid_create);
 	free2(myuid_change);
 	free2(myuid_cputime);
@@ -2490,14 +2492,25 @@ void save()
 			}
 		}
 	}
-}
 
-
-/* save config files from variables to disk */
-void save_logmark()
-{
-	/* save log mark to disk */
-	file_write(tmark, tmarkf);
+	/* store log mark backup if missig yet */
+	if (!tmarkf_bak3){
+		/* store backup */
+		strcpy2(&tmarkf_bak3, tmarkf);
+		/* save config to disk */
+		file_write(tmark, tmarkf);
+	}
+	else{
+		if (tmarkf){
+			/* compare config to backup and save only if changed */
+			if (strcmp(tmarkf, tmarkf_bak3)){
+				/* store backup */
+				strcpy2(&tmarkf_bak3, tmarkf);
+				/* save config to disk */
+				file_write(tmark, tmarkf);
+			}
+		}
+	}
 }
 
 
@@ -6948,7 +6961,6 @@ void finish()
 
 		/* save configs to disk */
 		save();
-		save_logmark();
 		reload();
 	}
 	else if (flag_firstrun) color("* haven't finished to run at least once\n", red);
@@ -7166,7 +7178,6 @@ int main(int argc, char **argv)
 		if ((mytime() - t2) >= const_time_save){
 			/* save configs */
 			save();
-			save_logmark();
 
 			/* reset time */
 			t2 = mytime();
