@@ -8,5 +8,3 @@
 - create an easily readable flow chart
 - create debian package
 - create manual and expand docs
-- no interactivity with --daemon option
-
