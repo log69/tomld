@@ -23,6 +23,7 @@
 */
 
 #include <time.h>
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>
 #include <termios.h>
@@ -58,6 +59,8 @@ char *file_read(const char *name, long length);
 void file_write(const char *name, const char *buff);
 
 void file_writea(const char *name, const char *buff);
+
+int file_get_mod_time(const char *name);
 
 int dir_exist(const char *name);
 
