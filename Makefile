@@ -10,7 +10,7 @@ tomld: $(OBJS)
 clean:
 	rm -f tomld *.o
 
-install:
+install: all
 	test -d $(PREFIX)                || mkdir $(PREFIX)
 	test -d $(PREFIX)/sbin           || mkdir $(PREFIX)/sbin
 	test -d $(PREFIX)/share          || mkdir $(PREFIX)/share
