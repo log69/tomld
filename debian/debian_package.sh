@@ -2,25 +2,26 @@
 # create debian package of tomld
 
 
-PWD=$(pwd)
+# cd to sources
+cd $(dirname $0);
+DEB=$(pwd)
+cd ..
+BASE=$(pwd)
 TEMP=$(mktemp -d)
-
-cd $(dirname $0)
 
 # determine latest upstream version
 VER=$(grep -E "^char *\*ver *= *" ./tomld.c | grep -Eo "[0-9]+[0-9\.]*[0-9]+")
-
 
 # create tomld.tgz
 echo
 echo "* creating tomld.tgz..."
 (make clean) &>/dev/null
 mkdir "$TEMP"/tomld-"$VER"
-cp -a ./* "$TEMP"/tomld-"$VER"/
+cp ./* "$TEMP"/tomld-"$VER"/
 cd "$TEMP"
 tar cfz tomld_"$VER".tar.gz tomld-"$VER" --exclude ".git"
 
-cd tomld-*
+cd tomld-"$VER"
 
 dh_make -f ../tomld_"$VER".tar.gz --single -e mail@log69.com -p tomld -c gpl
 
@@ -102,8 +103,8 @@ cd ..
 # echo "----------------------"
 
 
-cp tomld_*  /home/andras/Desktop/
-chown andras:andras /home/andras/Desktop/tomld_*
+cp tomld_*  "$DEB"/
+chown andras:andras "$DEB"/tomld_*
 rm -rf "$TEMP"
 
 
