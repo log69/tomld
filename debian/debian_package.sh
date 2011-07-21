@@ -28,18 +28,23 @@ dh_make -f ../tomld_"$VER".tar.gz --single -e mail@log69.com -p tomld -c gpl
 cd debian
 
 
-#rm -f compat watch.ex
+#rm -f compat watch.ex init.d.ex
 rm -f postinst.ex postrm.ex preinst.ex prerm.ex
 rm -f tomld.default.ex tomld.doc-base.EX cron.d.ex
 rm -f emacsen-install.ex emacsen-remove.ex emacsen-startup.ex
 rm -f init.d.ex init.d.lsb.ex manpage.1.ex manpage.sgml.ex manpage.xml.ex
 rm -f menu.ex README.Debian README.source tomld.cron.d.ex
 
-echo "usr/sbin" 			> dirs
+
+echo "usr/sbin" 		>  dirs
+echo "etc/init.d" 		>> dirs
+echo "etc/tomld" 		>> dirs
 
 cp ../tomld.control ./control
 cp ../tomld.manual ./tomld.1
 echo "debian/tomld.1" > ./tomld.manpages
+cp ../tomld.init ./init.d
+
 
 echo "This work was packaged for Debian by:" > copyright.new
 echo 				>> copyright.new
@@ -80,9 +85,6 @@ mv copyright.new copyright
 #	tail -n2 changelog >> changelog.new
 	mv changelog.new changelog
 
-
-
-sed -i s/"dh_installman"/"dh_installman debian\/tomld.1"/ rules
 
 grep -i "^version=" watch.ex > watch
 echo "http://log69.com/tomld.html downloads/tomld_v(.*)\.tar\.gz" >> watch
