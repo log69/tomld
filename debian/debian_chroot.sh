@@ -42,7 +42,7 @@ chown -R "$MYUSER":"$MYUSER" "$CHROOTDIR"/home/"$MYUSER"
 
 echo "copying .gnupg..."
 cp -a /home/"$MYUSER"/.gnupg "$CHROOTDIR"/home/"$MYUSER"/
-ln -s /home/"$MYUSER"/.gnupg "$CHROOTDIR"/root/
+ln -sf /home/"$MYUSER"/.gnupg "$CHROOTDIR"/root/
 echo "copying development/tomld..."
 cp -a /home/"$MYUSER"/development/tomld "$CHROOTDIR"/home/"$MYUSER"/development/
 
