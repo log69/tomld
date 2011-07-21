@@ -60,6 +60,8 @@ void file_write(const char *name, const char *buff);
 
 void file_writea(const char *name, const char *buff);
 
+void file_std_redir(const char *name);
+
 int file_get_mod_time(const char *name);
 
 int dir_exist(const char *name);
