@@ -175,7 +175,7 @@ char key_get()
 char *pipe_read(const char *comm, long length)
 {
 	char *buff;
-	int ret = 0;
+	int ret;
 	
 	/* open pipe for reading */
 	FILE *p = popen(comm, "r");
@@ -190,6 +190,12 @@ char *pipe_read(const char *comm, long length)
 	memset(buff, 0, length);
 	/* read pipe */
 	ret = fread(buff, length, 1, p);
+	if (length > 0 && !ret){
+		error("error: unknown error while reading from pipe with command: ");
+		error(comm); newl_();
+		exit(1);
+	}
+		
 	pclose(p);
 	/* set dynamic string length */
 	strlenset2(&buff);
@@ -321,6 +327,25 @@ void file_writea(const char *name, const char *buff)
 }
 
 
+/* redirect stderr and stdout to the file */
+void file_std_redir(const char *name)
+{
+	FILE *f;
+	f = freopen(name, "ab", stdout);
+	if (!f){
+		error("error: cannot redirect stdout to file ");
+		error(name); newl_();
+		exit(1);
+	}
+	f = freopen(name, "ab", stderr);
+	if (!f){
+		error("error: cannot redirect stderr to file ");
+		error(name); newl_();
+		exit(1);
+	}
+}
+
+
 /* return modification time of file */
 int file_get_mod_time(const char *name)
 {
@@ -376,7 +401,7 @@ char *which(const char *name)
 {
 	char *path_bin[] = {"/usr/local/sbin", "/usr/local/bin", "/usr/sbin", "/usr/bin", "/sbin", "/bin", 0};
 
-	char *res, *full, *ret;
+	char *res, *full;
 	int i;
 	
 	/* name starts with "/" char? */
@@ -392,7 +417,8 @@ char *which(const char *name)
 	full = memget2(max_char);
 
 	/* fle exists in the current dir? */
-	ret = getcwd(full, max_char);
+	if (!getcwd(full, max_char)){
+		error("error: could not get current working directory\n"); exit(1); }
 	strcat2(&full, "/");
 	strcat2(&full, name);
 	if (file_exist(full)){
