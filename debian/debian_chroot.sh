@@ -34,6 +34,7 @@ fi
 rm -rf "$CHROOTDIR"/home/"$MYUSER"
 
 if ! grep -q "$MYUSER" "$CHROOTDIR"/etc/passwd; then grep "$MYUSER" /etc/passwd >> "$CHROOTDIR"/etc/passwd; fi
+if ! grep -q "$MYUSER" "$CHROOTDIR"/etc/group;  then grep "$MYUSER" /etc/group  >> "$CHROOTDIR"/etc/group;  fi
 if ! grep -q "$MYUSER" "$CHROOTDIR"/etc/shadow; then grep "$MYUSER" /etc/shadow >> "$CHROOTDIR"/etc/shadow; fi
 
 mkdir -p "$CHROOTDIR"/home/"$MYUSER"/development/
@@ -41,6 +42,7 @@ chown -R "$MYUSER":"$MYUSER" "$CHROOTDIR"/home/"$MYUSER"
 
 echo "copying .gnupg..."
 cp -a /home/"$MYUSER"/.gnupg "$CHROOTDIR"/home/"$MYUSER"/
+ln -s /home/"$MYUSER"/.gnupg "$CHROOTDIR"/root/
 echo "copying development/tomld..."
 cp -a /home/"$MYUSER"/development/tomld "$CHROOTDIR"/home/"$MYUSER"/development/
 
@@ -50,7 +52,7 @@ echo
 
 if [ "$LC_ALL" == "" ]; then export LC_ALL='C'; fi
 
-chroot "$CHROOTDIR" su andras -c /home/andras/development/tomld/debian/debian_package.sh
+chroot "$CHROOTDIR" su -c /home/andras/development/tomld/debian/debian_package.sh
 
 
 BASE="/home/$MYUSER/development/tomld"
@@ -59,6 +61,8 @@ echo
 #echo "deleting files..."
 #rm -f "$BASE"/debian/tomld_*
 echo "copying files back..."
-cp "$CHROOTDIR""$BASE"/debian/tomld_*  "$BASE"/debian/
+cp -f "$CHROOTDIR""$BASE"/debian/tomld_*  "$BASE"/debian/
+chown andras:andras "$BASE"/debian/tomld_*
+
 echo
 echo done.

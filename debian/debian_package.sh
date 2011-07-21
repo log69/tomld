@@ -89,23 +89,11 @@ echo "http://log69.com/tomld.html downloads/tomld_v(.*)\.tar\.gz" >> watch
 rm -f watch.ex
 
 cd ..
-
-
-#dpkg-buildpackage -rfakeroot -k7CA53418
-dpkg-buildpackage -k7CA53418
+debuild -k7CA53418
 
 
 cd ..
-# echo
-# echo "--- LINTIAN OUTPUT ---"
-# lintian *.deb
-# lintian *.changes
-# echo "----------------------"
-
-
-cp tomld_*  "$DEB"/
-chown andras:andras "$DEB"/tomld_*
+cp -f tomld_*  "$DEB"/
 rm -rf "$TEMP"
-
 
 exit 0
