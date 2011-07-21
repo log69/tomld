@@ -22,6 +22,8 @@
 
 changelog:
 -----------
+21/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
+                         - some minor fixes
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -418,7 +420,9 @@ int opt_keep		= 0;
 int opt_recursive	= 0;
 int opt_once		= 0;
 int opt_mail		= 0;
+int opt_log			= 0;
 
+char *opt_log2		= 0;
 char *opt_info2		= 0;
 char *opt_remove2	= 0;
 char *dirs_recursive = 0;
@@ -564,6 +568,7 @@ void help() {
 	printf ("    -h   --help             print this help\n");
 	printf ("    -v   --version          print version information\n");
 	printf ("    -c   --color            colorize output\n");
+	printf ("         --log       [file] redirect stderr and stdout to this file\n");
 	printf ("         --clear            clear domain configurations\n");
 	printf ("                            (all previously learnt rules will be backed up)\n");
 	printf ("         --reset            reinitialize domain configurations\n");
@@ -580,7 +585,7 @@ void help() {
 	printf ("                            (this is the recommended way if still necessary)\n");
 	printf ("         --learn-all        turn learning mode back for all domains\n");
 	printf ("                            (this is not advised, only for correction purposes)\n");
-	printf ("         --mail      [user] send mail to user with recent deny logs\n");
+	printf ("         --mail     [users] send mail to users with recent deny logs\n");
 	printf ("    -1   --once             quit after first cycle\n");
 	printf ("         --yes              auto confirm everything with yes\n");
 	printf ("\n");
@@ -607,6 +612,7 @@ void myfree()
 	free2(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 	if (dirs_recursive_sub)		free(dirs_recursive_sub);
+	free2(opt_log2);
 	free2(opt_info2);
 	free2(opt_remove2);
 	free2(tmarkf);
@@ -2714,7 +2720,6 @@ void check_instance(){
 void create_prof()
 {
 	char *tmanf_old, *tmanf, *tmanf2 = 0, *tprof_old, *tprof, *tprof2, *res;
-	int ret = 0;
 	
 	/* check tomoyo version */
 	if (tomoyo_version() <= 2299){ tmanf = tmanf22; tprof = tprof22; }
@@ -2738,6 +2743,7 @@ void create_prof()
 	/* compare kernel manager config and mine */
 	/* reload it to kernel if they are not identical */
 	if (strcmp(tmanf2, tmanf_old)){
+		int ret = 0;
 		char *comm = 0;
 		/* write config to disk */
 		file_write(tman, tmanf2);
@@ -2749,6 +2755,9 @@ void create_prof()
 		 * upload my new manager.conf config to the kernel,
 		 * but from now on i have the right too to change policy through /sys */
 		ret = system(comm);
+		/* command failed? */
+		if (ret == -1 || ret == 127){
+			error("error: could not load manager config to kernel\n"); myexit(1); }
 		free2(comm);
 	}
 	
@@ -2811,6 +2820,7 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "-R") || !strcmp(myarg, "--recursive"))	{ opt_recursive  = 1; flag_ok = 4; }
 
 			if (!strcmp(myarg, "--mail" ))	{ opt_mail  = 1; flag_ok = 5; }
+			if (!strcmp(myarg, "--log"  ))	{ opt_log   = 1; flag_ok = 6; }
 			if (!strcmp(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
@@ -2851,6 +2861,10 @@ void check_options(int argc, char **argv){
 					strcat2(&mail_users, myarg);
 					strcat2(&mail_users, " ");
 				}
+				/* if last option arg was --mail, then this belongs to it */
+				if (flag_type == 6){
+					strcpy2(&opt_log2, myarg);
+				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (flag_type == 1 || flag_type == 99){
 					char *res;
@@ -2886,6 +2900,8 @@ void check_options(int argc, char **argv){
 		if (opt_remove && !opt_remove2){ error("error: argument missing for --remove option\n"); myexit(1); }
 		/* fail if no arguments for --mail option */
 		if (opt_mail && !mail_users){ error("error: argument missing for --mail option\n"); myexit(1); }
+		/* fail if no arguments for --log option */
+		if (opt_log && !opt_log2){ error("error: argument missing for --log option\n"); myexit(1); }
 		/* fail if no arguments for --recursive option */
 		if (opt_recursive && !dirs_recursive){ error("error: argument missing for --recursive option\n"); myexit(1); }
 
@@ -3773,7 +3789,7 @@ void domain_check_enforcing(char *domain)
 							/* get human readable seconds */
 							res = mytime_get_sec_human(d_change);
 							if (opt_color) printf(", changed %s ago, %s%d%%%s complete\n", res, red, cputime_all_percent, clr);
-							else           printf(", changed %s ago, %s%d%%%s complete\n", res, clr, cputime_all_percent, clr);
+							else           printf(", changed %s ago, %d%% complete\n", res, cputime_all_percent);
 							free2(res);
 						}
 
@@ -4063,7 +4079,7 @@ void domain_get_log()
 		/* ------------------------------- */
 
 		if (prog_rules){
-			char *tdomf_new, *prog, *rule, *rules_new = 0, *orig, *prog_rules_new = 0;
+			char *tdomf_new, *prog, *rule, *rules_new = 0, *prog_rules_new = 0;
 			char *mail_body = 0;
 
 			/* sort and unique rules */
@@ -4163,7 +4179,6 @@ void domain_get_log()
 				/* cycle through domains to add new rules */
 				temp = tdomf;
 				while(1){
-					orig = temp;
 					/* get next domain policy */
 					res = domain_get_next(&temp);
 					if (!res) break;
@@ -4937,7 +4952,7 @@ int compare_path_search_dir_in_list(char *list, char *dir)
 char *compare_path_search_dir_in_list_first_subdirs(char *list, char *dir)
 {
 	char *res, *res2, *temp;
-	int c, c1, c2, i1, i2, in, in1, in2;
+	int c, c1, c2, i1, i2, in1, in2;
 	int flag1, flag2;
 	long l1, l2;
 
@@ -4963,7 +4978,7 @@ char *compare_path_search_dir_in_list_first_subdirs(char *list, char *dir)
 			if (l1 && l2){
 				new1 = memget2(l1 * 2);
 				new2 = memget2(l2 * 2);
-				in = 0; i1 = 0; i2 = 0;
+				i1 = 0; i2 = 0;
 				c1 = 0; c2 = 0;
 
 				/* merge paths */
@@ -5459,7 +5474,7 @@ void domain_cleanup()
 {
 	/* vars */
 	char *res, *res2, *res3, *temp, *temp2, *temp3;
-	char *orig, *tdomf_new, *rules, *rules2, *rules_temp, *rule_type;
+	char *tdomf_new, *rules, *rules2, *rules_temp, *rule_type;
 	int c;
 	
 	/* alloc mem for new policy */
@@ -5471,7 +5486,6 @@ void domain_cleanup()
 	temp = tdomf;
 	while(1){
 		/* get next domain policy */
-		orig = temp;
 		res = domain_get_next(&temp);
 		if (!res) break;
 		
@@ -5530,7 +5544,6 @@ void domain_cleanup()
 	temp = tdomf;
 	while(1){
 		/* get next domain policy */
-		orig = temp;
 		res = domain_get_next(&temp);
 		if (!res) break;
 
@@ -5718,7 +5731,7 @@ void domain_reshape_rules_recursive_dirs()
 {
 	/* vars */
 	char *res, *res2, *res3, *temp, *temp2;
-	char *orig, *tdomf_new, *rules, *rules2;
+	char *tdomf_new, *rules, *rules2;
 
 
 	/* do the whole check if there are any recursive dirs at all, or else exit */	
@@ -5734,7 +5747,6 @@ void domain_reshape_rules_recursive_dirs()
 	temp = tdomf;
 	while(1){
 		/* get next domain policy */
-		orig = temp;
 		res = domain_get_next(&temp);
 		if (!res) break;
 
@@ -6665,13 +6677,6 @@ void check_exceptions()
 /* print process names using tcp or udp packets */
 void check_processes()
 {
-	/* vars */
-	int mypid;
-	int count2;
-
-	/* get my pid */
-	mypid = getpid();
-
 	/* run these only once */
 	if (!flag_new_proc){
 		flag_new_proc = 1;
@@ -6700,7 +6705,6 @@ void check_processes()
 		color("* new processes using network\n", green);
 	}
 
-	count2 = 0;
 	while(1){
 		char *netf2, *netf3;
 		int i;
@@ -6976,7 +6980,7 @@ void finish()
 	statistics();
 	
 	/* print end time */
-	color("ended ", clr); mytime_print_date(); newl();
+	color("ended ", clr); mytime_print_date(); newl(); newl();
 
 	/* exit and free all my pointers */
 	myexit(0);
@@ -7026,6 +7030,9 @@ int main(int argc, char **argv)
 	/* ---------------- */
 	/* ----- INIT ----- */
 	/* ---------------- */
+
+	/* on --log, redirect stderr and stdout to file */
+	if (opt_log) file_std_redir(opt_log2);
 
 	/* print start time */
 	if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn_all){
