@@ -3,8 +3,8 @@
 
 ### BEGIN INIT INFO
 # Provides:          tomld
-# Required-Start:    
-# Required-Stop:     
+# Required-Start:    $remote_fs
+# Required-Stop:     $remote_fs
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
 # Short-Description: tomoyo learning daemon
@@ -27,6 +27,8 @@ case $1 in
 	restart)
 		$0 stop
 		$0 start
+		;;
+	force-reload)
 		;;
 	learn)
 		$DAEMON --learn
