@@ -1,22 +1,28 @@
 #!/bin/sh
 # tomld service script
 
+### BEGIN INIT INFO
+# Provides:          tomld
+# Required-Start:    
+# Required-Stop:     
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: tomoyo learning daemon
+# Description:       fully automatic MAC configuration
+### END INIT INFO
+
+
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
-DAEMON=/usr/local/sbin/tomld
-DAEMON2=/usr/sbin/tomld
+DAEMON=/usr/sbin/tomld
 LOGFILE=/var/log/tomld.log
 KILLALL=/usr/bin/killall
 
-test -x $DAEMON || DAEMON=$DAEMON2
-
 case $1 in
 	start)
-		echo "Starting tomld"
-		$DAEMON >> $LOGFILE &
+		start-stop-daemon --start --exec $DAEMON --background -- --log /var/log/tomld.log
 		;;
 	stop)
-		echo "Stopping tomld"
-		$KILLALL -w tomld
+		start-stop-daemon --stop --exec $DAEMON --retry 1
 		;;
 	restart)
 		$0 stop
