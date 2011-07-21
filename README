@@ -49,6 +49,7 @@ The following options are supported:
     -h   --help             print this help
     -v   --version          print version information
     -c   --color            colorize output
+         --log       [file] redirect stderr and stdout to this file
          --clear            clear domain configurations
                             (all previously learnt rules will be backed up)
          --reset            reinitialize domain configurations
@@ -65,7 +66,7 @@ The following options are supported:
                             (this is the recommended way if still necessary)
          --learn-all        turn learning mode back for all domains
                             (this is not advised, only for correction purposes)
-         --mail      [user] send mail to user with recent deny logs
+         --mail     [users] send mail to users with recent deny logs
     -1   --once             quit after first cycle
          --yes              auto confirm everything with yes
 
