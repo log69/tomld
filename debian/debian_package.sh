@@ -28,12 +28,18 @@ dh_make -f ../tomld_"$VER".orig.tar.gz --single -e mail@log69.com -p tomld -c gp
 cd debian
 
 
-#rm -f compat watch.ex init.d.ex
-rm -f postinst.ex postrm.ex preinst.ex prerm.ex
+#rm -f compat watch.ex init.d.ex postinst.ex
+rm -f postrm.ex preinst.ex prerm.ex
 rm -f tomld.default.ex tomld.doc-base.EX cron.d.ex
 rm -f emacsen-install.ex emacsen-remove.ex emacsen-startup.ex
 rm -f init.d.ex init.d.lsb.ex manpage.1.ex manpage.sgml.ex manpage.xml.ex
 rm -f menu.ex README.Debian README.source tomld.cron.d.ex
+
+# manage postinst
+grep -E -m 1 -B 1000 "^ *configure\)" postinst.ex > postinst
+cat ../grub.sh | tail -n+4 >> postinst
+grep -E -m 1 -A 1000 "^ *configure\)" postinst.ex | tail -n+2 >> postinst
+rm postinst.ex
 
 
 > dirs
@@ -127,7 +133,6 @@ rm -rf tomld-"$VER"
 mv tomld.bak tomld-"$VER"
 cd tomld-"$VER"
 # 32 bit build
-ln -sf /usr/bin/strip /usr/bin/i486-linux-gnu-strip
 linux32 debuild -k7CA53418 -ai386 -us -uc
 cp -f ../tomld_*i386.deb  "$DEB"/
 

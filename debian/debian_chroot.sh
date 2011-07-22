@@ -50,6 +50,7 @@ echo
 
 if [ "$LC_ALL" == "" ]; then export LC_ALL='C'; fi
 
+ln -sf /usr/bin/strip "$CHROOTDIR"/usr/bin/i486-linux-gnu-strip
 chroot "$CHROOTDIR" su andras -c /home/andras/development/tomld/debian/debian_package.sh
 
 
