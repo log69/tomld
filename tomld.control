@@ -8,7 +8,7 @@ Homepage: http://log69.com
 
 Package: tomld
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}
+Depends: ${shlibs:Depends}, ${misc:Depends}, tomoyo-tools
 Description: tomoyo learning daemon, fully automatic MAC configuration
  Tomld (tomoyo learning daemon) is an extension to the Tomoyo security
  framework. Tomoyo increases security by confining applications and services
