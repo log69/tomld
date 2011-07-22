@@ -8,7 +8,7 @@ CHROOTDIR="/chroot-sid"
 MYUSER="andras"
 DEBIANVER="sid"
 ARCH="amd64"
-PKGS="dh-make devscripts lintian autotools-dev libjasper-dev libjpeg62-dev libpng12-dev autoconf2.13"
+PKGS="dh-make devscripts lintian autotools-dev libjasper-dev libjpeg62-dev libpng12-dev autoconf2.13 tree ne"
 
 
 if ! [ -x "$CHROOTDIR" ]
@@ -20,10 +20,8 @@ then
 	echo creating chroot...
 	mkdir -p "$CHROOTDIR"
 
-	# debootstrap --variant=minbase --arch $ARCH $DEBIANVER $CHROOTDIR http://ftp.de.debian.org/debian
-	debootstrap "$DEBIANVER" "$CHROOTDIR" http://ftp.de.debian.org/debian
+	debootstrap --arch "$ARCH" "$DEBIANVER" "$CHROOTDIR" http://ftp.de.debian.org/debian
 
-	# chroot "$CHROOTDIR" apt-get -y install $PKGS
 	chroot "$CHROOTDIR" apt-get -y --force-yes install $PKGS
 else
 	echo chroot directory already exists.
@@ -52,7 +50,7 @@ echo
 
 if [ "$LC_ALL" == "" ]; then export LC_ALL='C'; fi
 
-chroot "$CHROOTDIR" su -c /home/andras/development/tomld/debian/debian_package.sh
+chroot "$CHROOTDIR" su andras -c /home/andras/development/tomld/debian/debian_package.sh
 
 
 BASE="/home/$MYUSER/development/tomld"
@@ -62,7 +60,9 @@ echo
 #rm -f "$BASE"/debian/tomld_*
 echo "copying files back..."
 cp -f "$CHROOTDIR""$BASE"/debian/tomld_*  "$BASE"/debian/
-chown andras:andras "$BASE"/debian/tomld_*
+cp -f "$CHROOTDIR""$BASE"/debian/changelog  "$BASE"/debian/
+cd "$BASE"/debian/
+chown andras:andras tomld_* changelog
 
 echo
 echo done.
