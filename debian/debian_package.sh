@@ -19,11 +19,11 @@ echo "* creating tomld.tgz..."
 mkdir "$TEMP"/tomld-"$VER"
 cp ./* "$TEMP"/tomld-"$VER"/
 cd "$TEMP"
-tar cfz tomld_"$VER".tar.gz tomld-"$VER" --exclude ".git"
+tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER" --exclude ".git"
 
 cd tomld-"$VER"
 
-dh_make -f ../tomld_"$VER".tar.gz --single -e mail@log69.com -p tomld -c gpl
+dh_make -f ../tomld_"$VER".orig.tar.gz --single -e mail@log69.com -p tomld -c gpl
 
 cd debian
 
@@ -91,9 +91,10 @@ mv copyright.new copyright
 #	tail -n2 changelog >> changelog.new
 	echo >> changelog.new
 	cat changelog >> changelog.new
-	mv changelog.new changelog
 	
+	mv changelog.new changelog
 	ne changelog
+
 	cp changelog "$DEB"
 
 
@@ -103,11 +104,34 @@ rm -f watch.ex
 
 
 cd ..
+
+
+# 64 bit build
 debuild -k7CA53418
+cp -f ../tomld_*  "$DEB"/
 
 
+# cleanup
+make clean &>/dev/null
+rm -rf debian/tomld/
+rm -f debian/tomld.*
+rm -f ../tomld_*.dsc ../tomld_*.changes
+# create another orig with modified Makefile
 cd ..
-cp -f tomld_*  "$DEB"/
+mv tomld-"$VER" tomld.bak
+tar xf tomld_"$VER".orig.tar.gz
+sed -i s/"CFLAGS = "/"CFLAGS = -m32 "/ tomld-"$VER"/Makefile
+cp -f tomld-"$VER"/Makefile tomld.bak/Makefile
+tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER"
+rm -rf tomld-"$VER"
+mv tomld.bak tomld-"$VER"
+cd tomld-"$VER"
+# 32 bit build
+ln -sf /usr/bin/strip /usr/bin/i486-linux-gnu-strip
+linux32 debuild -k7CA53418 -ai386 -us -uc
+cp -f ../tomld_*i386.deb  "$DEB"/
+
+
 rm -rf "$TEMP"
 
 exit 0
