@@ -25,6 +25,8 @@ changelog:
 22/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
+                         - bugfix: stored empty logmark on clear()
+                         - speed up load() function
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -2056,6 +2058,7 @@ void load()
 	/* vars */
 	char *tdomf_new, *res, *res2, *res3, *temp, *temp2, *temp3, *temp4;
 	char *name1, *name2;
+	int flag;
 
 	/* load domain config */
 	free2(tdomf);
@@ -2068,18 +2071,61 @@ void load()
 		myexit(1);
 	}
 
-
 	/* load exception config */
 	free2(texcf);
 	texcf = file_read(texck, -1);
 	
-	/* alloc memory for new policy */
+
+	/* remove disabled mode entries so runtime will be faster */
 	tdomf_new = memget2(max_char);
+	temp = tdomf;
+	flag = 0;
+	while(1){
+		/* get next domain */
+		res = domain_get_next(&temp);
+		/* exit on end */
+		if (!res) break;
+
+		/* skip first domain that is <kernel> */
+		if (!flag){
+			flag = 1;
+			strcat2(&tdomf_new, res);
+		}
+		else{
+			/* add domain if not empty */
+			if (domain_get_profile(res)){
+				strcat2(&tdomf_new, res);
+			}
+		}
+		free2(res);
+	}
+	free2(tdomf);
+	tdomf = tdomf_new;
+		
+
+	/* remove quota_exceeded entries */
+	tdomf_new = memget2(max_char);
+	temp = tdomf;
+	while(1){
+		/* get next line */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		/* don't add line with quota_exceeded */
+		if (!string_search_keyword_first(res, "quota_exceeded")){
+			strcat2(&tdomf_new, res);
+			strcat2(&tdomf_new, "\n");
+		}
+		free2(res);
+	}
+	free2(tdomf);
+	tdomf = tdomf_new;
 
 
 	/* merge similar domains' rules to my domain
 	 * these are active domains with running processes
 	 * that will transit into my domain after process restart */
+	tdomf_new = memget2(max_char);
 	temp = tdomf;
 	while(1){
 		/* get next domain */
@@ -2111,7 +2157,7 @@ void load()
 				}
 				free2(res2);
 				
-				/* skip cycle on an main exception domain */
+				/* skip cycle on a main exception domain */
 				if (!flag){
 
 					/* add domain and its rules to new policy */
@@ -2163,69 +2209,10 @@ void load()
 		}
 		free2(res);
 	}
-
 	free2(tdomf);
 	tdomf = tdomf_new;
 	tdomf_new = memget2(max_char);
 
-
-	/* remove disabled mode entries so runtime will be faster */
-	temp = tdomf;
-	while(1){
-		int flag_deleted = 0;
-		
-		/* get next domain */
-		res = domain_get_next(&temp);
-		/* exit on end */
-		if (!res) break;
-		temp2 = res;
-
-		/* check if domain is marked as (deleted) */
-		res2 = string_get_next_line(&temp2);
-		if (res2){
-			/* don't add domain marked as (deleted) */
-			if (string_search_keyword(res2, "(deleted)") > -1) flag_deleted = 1;
-			free2(res2);
-		}
-		
-		/* root domain <kernel> with profile 0 should stay */
-/*		int flag_root_domain = 0;
-		char *res2, *temp;
-		temp = res;
-		res2 = string_get_next_line(&temp);
-		if (res2){
-			flag_root_domain = strcmp(res2, "<kernel>");
-		}
-		if (domain_get_profile(res) != -1 || !flag_root_domain){*/
-
-
-		/* check domain profile and add only profile with non-zero but only if not marked as deleted */
-		if (domain_get_profile(res) && !flag_deleted){
-			/* if it's not null, then add it to the new policy */
-			temp2 = res;
-			while(1){
-				/* read domain line by line */
-				res2 = string_get_next_line(&temp2);
-				if (!res2) break;
-
-				/* don't add empty lines */
-				if (strlen2(&res2)){
-					/* remove (deleted) and quota_exceeded entries */
-					if((string_search_keyword(res2, "(deleted)") == -1) && (string_search_keyword(res2, "(deleted)") == -1)){
-						/* add entry if ok */
-						strcat2(&tdomf_new, res2);
-						strcat2(&tdomf_new, "\n");
-					}
-				}
-				free2(res2);
-			}
-			strcat2(&tdomf_new, "\n");
-		}
-		free2(res);
-	}
-
-	free2(tdomf);
-	tdomf = tdomf_new;
 
 	domain_cleanup();
 }
@@ -3193,7 +3180,8 @@ void clear()
 	strcat2(&tdomf, "\n");
 
 	/* write config files */
-	save();
+	file_write(texc, texcf);
+	file_write(tdom, tdomf);
 	
 	/* delete all other domains from memory too */
 	domain_delete_all();
