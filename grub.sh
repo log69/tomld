@@ -33,6 +33,8 @@ test ! -f "$TDOMF" || mv "$TDOMF" "$TDOMF".bak
 test ! -f "$TEXCF" || mv "$TEXCF" "$TEXCF".bak
 
 # prompt for reboot
+echo "* done"
+echo
 echo "*****************************************************"
 echo "*** reboot is needed to activate tomoyo for tomld ***"
 echo "*****************************************************"
