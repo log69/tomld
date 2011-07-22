@@ -8,7 +8,7 @@ CHROOTDIR="/chroot-sid"
 MYUSER="andras"
 DEBIANVER="sid"
 ARCH="amd64"
-PKGS="dh-make devscripts lintian autotools-dev libjasper-dev libjpeg62-dev libpng12-dev autoconf2.13 tree ne"
+PKGS="dh-make devscripts lintian autotools-dev libjasper-dev libjpeg62-dev libpng12-dev autoconf2.13 ia32-libs libc6-dev-i386 tree ne"
 
 
 if ! [ -x "$CHROOTDIR" ]
