@@ -55,13 +55,14 @@ chroot "$CHROOTDIR" su andras -c /home/andras/development/tomld/debian/debian_pa
 
 BASE="/home/$MYUSER/development/tomld"
 
+
+cd "$BASE"/debian/
 echo
 #echo "deleting files..."
-#rm -f "$BASE"/debian/tomld_*
+#rm -f tomld_*.gz tomld_*.dsc tomld_*.changes tomld_*.build tomld_*.deb
 echo "copying files back..."
-cp -f "$CHROOTDIR""$BASE"/debian/tomld_*  "$BASE"/debian/
-cp -f "$CHROOTDIR""$BASE"/debian/changelog  "$BASE"/debian/
-cd "$BASE"/debian/
+cp -f "$CHROOTDIR""$BASE"/debian/tomld_*  ./
+cp -f "$CHROOTDIR""$BASE"/debian/changelog  ./
 chown andras:andras tomld_* changelog
 
 echo
