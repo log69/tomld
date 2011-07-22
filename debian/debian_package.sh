@@ -36,13 +36,20 @@ rm -f init.d.ex init.d.lsb.ex manpage.1.ex manpage.sgml.ex manpage.xml.ex
 rm -f menu.ex README.Debian README.source tomld.cron.d.ex
 
 
-echo "usr/sbin" 		>  dirs
-echo "etc/init.d" 		>> dirs
-echo "etc/tomld" 		>> dirs
+> dirs
+echo "usr/sbin" 			>> dirs
+echo "etc/init.d" 			>> dirs
+echo "etc/tomld" 			>> dirs
+echo "usr/share/man/man1" 	>> dirs
+
+# AUTHORS and COPYRIGHT not needed because of copyright file
+# COPYING and LICENSE not needed either
+> docs
+echo "README"		>> docs
 
 cp ../tomld.control ./control
-cp ../tomld.manual ./tomld.1
-echo "debian/tomld.1" > ./tomld.manpages
+#cp ../tomld.manual ./tomld.1
+#echo "debian/tomld.1" > ./tomld.manpages
 cp ../tomld.init ./init.d
 
 
@@ -72,10 +79,9 @@ echo "and is licensed under the GPL, see above." >> copyright.new
 mv copyright.new copyright
 
 
-#echo "3.0 (quilt)" > source/format
-
-
 # changelog file
+
+	cp -f "$DEB"/changelog .
 
 	head -n1 changelog > changelog.new
 	echo >> changelog.new
@@ -83,12 +89,18 @@ mv copyright.new copyright
 	echo >> changelog.new
 	echo " -- Andras Horvath <mail@log69.com>  "$(date -R) >> changelog.new
 #	tail -n2 changelog >> changelog.new
+	echo >> changelog.new
+	cat changelog >> changelog.new
 	mv changelog.new changelog
+	
+	ne changelog
+	cp changelog "$DEB"
 
 
 grep -i "^version=" watch.ex > watch
 echo "http://log69.com/tomld.html downloads/tomld_v(.*)\.tar\.gz" >> watch
 rm -f watch.ex
+
 
 cd ..
 debuild -k7CA53418
