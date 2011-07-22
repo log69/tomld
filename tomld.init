@@ -18,10 +18,10 @@ LOGFILE=/var/log/tomld.log
 
 case $1 in
 	start)
-		start-stop-daemon --start --exec $DAEMON --background -- --log $LOGFILE
+		start-stop-daemon --oknodo --start --exec $DAEMON --background -- --log $LOGFILE
 		;;
 	stop)
-		start-stop-daemon --stop --exec $DAEMON --retry 1
+		start-stop-daemon --oknodo --stop --exec $DAEMON --retry 1
 		;;
 	restart)
 		$0 stop
