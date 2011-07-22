@@ -2058,7 +2058,6 @@ void load()
 	/* vars */
 	char *tdomf_new, *res, *res2, *res3, *temp, *temp2, *temp3, *temp4;
 	char *name1, *name2;
-	int flag;
 
 	/* load domain config */
 	free2(tdomf);
@@ -2079,23 +2078,15 @@ void load()
 	/* remove disabled mode entries so runtime will be faster */
 	tdomf_new = memget2(max_char);
 	temp = tdomf;
-	flag = 0;
 	while(1){
 		/* get next domain */
 		res = domain_get_next(&temp);
 		/* exit on end */
 		if (!res) break;
 
-		/* skip first domain that is <kernel> */
-		if (!flag){
-			flag = 1;
+		/* add domain if not empty */
+		if (domain_get_profile(res)){
 			strcat2(&tdomf_new, res);
-		}
-		else{
-			/* add domain if not empty */
-			if (domain_get_profile(res)){
-				strcat2(&tdomf_new, res);
-			}
 		}
 		free2(res);
 	}
