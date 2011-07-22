@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-21/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
+22/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
@@ -253,7 +253,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.37";
+char *ver = "0.38";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
