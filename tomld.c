@@ -24,6 +24,7 @@ changelog:
 -----------
 22/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
+                         - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -269,7 +270,7 @@ char *home = "/home";
 
 
 /* interval of policy check to run in seconds */
-float const_time_check = 10;
+float const_time_check = 30;
 /* interval of saving configs to disk in seconds */
 float const_time_save = 300;
 /* interval of maximum time in seconds to wait in temporary learning mode for domains with deny logs
@@ -7181,7 +7182,7 @@ int main(int argc, char **argv)
 		}
 		
 		/* sleep some */
-		usleep(500000);
+		usleep(2000000);
 		/* exit if 'q' key is pressed */
 		if (key_get() == 'q') break;
 
