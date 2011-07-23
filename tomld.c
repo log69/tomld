@@ -7105,6 +7105,8 @@ void myinit()
 	string_add_line_uniq(&tomld_path, res); free2(res);
 	res = path_get_dir(tlearn);
 	string_add_line_uniq(&tomld_path, res); free2(res);
+	res = path_get_dir(tspec);
+	string_add_line_uniq(&tomld_path, res); free2(res);
 }
 
 
