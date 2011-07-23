@@ -29,6 +29,7 @@ changelog:
                          - speed up load() function
                          - avoid the possibility of any race condition while terminating the program
                            that could be caused by more signals at a time
+                         - prohibit to create any rule that matches any of tomld's working directory
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -390,6 +391,8 @@ char *tlog	= "/var/log/syslog";
 char *tlogf = 0;
 int tlogf_mod_time = -1;
 
+/* tomld paths */
+char *tomld_path = 0;
 /* kernel time of the last line of system log to identify the end of tomoyo logs
  * and make sure not to read it twice */
 char *tmark	= "/var/local/tomld/tomld.logmark";
@@ -638,6 +641,7 @@ void myfree()
 	free2(spec_replace2);
 	free2(mail_mta2);
 	free2(mail_users);
+	free2(tomld_path);
 }
 
 
@@ -2204,7 +2208,6 @@ void load()
 	}
 	free2(tdomf);
 	tdomf = tdomf_new;
-	tdomf_new = memget2(max_char);
 
 
 	domain_cleanup();
@@ -4677,6 +4680,7 @@ int compare_names(char *name1, char *name2)
 
 
 /* compare paths with wildcards */
+/* paths' types (both dirs or both files) must match */
 /* wildcard can be "\\*" or recursive wildcard */
 /* only standalone recursive wildcard at the end is supported */
 /* return true if they match, even if both are null */
@@ -5021,6 +5025,47 @@ char *compare_path_search_dir_in_list_first_subdirs(char *list, char *dir)
 		free2(res2);
 	}
 	
+	return 0;
+}
+
+
+/* return true if path is within any of tomld's path */
+int path_is_tomld_dir(char *path)
+{
+	char *path2, *res, *res2, *temp;
+	int c1, c2;
+
+	if (!path) return 0;
+
+	/* get dirs only */
+	path2 = path_get_dir(path);
+	c1 = path_count_subdirs_name(path2);
+
+	temp = tomld_path;
+	while(1){
+		/* get next path of tomld */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+
+		/* path contains more or equal number of subdirs than tomld's? */
+		c2 = path_count_subdirs_name(res);
+		if (c1 >= c2){
+			res2 = path_get_subdirs_name(path2, c2);
+
+			/* paths' beginnings match? */
+			if (compare_paths(res2, res)){
+				/* if so, then return true and exit */
+				free2(path2);
+				free2(res);
+				free2(res2);
+				return 1;
+			}
+			free2(res2);
+		}
+		free2(res);
+	}
+	free2(path2);
+
 	return 0;
 }
 
@@ -6180,6 +6225,48 @@ void domain_reshape_rules_create_double()
 }
 
 
+/* remove all entries that contains a path that matches any of tomld's working directory */
+void domain_remove_tomld_dir()
+{
+	/* vars */
+	char *res, *temp, *temp2;
+	char *rule_type, *param1, *param2;
+	char *tdomf_new;
+	
+	/* alloc mem for new policy */
+	tdomf_new = memget2(max_char);
+	
+	/* cycle through rules of all domains */
+	temp = tdomf;
+	while(1){
+		/* get next rule */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		/* get rule type and params */
+		temp2 = res;
+		rule_type = string_get_next_word(&temp2);
+		param1 = string_get_next_word(&temp2);
+		param2 = string_get_next_word(&temp2);
+
+		if (!path_is_tomld_dir(param1) && !path_is_tomld_dir(param2))
+		{
+			strcat2(&tdomf_new, res);
+			strcat2(&tdomf_new, "\n");
+		}
+		
+		free2(param1);
+		free2(param2);
+		free2(rule_type);
+		free2(res);
+	}
+	
+	/* replace old policy with new one */
+	free2(tdomf);
+	tdomf = tdomf_new;
+}
+
+
 /* rehsape rules */
 void domain_reshape_rules()
 {
@@ -6201,6 +6288,7 @@ void domain_reshape_rules()
 	sand_clock(0);
 	domain_cleanup();
 
+	domain_remove_tomld_dir();
 }
 
 
@@ -6980,6 +7068,8 @@ void finish()
 /* some initializations */
 void myinit()
 {
+	char *res;
+
 	/* store start time */
 	t_start = mytime();
 	
@@ -6990,6 +7080,14 @@ void myinit()
 	strcat2(&myuid_create, "/create_time/");
 	strcat2(&myuid_change, "/change_time/");
 	strcat2(&myuid_cputime, "/cpu_time/");
+	
+	/* create tomld paths from its vars */
+	res = path_get_dir(tpid);
+	string_add_line_uniq(&tomld_path, res); free2(res);
+	res = path_get_dir(tmark);
+	string_add_line_uniq(&tomld_path, res); free2(res);
+	res = path_get_dir(tlearn);
+	string_add_line_uniq(&tomld_path, res); free2(res);
 }
 
 
