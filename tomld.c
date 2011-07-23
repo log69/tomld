@@ -22,11 +22,13 @@
 
 changelog:
 -----------
-22/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
+23/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
                          - bugfix: stored empty logmark on clear()
                          - speed up load() function
+                         - avoid the possibility of any race condition while terminating the program
+                           that could be caused by more signals at a time
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -6932,38 +6934,46 @@ void statistics()
 /* save configs and finish program */
 void finish()
 {
-	newl();
+	/* signals are pointed to this finish() function
+	 * so this code is to avoid race condition if tomld gets more
+	 * external signals to terminate and so to run finsih() */
+	static int flag_safe = 0;
+	if (!flag_safe){
+		flag_safe = 1;
 
-	if (flag_safe){
-		/* run check for the last time */
-		check();
+		newl();
 
-		/* turn on enforcing mode for all old domains (manual mode) or
-		 * temporary learning mode domains (auto mode) before exiting */
-		domain_set_enforce_old();
+		if (flag_safe){
+			/* run check for the last time */
+			check();
 
-		/* update cpu times of all domains in domain policy */
-		/* this must be one of the last operation to run, because here
-		 * i add together the summary of all cpu time values */
-		domain_update_cpu_time_all();
+			/* turn on enforcing mode for all old domains (manual mode) or
+			 * temporary learning mode domains (auto mode) before exiting */
+			domain_set_enforce_old();
 
-		/* save configs to disk */
-		save();
-		reload();
+			/* update cpu times of all domains in domain policy */
+			/* this must be one of the last operation to run, because here
+			 * i add together the summary of all cpu time values */
+			domain_update_cpu_time_all();
+
+			/* save configs to disk */
+			save();
+			reload();
+		}
+		else if (flag_firstrun) color("* haven't finished to run at least once\n", red);
+
+		/* clear temporary learning mode flag file on exit for security */
+		file_write(tlearn, 0);
+		
+		/* print statistics */
+		statistics();
+		
+		/* print end time */
+		color("ended ", clr); mytime_print_date(); newl(); newl();
+
+		/* exit and free all my pointers */
+		myexit(0);
 	}
-	else if (flag_firstrun) color("* haven't finished to run at least once\n", red);
-
-	/* clear temporary learning mode flag file on exit for security */
-	file_write(tlearn, 0);
-	
-	/* print statistics */
-	statistics();
-	
-	/* print end time */
-	color("ended ", clr); mytime_print_date(); newl(); newl();
-
-	/* exit and free all my pointers */
-	myexit(0);
 }
 
 
