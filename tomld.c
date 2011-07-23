@@ -30,6 +30,7 @@ changelog:
                          - avoid the possibility of any race condition while terminating the program
                            that could be caused by more signals at a time
                          - prohibit to create any rule that matches any of tomld's working directory
+                         - print time passed since creation date of domain when turning it into enforcing mode
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -3785,7 +3786,12 @@ void domain_check_enforcing(char *domain)
 						/* turn domain into enforcing mode */
 						color(name, blue);
 						color(", ", clr);
-						color("turn on enforcing mode\n", purple);
+						color("turn on enforcing mode", purple);
+						res = mytime_get_sec_human(d_create);
+						color(" after ", clr);
+						color(res, clr);
+						newl();
+						free2(res);
 						domain_set_profile_for_prog(name, 3);
 					}
 				}
