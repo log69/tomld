@@ -10,7 +10,7 @@ Tomld creates domains with rules for applications listening on sockets or those 
 Tomld keeps track of all domains' creation time, last change time and cpu usage. With an algorithm, I calculate the complexity of the domain, and the more it is the more time it gets in learning mode. Once the cpu usage is over a limit taken the complexity, the domain gets turned into enforcing mode. Once in this mode, the learning time is over. 
 
 
-What if a domain gets turned into enforcing mode too early?
+What if a domain has enforcing mode too early?
 
 If a domain is in enforcing mode, then it cannot have access to more than it is defined in its rules in the policy. 
 
@@ -48,7 +48,7 @@ What are the features?
 
 How to get it?
 
-If you want to compile yourself, download the tarball and extract it. If the build tools are installed on the system, then running 'make install' will compile the stuff, create the executable and install it to the system. You need to have tomoyo-tools installed for tomld to work. 
+If you want to compile yourself, download the tarball and extract it. If the build tools are installed on the system, then running 'make install' from its dir will compile the stuff, create the executable and install it to the system. You need to have tomoyo-tools installed for tomld to work. 
 
 If you intend to use packages, Debian packages (32 and 64 bit) are already available inside tomld.tgz in a Debian directory. These are for Debian (6.x and up) and Ubuntu (10.04 and up) systems. 
 
@@ -73,7 +73,7 @@ How much CPU and memory does it eat?
 
 An average of around 1-3 % of CPU is used by tomld while running taken a longer time interval on a 3-4 year old hardware. The maximum virtual memory may be somewhere between 6 and 60 MB, and the resident somewhere between 1 and 20 MB at average usage. 
 
-While it may use more CPU when new rules come for the time being, i wouldn't consider the empty cycles of tomld too bad. 
+While it may use more CPU when new rules come for the time being, i would consider the power consumption of the empty cycles acceptable. 
 
 
 Isn't it better to create Tomoyo rules by hand?
@@ -87,20 +87,22 @@ While there may be situations when there is a need to create Tomoyo rules manual
 
 Can formerly created Tomoyo rules be used for tomld?
 
-No. Tomld uses its own way and logic while creating rules. There may be incompatibility with manually created rules. I don't recommend it. When installing tomld from a .deb package for the first time, it creates empty rules and backs up the current ones. Otherwise it complains about it. 
+No. Tomld uses its own way and logic while creating rules. There may be incompatibility with manually created rules. I don't recommend it. 
+
+When installing tomld from a .deb package for the first time, it creates empty rules and backs up the current ones. Otherwise it complains about it. 
 
 
-What are those tags in tomld.conf setting file?
+What are those tags in the tomld.conf setting file?
 
-[mta] Tomld will call this external binary specified below to send e-mail to the persons specified after --mail option. From security view point this is not recommended. Use the log file /var/log/tomld.log instead. 
+[mta] Tomld will call this external binary specified below to send e-mail to the persons specified after --mail option. From security view point this is not recommended. Use the log file /var/log/tomld.log for checking instead. 
 
-[exception] The files in these directories specified below won't get automatically wildcarded. Only if the file is a temporary file, then only its random part will be wildcarded. The idea behind it is to not let automatically all files to be read in these directories, like .gnupg in home dir or /etc/passwd in /etc. 
+[exception] The files in these directories specified below won't get automatically wildcarded. If the file is a temporary file, then only its random part will be wildcarded. The idea behind it is to not let automatically all files to be read in these directories, like .gnupg in home dir or /etc/passwd in /etc and so on. 
 
 [wildcard] The files in these directories will always be wildcarded, regardless whether the rule is a writing rule, or just a reading one (the idea of tomld is to wildcard all files in "writing" rules, like create, rename, truncate etc., and leave the rest untouched). This is useful to have it in not so important dirs, so the chance for a final rule and for the end of the learning mode is higher. 
 
 [replace] The paths in the rules of domains will be replaced with these directories, if this dir seems more general with more wildcards in it. The idea here is to have a possibility to manually wildcard some directory if tomld cannot do that automatically for some reason. The problem is that not only there are random names in the file names sometimes, but in the directory names too. Though this last one is not usual, it is hard to give a general solution for it. An example is the GDM v3 dir structure that looks like /var/run/gdm/auth-for-X5gGF53/, and every time the system is rebooted, a new auth directory is created. So this way there wouldn't be an end of the rules. 
 
-[recursive] Everything will be recursively wildcarded in these directories every time. It may have a sense to mark a directory here that tomld couldn't find a general rule for and it keeps changing all the time (like new random named directory is created in it continously). Some may put here '/home/user/.mozilla' or the dirs of samba shares for example. But i do not recommend this option if not necessary. 
+[recursive] Everything will be recursively wildcarded in these directories every time. It may have a sense to put a directory here that tomld couldn't find a general rule for and it keeps changing all the time (like new random named directory is created in it continously). Some may put here '/home/user/.mozilla' or the dirs of samba shares for example. But i do not recommend this option if not necessary. 
 
 
 Why are all shell binaries marked as exceptions?
@@ -121,17 +123,15 @@ Nobody. I contribute from my own time.
 
 Other remarks
 
-- the program assumes to be run in a fully trusted environment 
+- the program assumes tomld to be run in a fully trusted environment 
 
 - programs should be used as comprehensively as possible during the learning phase to create rules for all kinds of behavior 
 
-- it has to start with new rules rather than keeping any manually created 
-
-- tomld has to be run with --reset switch for the first time 
+- it has to start with new rules rather than keeping any manually created, so tomld has to be run with --reset switch for the first time 
 
 - using the --clear or --reset switch config files will be backed up and former log entries will be ignored, this is equivalent to a start from a clean set up 
 
-- tomld files: /var/local/tomld.logmark (this contains a mark to identify the end of the recently read message logs), /var/run/tomld.pid (pid file to avoid multiple instances of the program running at the same time) 
+- tomld files: /var/local/tomld/tomld.logmark (this contains a mark to identify the end of the recently read message logs), /var/run/tomld/tomld.pid (pid file to avoid multiple instances of the program running at the same time), /var/run/tomld/tomld.learn (file to signal a request for temporary learning mode to the running daemon), /etc/tomld/tomld.conf (settings file) 
 
 - in case an application or its settings change with a new version, its rules can be regenerated easily 
 
