@@ -59,7 +59,7 @@ How general solution is this?
 
 I don't hardcode settings and directory names of any particular software into tomld to make it as general solution as possible. It should work in any Linux based environment. 
 
-The line between security and usability must be drawn. Tomld gives an good security with a good usability in my opinion. 
+The line between security and usability must be drawn. Tomld gives a fine security with good usability in my opinion. 
 
 
 How secure is it?
@@ -71,7 +71,7 @@ It doesn't listen on any sockets and you cannot communicate with it except reque
 
 How much CPU and memory does it eat?
 
-An average of around 1-3% of CPU is used by tomld while running taken a longer time interval on a 3-4 year old computer. The maximum virtual memory may be somewhere between 6 and 60, and the resident somewhere between 1 and 20 at average usage. 
+An average of around 1-3 % of CPU is used by tomld while running taken a longer time interval on a 3-4 year old hardware. The maximum virtual memory may be somewhere between 6 and 60 MB, and the resident somewhere between 1 and 20 MB at average usage. 
 
 While it may use more CPU when new rules come for the time being, i wouldn't consider the empty cycles of tomld too bad. 
 
