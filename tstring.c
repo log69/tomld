@@ -914,6 +914,20 @@ int string_search_line(const char *text, const char *line)
 }
 
 
+/* add a line to string if the line doesn't exist yet */
+void string_add_line_uniq(char **text, const char *line)
+{
+	if (!line) return;
+
+	/* list contains line? */
+	if (string_search_line(*text, line) == -1){
+		/* if not then add it */
+		strcat2(text, line);
+		strcat2(text, "\n");
+	}
+}
+
+
 /* remove a whole line from a string and return the result */
 /* returned value must be freed by caller */
 char *string_remove_line(char *text, const char *line)
