@@ -52,6 +52,7 @@ echo "usr/share/man/man1" 	>> dirs
 # COPYING and LICENSE not needed either
 > docs
 echo "README"		>> docs
+echo "FAQ"			>> docs
 
 cp ../tomld.control ./control
 #cp ../tomld.manual ./tomld.1
