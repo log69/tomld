@@ -111,6 +111,8 @@ int string_search_keyword(const char *text, const char *key);
 
 int string_search_line(const char *text, const char *line);
 
+void string_add_line_uniq(char **text, const char *line);
+
 char *string_remove_line(char *text, const char *line);
 
 char *string_remove_line_from_pos(char *text, unsigned int pos);
