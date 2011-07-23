@@ -6249,21 +6249,32 @@ void domain_remove_tomld_dir()
 		res = string_get_next_line(&temp);
 		if (!res) break;
 		
-		/* get rule type and params */
-		temp2 = res;
-		rule_type = string_get_next_word(&temp2);
-		param1 = string_get_next_word(&temp2);
-		param2 = string_get_next_word(&temp2);
+		/* is it a rule? */
+		if (string_search_keyword_first(res, "allow_")){
+			
+			/* get rule type and params */
+			temp2 = res;
+			rule_type = string_get_next_word(&temp2);
+			param1 = string_get_next_word(&temp2);
+			param2 = string_get_next_word(&temp2);
 
-		if (!path_is_tomld_dir(param1) && !path_is_tomld_dir(param2))
-		{
+			if (!path_is_tomld_dir(param1) && !path_is_tomld_dir(param2))
+			{
+				strcat2(&tdomf_new, res);
+				strcat2(&tdomf_new, "\n");
+			}
+			
+			free2(param1);
+			free2(param2);
+			free2(rule_type);
+		}
+
+		/* if not, then no check, add it anyway */
+		else{
 			strcat2(&tdomf_new, res);
 			strcat2(&tdomf_new, "\n");
 		}
-		
-		free2(param1);
-		free2(param2);
-		free2(rule_type);
+
 		free2(res);
 	}
 	
