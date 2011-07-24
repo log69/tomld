@@ -17,20 +17,20 @@ then
 		echo "GRUB_CMDLINE_LINUX=\"security=tomoyo\"" >> "$GRUB_DEFAULT"
 	fi
 	echo "* kernel parameter added"
+
+	# update grub
+	if which update-grub >/dev/null; then
+		echo "* updating grub"
+		update-grub
+	fi
 else
 	echo "* kernel parameter already set"
 fi
 
-# update grub
-if which update-grub >/dev/null; then
-	echo "* updating grub"
-	update-grub
-fi
-
 # backup tomoyo config
 echo "* backing up original tomoyo config"
-test ! -f "$TDOMF" || mv "$TDOMF" "$TDOMF".bak
-test ! -f "$TEXCF" || mv "$TEXCF" "$TEXCF".bak
+test ! -f "$TDOMF" || mv "$TDOMF" "$TDOMF".bak.installer.$(date +%s)
+test ! -f "$TEXCF" || mv "$TEXCF" "$TEXCF".bak.installer.$(date +%s)
 
 # prompt for reboot
 echo "* done"
