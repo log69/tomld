@@ -94,7 +94,7 @@ When installing tomld from a .deb package for the first time, it creates empty r
 
 What are those tags in the tomld.conf setting file?
 
-[mta] Tomld will call this external binary specified below to send e-mail to the persons specified after --mail option. From security view point this is not recommended. Use the log file /var/log/tomld.log for checking instead. 
+[mail] Tomld will send e-mails to the persons specified below with all the recent deny logs. If unset, you can also use the file /var/log/tomld.log for checking the logs. 
 
 [exception] The files in these directories specified below won't get automatically wildcarded. If the file is a temporary file, then only its random part will be wildcarded. The idea behind it is to not let automatically all files to be read in these directories, like .gnupg in home dir or /etc/passwd in /etc and so on. 
 
