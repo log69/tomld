@@ -7156,7 +7156,7 @@ int main(int argc, char **argv)
 	/* check if mta binary exists */
 	if (opt_mail){
 		if (file_exist(mail_mta)){
-			color("* mail requested to following reciepents: ", yellow);
+			color("* mail requested to following recipients: ", yellow);
 			color(mail_users, yellow);
 			newl();
 		}
