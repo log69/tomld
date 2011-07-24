@@ -2987,9 +2987,10 @@ void check_tomoyo()
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
-						/* add "/" char to the end of dirs if missing */
+						/* add "/" char to the end of dirs if missing
+						 * if last tag was not [mail] */
 						long l = strlen2(&res);
-						if (l > 0){ if (res[l - 1] != '/') strcat2(&res, "/"); }
+						if (flag_spec != 5 && l > 0){ if (res[l - 1] != '/') strcat2(&res, "/"); }
 						/* store line */
 						if (flag_spec == 1){ strcat2(&spec_exception2, res); strcat2(&spec_exception2, "\n"); }
 						if (flag_spec == 2){ strcat2(&spec_wildcard2,  res); strcat2(&spec_wildcard2,  "\n"); }
