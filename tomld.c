@@ -33,6 +33,7 @@ changelog:
                          - print time passed since creation date of domain when turning it into enforcing mode
                          - remove [mta] tag and use [mail] only
                          - add "/" char to the end of dirs only, and not to mail recipients
+                         - replace uid check from load() to check_tomoyo()
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -2069,13 +2070,6 @@ void load()
 	/* load domain config */
 	free2(tdomf);
 	tdomf = file_read(tdomk, -1);
-	
-	/* search for my unique id in domain policy */
-	if (string_search_keyword(tdomf, myuid) == -1){
-		error("error: tomoyo config is not made by tomld or not compatible with this version and a new one needs to be created with --reset option\n");
-		error("if error persists it means Tomoyo is not active or wasn't initialized correctly, so reboot system too\n");
-		myexit(1);
-	}
 
 	/* load exception config */
 	free2(texcf);
@@ -2947,6 +2941,21 @@ void check_tomoyo()
 	if (!file_exist(tinit)){ error("error: "); error(tinit); error(" executable binary missing\n"); myexit(1); }
 	if (!file_exist(tload)){ error("error: "); error(tload); error(" executable binary missing\n"); myexit(1); }
 /*	if (!file_exist(tsave)){ error("error: "); error(tsave); error(" executable binary missing\n"); myexit(1); }*/
+
+
+	/* load domain config file and search for my unique id in domain policy
+	 * and create new one if incompatible */
+	if (file_exist(tdom)){
+		tdomf = file_read(tdom, 0);
+		/* my unique id matches in domain policy? */
+		if (string_search_keyword(tdomf, myuid) == -1){
+			backup();
+			clear();
+			color("* warning: incompatible config files found, created new ones after backup\n", red);
+		}
+		free2(tdomf);
+		strnull(&tdomf);
+	}
 
 	/* create tomoyo dir if it doesn't exist yet */
 	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
