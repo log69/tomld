@@ -32,6 +32,7 @@ changelog:
                          - prohibit to create any rule that matches any of tomld's working directory
                          - print time passed since creation date of domain when turning it into enforcing mode
                          - remove [mta] tag and use [mail] only
+                         - add "/" char to the end of dirs only, and not to mail recipients
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
