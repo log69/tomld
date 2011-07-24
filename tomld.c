@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-23/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
+24/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
                          - bugfix: stored empty logmark on clear()
@@ -31,6 +31,7 @@ changelog:
                            that could be caused by more signals at a time
                          - prohibit to create any rule that matches any of tomld's working directory
                          - print time passed since creation date of domain when turning it into enforcing mode
+                         - remove [mta] tag and use [mail] only
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -2984,7 +2985,7 @@ void check_tomoyo()
 					if (string_search_keyword_first(res2, "[wildcard]")){  flag_spec = 2; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[replace]")){   flag_spec = 3; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[recursive]")){ flag_spec = 4; flag_ok = 0; }
-					if (string_search_keyword_first(res2, "[mta]")){       flag_spec = 5; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[mail]")){      flag_spec = 5; flag_ok = 0; }
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
@@ -2996,7 +2997,7 @@ void check_tomoyo()
 						if (flag_spec == 2){ strcat2(&spec_wildcard2,  res); strcat2(&spec_wildcard2,  "\n"); }
 						if (flag_spec == 3){ strcat2(&spec_replace2,   res); strcat2(&spec_replace2,   "\n"); }
 						if (flag_spec == 4){ strcat2(&dirs_recursive,  res); strcat2(&dirs_recursive,  "\n"); }
-						if (flag_spec == 5){ strcpy2(&mail_mta2,       res); }
+						if (flag_spec == 5){ strcat2(&mail_users,      res); }
 					}
 				}
 				free2(res2);
@@ -3011,7 +3012,7 @@ void check_tomoyo()
 	if (!spec_wildcard2)  spec_wildcard2  = array_copy_to_string_list(spec_wildcard);
 	if (!spec_replace2)   spec_replace2   = array_copy_to_string_list(spec_replace);
 	if (dirs_recursive)   opt_recursive   = 1;
-	if (!mail_mta2)       strcpy2(&mail_mta2, mail_mta);
+	if (mail_users)       opt_mail        = 1;
 }
 
 
