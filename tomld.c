@@ -34,6 +34,7 @@ changelog:
                          - remove [mta] tag and use [mail] only
                          - add "/" char to the end of dirs only, and not to mail recipients
                          - replace uid check from load() to check_tomoyo()
+                         - bugfix: create manager and profile config files on startup if missing
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -2723,7 +2724,7 @@ void create_prof()
 	
 	/* compare kernel manager config and mine */
 	/* reload it to kernel if they are not identical */
-	if (strcmp(tmanf2, tmanf_old)){
+	if (strcmp(tmanf2, tmanf_old) || !file_exist(tman)){
 		int ret = 0;
 		char *comm = 0;
 		/* write config to disk */
@@ -2753,7 +2754,7 @@ void create_prof()
 	
 	/* compare kernel profile config and mine */
 	/* reload it to kernel if they are not identical */
-	if (strcmp(tprof2, tprof_old)){
+	if (strcmp(tprof2, tprof_old) || !file_exist(tpro)){
 		/* write profiles to disk */
 		file_write(tpro, tprof);
 		/* write profiles to kernel */
