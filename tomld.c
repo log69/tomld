@@ -517,6 +517,8 @@ char *spec_replace2 = 0;
 /* ----------------------------------- */
 
 
+void clear();
+
 void domain_cleanup();
 
 void domain_update_cpu_time_all();
@@ -2953,8 +2955,7 @@ void check_tomoyo()
 			clear();
 			color("* warning: incompatible config files found, created new ones after backup\n", red);
 		}
-		free2(tdomf);
-		strnull(&tdomf);
+		free2(tdomf); tdomf = 0;
 	}
 
 	/* create tomoyo dir if it doesn't exist yet */
