@@ -23,6 +23,13 @@ then
 		echo "* updating grub"
 		update-grub
 	fi
+
+	# prompt for reboot
+	echo "* done"
+	echo
+	echo "*****************************************************"
+	echo "*** reboot is needed to activate tomoyo for tomld ***"
+	echo "*****************************************************"
 else
 	echo "* kernel parameter already set"
 fi
@@ -31,10 +38,3 @@ fi
 echo "* backing up original tomoyo config"
 test ! -f "$TDOMF" || mv "$TDOMF" "$TDOMF".bak.installer.$(date +%s)
 test ! -f "$TEXCF" || mv "$TEXCF" "$TEXCF".bak.installer.$(date +%s)
-
-# prompt for reboot
-echo "* done"
-echo
-echo "*****************************************************"
-echo "*** reboot is needed to activate tomoyo for tomld ***"
-echo "*****************************************************"
