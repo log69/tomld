@@ -2997,7 +2997,7 @@ void check_tomoyo()
 						if (flag_spec == 2){ strcat2(&spec_wildcard2,  res); strcat2(&spec_wildcard2,  "\n"); }
 						if (flag_spec == 3){ strcat2(&spec_replace2,   res); strcat2(&spec_replace2,   "\n"); }
 						if (flag_spec == 4){ strcat2(&dirs_recursive,  res); strcat2(&dirs_recursive,  "\n"); }
-						if (flag_spec == 5){ strcat2(&mail_users,      res); }
+						if (flag_spec == 5){ strcat2(&mail_users,      res); strcat2(&mail_users,       " "); }
 					}
 				}
 				free2(res2);
