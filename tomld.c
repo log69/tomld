@@ -483,7 +483,6 @@ char *domain_cputime_list_current = 0;
 
 /* mail */
 char *mail_mta  = "/usr/sbin/sendmail";
-char *mail_mta2 = 0;
 char *mail_users = 0;
 
 /* arrays */
@@ -641,7 +640,6 @@ void myfree()
 	free2(spec_exception2);
 	free2(spec_wildcard2);
 	free2(spec_replace2);
-	free2(mail_mta2);
 	free2(mail_users);
 	free2(tomld_path);
 }
@@ -4145,7 +4143,7 @@ void domain_get_log()
 					strcat2(&text, mail_body);
 
 					/* create command */
-					strcat2(&comm, mail_mta2);
+					strcat2(&comm, mail_mta);
 					strcat2(&comm, " ");
 					strcat2(&comm, mail_users);
 					
@@ -7155,14 +7153,14 @@ int main(int argc, char **argv)
 
 	/* check if mta binary exists */
 	if (opt_mail){
-		if (file_exist(mail_mta2)){
+		if (file_exist(mail_mta)){
 			color("* mail requested to following reciepents: ", yellow);
 			color(mail_users, yellow);
 			newl();
 		}
 		else{
 			color("* mail requested but binary ", red);
-			color(mail_mta2, red);
+			color(mail_mta, red);
 			color(" missing\n", red);
 			/* clear mail option because of missing mta binary */
 			opt_mail = 0;
