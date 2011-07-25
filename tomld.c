@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-24/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
+25/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
                          - bugfix: stored empty logmark on clear()
@@ -35,6 +35,7 @@ changelog:
                          - add "/" char to the end of dirs only, and not to mail recipients
                          - replace uid check from load() to check_tomoyo()
                          - bugfix: create manager and profile config files on startup if missing
+                         - add fflush to some printf functions
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -686,11 +687,13 @@ int choice(const char *text)
 	if (opt_yes){
 		printf("%s", text);
 		printf(" (y)\n");
+		fflush(stdout);
 	}
 	else{
 		/* ask question and wait for user input */
 		printf("%s", text);
 		printf(" [y/N]");
+		fflush(stdout);
 		c = getchar();
 		if (c == '\n') return 0;
 		while((c2 = getchar()) != '\n');
@@ -3788,6 +3791,7 @@ void domain_check_enforcing(char *domain)
 							res = mytime_get_sec_human(d_change);
 							if (opt_color) printf(", changed %s ago, %s%d%%%s complete\n", res, red, cputime_all_percent, clr);
 							else           printf(", changed %s ago, %d%% complete\n", res, cputime_all_percent);
+							fflush(stdout);
 							free2(res);
 						}
 
@@ -6970,6 +6974,7 @@ void statistics()
 	
 	/* print stat about the min, max and average time of check cycle */
 	printf("cycle times min/avg/max %.2f/%.2f/%.2f sec\n", time_min_cycle, time_avg_cycle / (float)(time_avg_cycle_counter), time_max_cycle);
+	fflush(stdout);
 
 	/* create dirname like /proc/pid/stat */
 	mypid = string_itos(getpid());
@@ -7014,6 +7019,7 @@ void statistics()
 	tt = 0;
 	if (t2) tt = (float)(t) * 100 / (float)(t2);
 	printf("used cpu %.2f %%, ", tt);
+	fflush(stdout);
 	
 
 	/* create dirname like /proc/pid/status */
@@ -7041,6 +7047,7 @@ void statistics()
 	
 	/* calculate values to MB and print them */
 	printf("vm peak %.1f MB, rss peak %.1f MB\n", (float)(t) / 1024, (float)(t2) / 1024);
+	fflush(stdout);
 
 	free2(mydir_name);
 	free2(mypid);
@@ -7278,7 +7285,7 @@ int main(int argc, char **argv)
 			if (flag_firstrun){
 				flag_firstrun = 0;
 				color("* first whole running cycle took ", green);
-				printf("%.2fs\n", t3);
+				printf("%.2fs\n", t3); fflush(stdout);
 				if (!opt_once){
 					color("(press q to quit)\n", red);
 				}
