@@ -113,7 +113,7 @@ rm -f watch.ex
 cd ..
 
 
-# 64 bit build
+# create 64 bit build .deb package
 debuild -k7CA53418
 cp -f ../tomld_*  "$DEB"/
 
@@ -123,6 +123,7 @@ make clean &>/dev/null
 rm -rf debian/tomld/
 rm -f debian/tomld.*
 rm -f ../tomld_*.dsc ../tomld_*.changes
+
 # create another orig with modified Makefile
 cd ..
 mv tomld-"$VER" tomld.bak
@@ -133,11 +134,34 @@ tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER"
 rm -rf tomld-"$VER"
 mv tomld.bak tomld-"$VER"
 cd tomld-"$VER"
-# 32 bit build
+
+# create 32 bit build .deb package
 linux32 debuild -k7CA53418 -ai386 -us -uc
-cp -f ../tomld_*i386.deb  "$DEB"/
+#cp -f ../tomld_*i386.deb  "$DEB"/
+
+# change dependency in 32 bit package from libc-i386 to libc
+cd ..
+TEMP2=$(mktemp -d)
+NAME=$(ls tomld_*i386.deb)
+cp "$NAME" "$TEMP2"
+cd "$TEMP2"
+ar x "$NAME"
+rm -f "$NAME"
+mkdir control
+mv control.tar.gz control
+cd control
+tar xf control.tar.gz
+rm -f control.tar.gz
+sed -i s/" libc6-i386 "/" libc6 "/ control
+tar cfz ../control.tar.gz *
+rm -f *
+cd ..
+rmdir control
+ar r "$NAME" *
+cp -f "$NAME" "$DEB"/
 
 
-rm -rf "$TEMP"
+
+rm -rf "$TEMP" "$TEMP2"
 
 exit 0
