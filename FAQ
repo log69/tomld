@@ -89,10 +89,10 @@ Can formerly created Tomoyo rules be used for tomld?
 
 No. Tomld uses its own way and logic while creating rules. There may be incompatibility with manually created rules. I don't recommend it. 
 
-When installing tomld from a .deb package for the first time, it creates empty rules and backs up the current ones. Otherwise it complains about it. 
+When installing tomld from a .deb package for the first time, it checks if the policy was created by tomld formerly, and if not, then it creates empty rules and backs up the current ones. Otherwise it complains about it. 
 
 
-What are those tags in the tomld.conf setting file?
+What are the settings in /etc/tomld/tomld.conf?
 
 [mail] Tomld will send e-mails to the persons specified below with all the recent deny logs. If unset, you can also use the file /var/log/tomld.log for checking the logs. 
 
