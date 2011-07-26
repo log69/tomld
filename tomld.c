@@ -38,6 +38,7 @@ changelog:
                          - add fflush to some printf functions
                          - run check() at once after requesting temporary learning mode, and not 30 sec later
                          - bugfix: don't write learn file every cycle in manual mode
+                         - add [exe] tag to tdomf.conf to specify extra executables to create domain for
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -2864,7 +2865,7 @@ void check_options(int argc, char **argv){
 					}
 					/* search for name in paths and check if file exists */
 					res = which(myarg);
-					if(!res){
+					if (!res){
 						error("error: no such file: "); error(myarg); newl_();
 						free2(myarg); myexit(1);
 					}
@@ -3004,19 +3005,30 @@ void check_tomoyo()
 					if (string_search_keyword_first(res2, "[replace]")){   flag_spec = 3; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[recursive]")){ flag_spec = 4; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[mail]")){      flag_spec = 5; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[exe]")){       flag_spec = 6; flag_ok = 0; }
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
 						/* add "/" char to the end of dirs if missing
 						 * if last tag was not [mail] */
 						long l = strlen2(&res);
-						if (flag_spec != 5 && l > 0){ if (res[l - 1] != '/') strcat2(&res, "/"); }
+						if (flag_spec != 5 && flag_spec != 6 && l > 0){ if (res[l - 1] != '/') strcat2(&res, "/"); }
 						/* store line */
 						if (flag_spec == 1){ strcat2(&spec_exception2, res); strcat2(&spec_exception2, "\n"); }
 						if (flag_spec == 2){ strcat2(&spec_wildcard2,  res); strcat2(&spec_wildcard2,  "\n"); }
 						if (flag_spec == 3){ strcat2(&spec_replace2,   res); strcat2(&spec_replace2,   "\n"); }
 						if (flag_spec == 4){ strcat2(&dirs_recursive,  res); strcat2(&dirs_recursive,  "\n"); }
 						if (flag_spec == 5){ strcat2(&mail_users,      res); strcat2(&mail_users,       " "); }
+						if (flag_spec == 6){
+							/* executable exists? */
+							char *res3 = which(res);
+							if (res3){
+								/* store executable */
+								strcat2(&tprogs, res3);
+								strcat2(&tprogs, "\n");
+								free2(res3);
+							}
+						}
 					}
 				}
 				free2(res2);
@@ -3665,7 +3677,7 @@ void domain_check_enforcing(char *domain)
 	name = domain_get_name(domain);
 	
 	/* domain's process is running currently? */
-	if(process_running(process_get_pid(name))){
+	if (process_running(process_get_pid(name))){
 
 		/* get process uptime of domain */
 		p_uptime = process_get_least_uptime(name);
@@ -4220,7 +4232,7 @@ void domain_get_log()
 									 * or else it would switch back to enforcing mode immediately */
 									process_get_cpu_time_all(prog, 1);
 									/* add domain to temporary list */
-									if(string_search_line(tprogs_learn_auto, prog) == -1){
+									if (string_search_line(tprogs_learn_auto, prog) == -1){
 										strcat2(&tprogs_learn_auto, prog);
 										strcat2(&tprogs_learn_auto, "\n");
 									}
@@ -4353,7 +4365,7 @@ void domain_print_mode()
 		char *s = 0;
 		
 		prog = string_get_next_line(&temp);
-		if(!prog) break;
+		if (!prog) break;
 		
 		/* does the domain exist for the program? */
 		strcpy2(&s, "initialize_domain ");
@@ -4439,7 +4451,7 @@ void domain_print_mode()
 			strcat2(&tdomf, "0\n");
 			free2(t);
 			/* store prog name to know not to turn on enforcing mode for these ones on exit */
-			if(string_search_line(tprogs_learn, prog) == -1){
+			if (string_search_line(tprogs_learn, prog) == -1){
 				strcat2(&tprogs_learn, prog);
 				strcat2(&tprogs_learn, "\n");
 			}
@@ -5118,7 +5130,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 	temp = rule;
 	type = string_get_next_word(&temp);
 	/* return null on empty line */
-	if(!type) return 0;
+	if (!type) return 0;
 	/* get path param 1 */
 	path1 = string_get_next_word(&temp);
 	/* get path param 2 */
@@ -5924,7 +5936,7 @@ void domain_reshape_rules_wildcard_spec()
 				/* ************************************** */
 				/* check if rule is a special create rule */
 				/* ************************************** */
-				if(array_search_keyword(cre, rule_type)){
+				if (array_search_keyword(cre, rule_type)){
 
 					/* are there any parameters (more words)? */
 					if (param1){
@@ -5946,7 +5958,7 @@ void domain_reshape_rules_wildcard_spec()
 				/* ************************************* */
 				/* check if rule is a special mkdir rule */
 				/* ************************************* */
-				if(array_search_keyword(cre2, rule_type)){
+				if (array_search_keyword(cre2, rule_type)){
 
 					/* are there any parameters (more words)? */
 					if (param1){
@@ -6010,7 +6022,7 @@ void domain_reshape_rules_wildcard_spec()
 				/* **************************************************** */
 				/* check if rule is an "allow_ioctl" rule */
 				/* **************************************************** */
-				if(array_search_keyword(cre3, rule_type)){
+				if (array_search_keyword(cre3, rule_type)){
 
 					/* param1 */
 					if (param1){
@@ -6038,7 +6050,7 @@ void domain_reshape_rules_wildcard_spec()
 				/* ********************************************** */
 				/* check if rule is an "mksock, mkfifo etc." rule */
 				/* ********************************************** */
-				if(array_search_keyword(cre4, rule_type)){
+				if (array_search_keyword(cre4, rule_type)){
 
 					/* param2 */
 					if (param2){
@@ -6205,7 +6217,7 @@ void domain_reshape_rules_create_double()
 		param2 = string_get_next_word(&temp2);
 
 		/* is the rule any of the create rule type? */
-		if(array_search_keyword(cre, rule_type)){
+		if (array_search_keyword(cre, rule_type)){
 
 			/* allow_create can have second parameter from kernel 2.6.36 and above */
 			strcat2(&tdomf_new, "allow_create ");
@@ -6679,7 +6691,7 @@ void check()
 	domain_get_log();
 	
 	/* check change of policy and run if there is any change only, don't do unnecessary work */
-	if(check_policy_change()){
+	if (check_policy_change()){
 
 		/* reshape rules */
 		domain_reshape_rules();
@@ -6844,7 +6856,7 @@ void check_processes()
 				if (!res2) break;
 				temp2 = res2;
 				res3 = string_get_next_wordn(&temp2, 9);
-				if(res3){
+				if (res3){
 					strcat2(&netf2, "socket:[");
 					strcat2(&netf2, res3);
 					strcat2(&netf2, "]\n");
