@@ -108,6 +108,8 @@ What are the settings in /etc/tomld/tomld.conf?
 
 [recursive] Everything will be recursively wildcarded in these directories every time. It may have a sense to put a directory here that tomld couldn't find a general rule for and it keeps changing all the time (like new random named directory is created in it continously). Some may put here '/home/user/.mozilla' or the dirs of samba shares for example. But i do not recommend this option if not necessary. 
 
+[exe] All the entries below this will be interpreted as extra executables to create domain for. 
+
 
 Why are all shell binaries marked as exceptions?
 
