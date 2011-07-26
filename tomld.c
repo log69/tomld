@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-25/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
+26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
                          - bugfix: stored empty logmark on clear()
@@ -36,6 +36,8 @@ changelog:
                          - replace uid check from load() to check_tomoyo()
                          - bugfix: create manager and profile config files on startup if missing
                          - add fflush to some printf functions
+                         - run check() at once after requesting temporary learning mode, and not 30 sec later
+                         - bugfix: don't write learn file every cycle in manual mode
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -396,6 +398,7 @@ char *tmarkf_bak3 = 0;
 char *tlog	= "/var/log/syslog";
 char *tlogf = 0;
 int tlogf_mod_time = -1;
+int tlearnf_mod_time = -1;
 
 /* tomld paths */
 char *tomld_path = 0;
@@ -409,10 +412,12 @@ int flag_pid = 0;
 /* file to signal user request for learning mode */
 char *tlearn = "/var/run/tomld/tomld.learn";
 /* flags to signal temporary learning mode
- * flag is to signal if there was a deny log already since user requested temporary learning mode
- * flag2 is to signal if the 1 hour interval of temporary learning mode is still on or ended already */
+ * flag_learn is to signal if there was a deny log already since user requested temporary learning mode
+ * flag_learn2 is to signal if the 1 hour interval of temporary learning mode is still on or ended already
+ * flag_learn2 is to run check() at once, but only once */
 int flag_learn  = 0;
 int flag_learn2 = 0;
+int flag_learn3 = 0;
 /* buffer to hold the names of domains temporarily turned into learning mode */
 char *tprogs_learn_auto = 0;
 
@@ -6609,21 +6614,32 @@ void check_learn()
 		if (!flag_learn2){
 			/* check global var for temporary learning mode request */
 			if (file_exist(tlearn)){
-				/* read 1 char from signal file */
-				char *f = file_read(tlearn, 1);
-				/* check if length is not null */
-				if (strlen2(&f)){
-					/* set starting time */
-					t = mytime();
-					color("* user request for temporary learning mode (max 1 hour) ", yellow);
-					mytime_print_date(); newl();
-					/* clear temporary learning mode flag file */
-					file_write(tlearn, 0);
-					/* set flag for temporary learning mode */
-					flag_learn  = 1;
-					flag_learn2 = 1;
+				
+				int tlearnf_mod_time2;
+				/* check modification time of learn file and read its content only if modified */
+				tlearnf_mod_time2 = file_get_mod_time(tlearn);
+				if (tlearnf_mod_time != tlearnf_mod_time2){
+					char *f;
+					/* store new time */
+					tlearnf_mod_time = tlearnf_mod_time2;
+
+					/* read 1 char from signal file */
+					f = file_read(tlearn, 1);
+					/* check if length is not null */
+					if (strlen2(&f)){
+						/* set starting time */
+						t = mytime();
+						color("* user request for temporary learning mode (max 1 hour) ", yellow);
+						mytime_print_date(); newl();
+						/* clear temporary learning mode flag file */
+						file_write(tlearn, 0);
+						/* set flag for temporary learning mode */
+						flag_learn  = 1;
+						flag_learn2 = 1;
+						flag_learn3 = 1;
+					}
+					free2(f);
 				}
-				free2(f);
 			}
 		}
 		else{
@@ -6640,19 +6656,12 @@ void check_learn()
 		}
 
 	}
-	else{
-		/* clear flag in manual mode */
-		file_write(tlearn, 0);
-	}
 }
 
 
 /* manage policy and rules */
 void check()
 {
-	/* check signal of user request for learning mode */
-	check_learn();
-	
 	/* load config files */
 	sand_clock(0);
 	load();
@@ -7264,9 +7273,14 @@ int main(int argc, char **argv)
 		/* check running processes */
 		check_processes();
 
-		/* run policy check from time to time */
-		if ((mytime() - t) >= const_time_check){
+		/* check signal of user request for learning mode */
+		check_learn();
+
+		/* run policy check from time to time or at once if temporary learning mode is requested,
+		 * and not 30 sec later */
+		if ((mytime() - t) >= const_time_check || flag_learn3){
 			flag_safe = 0;
+			flag_learn3 = 0;
 
 			/* store time for speed comparision */			
 			t3 = mytime();
