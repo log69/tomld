@@ -7194,11 +7194,13 @@ int main(int argc, char **argv)
 	create_prof();
 
 	/* check if mta binary exists */
-	if (opt_mail && !opt_info && !opt_remove && !opt_clear && !opt_learn_all){
+	if (opt_mail){
 		if (file_exist(mail_mta)){
-			color("* mail requested to following recipients: ", yellow);
-			color(mail_users, yellow);
-			newl();
+			if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn_all){
+				color("* mail requested to following recipients: ", yellow);
+				color(mail_users, yellow);
+				newl();
+			}
 		}
 		else{
 			color("* mail requested but binary ", red);
