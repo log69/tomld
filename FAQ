@@ -54,6 +54,8 @@ If you want to compile yourself, download the tarball and extract it. If the bui
 
 If you intend to use packages, Debian packages (32 and 64 bit) are already available inside tomld.tgz in a debian directory. These are for Debian (6.x and up) and Ubuntu (10.04 and up) systems. 
 
+To install it, run this command with the appropriate .deb file: sudo dpkg -i tomld*.deb; sudo apt-get -f install 
+
 OpenSUSE will enable Tomoyo in the default kernel from version 12.1, so I'm planning to create an .rpm package for it too. 
 
 
