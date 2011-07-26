@@ -3,6 +3,7 @@
 # linux has to start with "security=tomoyo" kernel parameter to activate tomoyo
 
 GRUB_DEFAULT="/etc/default/grub"
+REBOOT_NOTIFY="/usr/share/update-notifier/notify-reboot-required"
 
 # add kernel parameter to grub config
 echo "* checking grub config"
@@ -23,6 +24,8 @@ then
 	fi
 
 	# prompt for reboot
+	if [ -x "$REBOOT_NOTIFY" ]; then "$REBOOT_NOTIFY"; fi
+	
 	echo "* done"
 	echo
 	echo "*****************************************************"
