@@ -145,21 +145,14 @@ TEMP2=$(mktemp -d)
 NAME=$(ls tomld_*i386.deb)
 cp "$NAME" "$TEMP2"
 cd "$TEMP2"
-ar x "$NAME"
-rm -f "$NAME"
-mkdir control
-mv control.tar.gz control
-cd control
-tar xf control.tar.gz
-rm -f control.tar.gz
-sed -i s/" libc6-i386 "/" libc6 "/ control
-tar cfz ../control.tar.gz *
-rm -f *
-cd ..
-rmdir control
-ar r "$NAME" *
-cp -f "$NAME" "$DEB"/
-
+mkdir -p extract/DEBIAN
+dpkg-deb -x "$NAME" extract/
+dpkg-deb -e "$NAME" extract/DEBIAN
+sed -i s/" libc6-i386 "/" libc6 "/ extract/DEBIAN/control
+mkdir build
+dpkg-deb -b extract/ build/
+cp -f build/"$NAME" "$DEB"/
+cd
 
 
 rm -rf "$TEMP" "$TEMP2"
