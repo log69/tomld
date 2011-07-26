@@ -9,7 +9,7 @@ Tomld creates domains with rules for applications listening on sockets or those 
 
 Tomld keeps track of all domains' creation time, last change time and cpu usage. With an algorithm, I calculate the complexity of the domain, and the more it is the more time it gets in learning mode. Once the cpu usage is over a limit taken the complexity, the domain gets turned into enforcing mode. Once in this mode, the learning time is over. 
 
-There is absolute limit to the learning time, this is currently 2 weeks. 
+There is an absolute limit to the learning time, this is currently 2 weeks. 
 
 
 What if a domain has enforcing mode too early?
