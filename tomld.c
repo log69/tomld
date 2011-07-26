@@ -39,6 +39,7 @@ changelog:
                          - run check() at once after requesting temporary learning mode, and not 30 sec later
                          - bugfix: don't write learn file every cycle in manual mode
                          - add [exe] tag to tdomf.conf to specify extra executables to create domain for
+                         - bugfix: print info about mail recipients only if option is not --info, --remove etc.
 19/07/2011 - tomld v0.37 - handle rules with "allow_execute /proc/$PID/exe" forms present in chromium browser
                          - allow temporary learning mode only for those domains that had access deny logs just now
                          - fix some warnings during compile time (thanks to Andy Booth for reporting it)
@@ -7193,7 +7194,7 @@ int main(int argc, char **argv)
 	create_prof();
 
 	/* check if mta binary exists */
-	if (opt_mail){
+	if (opt_mail && !opt_info && !opt_remove && !opt_clear && !opt_learn_all){
 		if (file_exist(mail_mta)){
 			color("* mail requested to following recipients: ", yellow);
 			color(mail_users, yellow);
