@@ -52,7 +52,7 @@ How to get it?
 
 If you want to compile yourself, download the tarball and extract it. If the build tools are installed on the system, then running 'make install' from its dir will compile the stuff, create the executable and install it to the system. You need to have tomoyo-tools installed for tomld to work. 
 
-If you intend to use packages, Debian packages (32 and 64 bit) are already available inside tomld.tgz in a debian directory. These are for Debian (6.x and up) and Ubuntu (10.04 and up) systems. 
+If you intend to use packages, Debian packages (32 and 64 bit) are already available inside tomld.tgz in a debian directory. These are for Debian (6.x and up) and Ubuntu (10.10 and up) systems. 
 
 To install it, run this command with the appropriate .deb file: sudo dpkg -i tomld*.deb; sudo apt-get -f install 
 
