@@ -24,6 +24,7 @@ changelog:
 -----------
 27/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
+                         - bugfix in domain_get()
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
@@ -1349,7 +1350,7 @@ char *domain_get(char *prog)
 		res = domain_get_next(&temp);
 		if (!res) break;
 		/* get main domain name */
-		res2 = domain_get_name(res);
+		res2 = domain_get_name_sub(res);
 		if (res2){
 			/* if prog names matches main domain name, then success */
 			if (!strcmp(prog, res2)){
