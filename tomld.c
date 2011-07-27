@@ -23,6 +23,7 @@
 changelog:
 -----------
 27/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
+                         - bugfix: don't print "restart needed" message to domains whose process is not running
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
@@ -4469,7 +4470,7 @@ void domain_print_mode()
 				/* are all processes' uptime greater than the time passed since domain creation time?
 				 * if so, then this means that none of the domain's processes has been restarted since then
 				 * so this one blocks turning it into enforcing mode */
-				if (d_create == -1 || d_create < p_uptime + 1) color(" (restart needed)", red);
+				if (p_uptime && (d_create == -1 || d_create < p_uptime + 1)) color(" (restart needed)", red);
 				/* *************************************** */
 
 			}
