@@ -22,6 +22,8 @@
 
 changelog:
 -----------
+27/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
+                         - simplify messages and code in domain creation
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -269,7 +271,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.38";
+char *ver = "0.39";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -453,7 +455,6 @@ int  *dirs_recursive_sub = 0;
 int flag_reset		= 0;
 int flag_check		= 0;
 int flag_check2		= 0;
-int flag_check3		= 0;
 int flag_firstrun	= 1;
 int flag_safe		= 0;
 int flag_new_proc	= 0;
@@ -1358,6 +1359,34 @@ char *domain_get(char *prog)
 		free2(res);
 	}
 	return 0;
+}
+
+
+/* return creation time of domain in seconds (how long ago it was created),
+ * or -1 if it doesn't exist */
+int domain_get_creation_time(char *prog)
+{
+	char *temp;
+	int d_create = -1;
+	
+	char *domain = domain_get(prog);
+	if (domain){
+		int i = string_search_keyword(domain, myuid_create);
+		if (i > -1){
+			char *res, *res2;
+			temp = domain + i;
+			/* get my unique id with the creation time in it */
+			res = string_get_next_line(&temp);
+			/* get epoch time from my uid */
+			res2 = string_get_number_last(res);
+			/* convert epoch string to integer */
+			d_create = time(0) - atoi(res2);
+			free2(res); free2(res2);
+		}
+		free2(domain);
+	}
+	
+	return d_create;
 }
 
 
@@ -4280,7 +4309,7 @@ void domain_print_list_not_progs()
 	/* vars */
 	char *res, *res2, *list, *list2 = 0, *list3, *temp;
 	
-	/* get list of all domain names */
+	/* get list of all main domain names */
 	list = domain_get_list();
 
 	/* remove entries from the list that are in tprogs too */
@@ -4290,26 +4319,33 @@ void domain_print_list_not_progs()
 		if (!res) break;
 		/* does tprogs contain any of the domain names? */
 		if (string_search_line(tprogs, res) == -1){
-			strcat2(&list2, res);
-			strcat2(&list2, "\n");
 			/* add domain to tprogs if not in exceptions */
 			if (string_search_line(tprogs_exc, res) == -1){
 				strcat2(&tprogs, res);
 				strcat2(&tprogs, "\n");
 			}
 		}
+		else{
+			/* these are already existing domains */
+			strcat2(&list2, res);
+			strcat2(&list2, "\n");
+		}
 		free2(res);
 	}
+	/* sort list */
+	res = string_sort_uniq_lines(tprogs);
+	free2(tprogs); tprogs = res;
+
 	
 	free2(list);
 	list = list2;
 
 	/* is any element in the list? */
-	if (strlen2(&list)){
+	if (flag_firstrun && strlen2(&list)){
+
 		/* sort list */
 		list2 = string_sort_uniq_lines(list);
-		free2(list);
-		list = list2;
+		free2(list); list = list2;
 
 		color("* already existing main domains\n", green);
 
@@ -4368,70 +4404,30 @@ void domain_print_mode()
 		prog = string_get_next_line(&temp);
 		if (!prog) break;
 		
-		/* does the domain exist for the program? */
+
+		/* does the domain exception exist for the program?
+		 * if not, then add program entry to exception policy */
 		strcpy2(&s, "initialize_domain ");
 		strcat2(&s, prog);
-		if (string_search_line(texcf, s) > -1){
-			if (flag_firstrun){
-				int i, p_uptime, d_create;
-				char *res, *res2, *temp, *domain;
-				
-				color(prog, blue);
-				color(", domain exists", clr);
-
-				/* **************************************
-				 * check if restart is still needed,
-				 * this happens when the uptime of process is greater than
-				 * the time passed since domain creation */
-
-				/* get process uptime of domain */
-				p_uptime = process_get_least_uptime(prog);
-				/* get creation time of domain */
-				domain = domain_get(prog);
-				if (domain){
-					i = string_search_keyword(domain, myuid_create);
-					if (i > -1){
-						temp = domain + i;
-						/* get my unique id with the creation time in it */
-						res = string_get_next_line(&temp);
-						/* get epoch time from my uid */
-						res2 = string_get_number_last(res);
-						/* convert epoch string to integer */
-						d_create = time(0) - atoi(res2);
-						
-						free2(res); free2(res2);
-
-						/* are all processes' uptime greater than the time passed since domain creation time?
-						 * if so, then this means that none of the domain's processes has been restarted since then
-						 * so this one blocks turning it into enforcing mode */
-						if (d_create < p_uptime + 1) color(" (restart needed)", red);
-					}
-					free2(domain);
-				}
-
-				flag_check3 = 1;
-			}
-		}
-		/* if not, then add program entry to exception policy */
-		else{
-			color(prog, blue);
-			color(", no domain, ", clr);
-			flag_check3 = 1;
-			/* create a domain for the program */
-			color("create domain", green);
-			/* if the program is running already, then restart is needed for the rules to take effect */
-			if (process_get_pid(prog)) color(" (restart needed)", red);
+		if (string_search_line(texcf, s) == -1){
 			strcat2(&texcf, s);
 			strcat2(&texcf, "\n");
 		}
-		free2(s);
+		free2(s); s = 0;
 		
-		/* does the rule exist for it? */
+
+		/* does the domain exist for the program? */
 		pos = domain_exist(prog);
 		if (pos == -1){
 			char *t;
-			color(", no rule, ", clr);
-			color("create rule with learning mode on", green);
+			
+			color(prog, blue);
+			color(", no domain, ", clr);
+			color("create domain with learning mode", green);
+
+			/* if the program is running already, then restart is needed for the rules to take effect */
+			if (process_get_pid(prog)) color(" (restart needed)", red);
+
 			if (!flag_firstrun) newl();
 			/* create a rule for it */
 			strcat2(&tdomf, "<kernel> ");
@@ -4459,21 +4455,41 @@ void domain_print_mode()
 		}
 		else{
 			int profile;
-			if (flag_firstrun) color(", rule exists", clr);
+			if (flag_firstrun){
+				int p_uptime, d_create;
+
+				color(prog, blue);
+				color(", domain exists", clr);
+
+				/* **************************************
+				 * check if restart is still needed,
+				 * this happens when the uptime of process is greater than
+				 * the time passed since domain creation */
+
+				/* get process uptime of domain */
+				p_uptime = process_get_least_uptime(prog);
+				/* get creation time of domain */
+				d_create = domain_get_creation_time(prog);
+				/* are all processes' uptime greater than the time passed since domain creation time?
+				 * if so, then this means that none of the domain's processes has been restarted since then
+				 * so this one blocks turning it into enforcing mode */
+				if (d_create == -1 || d_create < p_uptime + 1) color(" (restart needed)", red);
+				/* *************************************** */
+
+			}
+
 			/* get profile mode for domain */
 			profile = domain_get_profile(tdomf + pos);
 			if (profile == -1){ error("error: domain policy is corrupt\n"); free2(prog); myexit(1); }
 			/* check which mode is on */
-			
+
 			/* disabled mode */
 			if (!profile){
-				if (!flag_check3){
+				if (flag_firstrun){
 					color(prog, blue);
-					flag_check3 = 1;
+					color(", disabled mode, ", clr);
+					color("turn on learning mode", green);
 				}
-				color(", disabled mode, ", clr);
-				color("turn on learning mode", green);
-				if (!flag_firstrun) newl();
 				/* turn on learning mode for the domain and all its subdomains */
 				domain_set_profile_for_prog(prog, 1);
 				/* reset cpu time counter for prog because of switching it into learning mode */
@@ -4506,7 +4522,7 @@ void domain_print_mode()
 
 			/* enforcing mode */
 			if (profile == 3){
-				if (flag_firstrun) color(", enforcing mode on", purple);
+				if (flag_firstrun){ color(", ", clr); color("enforcing mode on", purple); }
 			}
 
 		}
@@ -6776,7 +6792,6 @@ void check_exceptions()
 	/* sort program list */
 	if (strlen2(&tprogs)){
 		res = string_sort_uniq_lines(tprogs);
-		/* realloc more mem above the sorted list to expand it later */
 		free2(tprogs);
 		tprogs = res;
 	}
