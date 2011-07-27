@@ -24,6 +24,7 @@ changelog:
 -----------
 27/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - simplify messages and code in domain creation
+                         - speed up domain_get_profile()
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -1415,7 +1416,7 @@ char *domain_get_list()
 		}
 		free2(res);
 	}
-	
+
 	/* sort and unique list because there many same entries because of subdomains */
 	if (strlen2(&list)){
 		list2 = string_sort_uniq_lines(list);
@@ -1451,25 +1452,19 @@ int domain_get_profile(char *text)
 	int i, p;
 	char *key = "use_profile ";
 	int keyl = 12;
-	char *res, *orig;
 	
-	while(1){
-		orig = text;
-
-		/* get next line */
-		res = string_get_next_line(&text);
-		if (!res) break;
-
-		/* search for the keyword */
-		i = string_search_keyword(res, key);
-		free2(res);
-
-		/* if match */
-		if (i > -1){
-			i += keyl;
-			p = string_ctoi(orig[i]);
-			return p;
-		}
+	/* search for the keyword */
+	i = string_search_keyword(text, key);
+	
+	/* if match */
+	if (i > -1){
+		/* former char should be a newline */
+		if (i < 1) return -1;
+		if (text[i - 1] != '\n') return -1;
+		/* get numer */
+		i += keyl;
+		p = string_ctoi(text[i]);
+		return p;
 	}
 	
 	return -1;
@@ -2116,7 +2111,7 @@ void load()
 	/* load exception config */
 	free2(texcf);
 	texcf = file_read(texck, -1);
-	
+
 
 	/* remove disabled mode entries so runtime will be faster */
 	tdomf_new = memget2(max_char);
@@ -2402,7 +2397,7 @@ void reload()
 				 * and if my full domain names matches the end of any active domain names,
 				 * then i apply my rules to that one too,
 				 * so this way the current running process will have its rules applied on it on-the-fly,
-				 * while it will also enter to my prepared domain after restart */
+				 * while it will also enter to my prepared domain after its restart */
 				if (strlen2(&domain_names_active)){
 
 					/* cycle through the active domain names */
@@ -4308,7 +4303,7 @@ void domain_print_list_not_progs()
 {
 	/* vars */
 	char *res, *res2, *list, *list2 = 0, *list3, *temp;
-	
+
 	/* get list of all main domain names */
 	list = domain_get_list();
 
@@ -4447,6 +4442,7 @@ void domain_print_mode()
 			strcat2(&tdomf, myuid_cputime);
 			strcat2(&tdomf, "0\n");
 			free2(t);
+
 			/* store prog name to know not to turn on enforcing mode for these ones on exit */
 			if (string_search_line(tprogs_learn, prog) == -1){
 				strcat2(&tprogs_learn, prog);
