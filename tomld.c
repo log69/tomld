@@ -7191,6 +7191,9 @@ int main(int argc, char **argv)
 	/* check if i am root */
 	if (getuid()) { error("error: root privilege needed\n"); myexit(1); }
 
+	/* create exception list from program names and available shells */
+	check_exceptions();
+
 	/* check tomoyo status */
 	check_tomoyo();
 
@@ -7298,9 +7301,6 @@ int main(int argc, char **argv)
 
 	/* create new empty policy files if missing or if --reset switch is on */
 	if (!file_exist(tdom) || !file_exist(texc) || opt_reset) clear();
-
-	/* create exception list from program names and available shells */
-	check_exceptions();
 
 	/* store negatív reference time for check() function to make check() run at least once */	
 	t  = -const_time_check;
