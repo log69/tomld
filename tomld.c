@@ -146,7 +146,7 @@ changelog:
                          - improve checking profile config
                          - reenable ubuntu beta support
 07/04/2011 - tomld v0.28 - change quit method from ctrl+c to q key
-                         - bugfix: do not switch enforcing mode for newly created domains
+                         - bugfix: do not switch newly created domains to enforcing mode
                          - add compatibility to tomoyo version 2.3
 05/04/2011 - tomld v0.27 - rewrite domain cleanup function
                          - speed up the new domain cleanup function by skipping rules reading libs
@@ -156,7 +156,7 @@ changelog:
 03/04/2011 - tomld v0.26 - improve domain cleanup function
                          - improve info function
                          - bugfixes
-                         - add --learn switch to switch learning mode back for all domains on mistake
+                         - add --learn switch to switch all domains on mistake back to learning mode
 02/04/2011 - tomld v0.25 - more major bugfixes
                          - add sand clock to see when check rutin is working, so we can stop it while sleeping
                          - some code cleanup
@@ -610,7 +610,7 @@ void help() {
 	printf ("                            (learning mode domains will stay so on exit)\n");
 	printf ("    -l   --learn            request temporary learning mode\n");
 	printf ("                            (this is the recommended way if still necessary)\n");
-	printf ("         --learn-all        switch learning mode back for all domains\n");
+	printf ("         --learn-all        switch all domains back to learning mode\n");
 	printf ("                            (this is not advised, only for correction purposes)\n");
 	printf ("         --mail     [users] send mail to users with recent deny logs\n");
 	printf ("    -1   --once             quit after first cycle\n");
@@ -3514,7 +3514,7 @@ void domain_remove(const char *pattern)
 }
 
 
-/* switch back learning mode for all domains with profile 2-3 */
+/* switch all domains with profile 2-3 back to learning mode */
 void domain_set_learn_all()
 {
 	char *res, *name, *name_sub, *temp, *orig;
@@ -3556,7 +3556,7 @@ void domain_set_learn_all()
 }
 
 
-/* switch enforcing mode for old domains only with profile 1-2 */
+/* switch old domains only with profile 1-2 to enforcing mode */
 void domain_set_enforce_old()
 {
 	char *res, *res2, *prog, *prog_sub, *temp, *orig;
@@ -3611,9 +3611,9 @@ void domain_set_enforce_old()
 							/* print info once */
 							if (!flag_turned){
 								flag_turned = 1;
-								color("* switch back enforcing mode for old domains\n", red);
+								color("* switch old domains back to enforcing mode\n", red);
 							}
-							/* switch to enforcing mode for domain and all its subdomains */
+							/* switch domain and all its subdomains to enforcing mode */
 							color(prog, blue); newl();
 							domain_set_profile_for_prog(prog, 3);
 						}
@@ -3661,9 +3661,9 @@ void domain_set_enforce_old()
 									/* print info once */
 									if (!flag_turned){
 										flag_turned = 1;
-										color("* switch back enforcing mode for temporary domains\n", red);
+										color("* switch temporary domains back to enforcing mode\n", red);
 									}
-									/* switch to enforcing mode for domain and all its subdomains */
+									/* switch domain and all its subdomains to enforcing mode */
 									color(prog, blue); color(", ", clr);
 									color("switch to enforcing mode\n", purple);
 									domain_set_profile_for_prog(prog, 3);
@@ -4286,7 +4286,7 @@ void domain_get_log()
 				}
 				free2(rules_new);
 				
-				color("* switched to learning mode for domains with new rules\n", red);
+				color("* switched domains with new rules to learning mode\n", red);
 
 				/* replace old policy with new one */
 				free2(tdomf);
@@ -4446,7 +4446,7 @@ void domain_print_mode()
 			strcat2(&tdomf, "0\n");
 			free2(t);
 
-			/* store prog name to know not to switch to enforcing mode for these ones on exit */
+			/* store prog name to know not to switch these ones to enforcing mode on exit */
 			if (string_search_line(tprogs_learn, prog) == -1){
 				strcat2(&tprogs_learn, prog);
 				strcat2(&tprogs_learn, "\n");
@@ -4489,7 +4489,7 @@ void domain_print_mode()
 					color(", disabled mode, ", clr);
 					color("switch to learning mode", green);
 				}
-				/* switch to learning mode for the domain and all its subdomains */
+				/* switch the domain and all its subdomains to learning mode */
 				domain_set_profile_for_prog(prog, 1);
 				/* reset cpu time counter for prog because of switching it to learning mode */
 				process_get_cpu_time_all(prog, 1);
@@ -7107,8 +7107,8 @@ void finish()
 			/* run check for the last time */
 			check();
 
-			/* switch to enforcing mode for all old domains (manual mode) or
-			 * temporary learning mode domains (auto mode) before exiting */
+			/* switch all old domains (manual mode) or temporary learning mode domains (auto mode)
+			 * to enforcing mode before exiting */
 			domain_set_enforce_old();
 
 			/* update cpu times of all domains in domain policy */
