@@ -48,10 +48,10 @@ http://en.wikipedia.org/wiki/Mandatory_access_control
 The following options are supported:
 .TP
 \fB\-h\fR   \fB\-\-help\fR
-print this help
+**print this help
 .TP
 \fB\-v\fR   \fB\-\-version\fR
-print version information
+**print version information
 .TP
 \fB\-c\fR   \fB\-\-color\fR
 colorize output
@@ -70,7 +70,7 @@ reinitialize domain configurations and run
 (all previously learnt rules will be backed up)
 .TP
 \fB\-i\fR   \fB\-\-info [pattern]\fR
-print domains' rules by pattern
+**print domains' rules by pattern
 .br
 (without pattern, print a list of main domains)
 .TP
@@ -91,7 +91,7 @@ don't change domain's mode for this session
 (learning mode domains will stay so on exit)
 .TP
 \fB\-l\fR   \fB\-\-learn\fR
-request temporary learning mode
+**request temporary learning mode
 .br
 (this is the recommended way if still necessary)
 .TP
@@ -111,6 +111,9 @@ auto confirm everything with yes
 
 .TP
 *executables are additional programs to create domains for
+
+.TP
+**these options can be used simultaneously with a running tomld daemon
 
 .SH AUTHORS
 .br
