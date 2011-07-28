@@ -46,29 +46,30 @@ http://en.wikipedia.org/wiki/Mandatory_access_control
 USAGE: tomld [options] [executables]
 
 The following options are supported:
-    -h   --help             **print this help
-    -v   --version          **print version information
-    -c   --color            colorize output
-         --log       [file] redirect stderr and stdout to this file
-         --clear            clear domain configurations
-                            (all previously learnt rules will be backed up)
-         --reset            reinitialize domain configurations
-                            (all previously learnt rules will be backed up)
-    -i   --info   [pattern] **print domains' rules by pattern
-                            (without pattern, print a list of main domains)
-    -r   --remove [pattern] remove domains by pattern
-    -R   --recursive [dirs] replace subdirs of dirs with wildcards in rules
-    -m   --manual           exiting from tomld for the second time switches
-                            all old learning mode domains to enforcing mode
-    -k   --keep             don't change domain's mode for this session
-                            (learning mode domains will stay so on exit)
-    -l   --learn            **request temporary learning mode
-                            (this is the recommended way if still necessary)
-         --learn-all        switch all domains back to learning mode
-                            (this is not advised, only for correction purposes)
-         --mail     [users] send mail to users with recent deny logs
-    -1   --once             quit after first cycle
-         --yes              auto confirm everything with yes
+    -h   --help              **print this help
+    -v   --version           **print version information
+    -c   --color             colorize output
+         --log        [file] redirect stderr and stdout to this file
+         --no-domain [files] don't create domains for these executables
+         --clear             clear domain configurations
+                             (all previously learnt rules will be backed up)
+         --reset             reinitialize domain configurations
+                             (all previously learnt rules will be backed up)
+    -i   --info    [pattern] **print domains' rules by pattern
+                             (without pattern, print a list of main domains)
+    -r   --remove  [pattern] remove domains by pattern
+    -R   --recursive  [dirs] replace subdirs of dirs with wildcards in rules
+    -m   --manual            exiting from tomld for the second time switches
+                             all old learning mode domains to enforcing mode
+    -k   --keep              don't change domain's mode for this session
+                             (learning mode domains will stay so on exit)
+    -l   --learn             **request temporary learning mode
+                             (this is the recommended way if still necessary)
+         --learn-all         switch all domains back to learning mode
+                             (this is not advised, only for correction purposes)
+         --mail      [users] send mail to users with recent deny logs
+    -1   --once              quit after first cycle
+         --yes               auto confirm everything with yes
 
 *executables are additional programs to create domains for
 
