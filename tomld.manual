@@ -81,9 +81,9 @@ remove domains by pattern
 replace subdirs of dirs with wildcards in rules
 .TP
 \fB\-m\fR   \fB\-\-manual\fR
-exiting from tomld for the second time turns
+exiting from tomld for the second time switches
 .br
-all old learning mode domains into enforcing mode
+all old learning mode domains to enforcing mode
 .TP
 \fB\-k\fR   \fB\-\-keep\fR
 don't change domain's mode for this session
@@ -96,7 +96,7 @@ request temporary learning mode
 (this is the recommended way if still necessary)
 .TP
      \fB\-\-learn-all\fR
-turn learning mode back for all domains
+switch learning mode back for all domains
 .br
 (this is not advised, only for correction purposes)
 .TP
