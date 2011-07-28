@@ -64,7 +64,7 @@ The following options are supported:
                             (learning mode domains will stay so on exit)
     -l   --learn            request temporary learning mode
                             (this is the recommended way if still necessary)
-         --learn-all        switch learning mode back for all domains
+         --learn-all        switch all domains back to learning mode
                             (this is not advised, only for correction purposes)
          --mail     [users] send mail to users with recent deny logs
     -1   --once             quit after first cycle
