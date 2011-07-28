@@ -25,6 +25,7 @@ changelog:
 28/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
+                         - bugfix in processing log files (affects Tomoyo version 2.2)
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
                          - documentation fully revised in english, thanks to Andy Booth
@@ -4015,7 +4016,7 @@ void domain_get_log()
 		/* get a list of all subdomains, so later i add those rules only whose domains exist */
 		dlist = domain_get_list();
 
-		if (tomoyo_version() <= 2299) l = 22;
+		if (tomoyo_version() <= 2299) l = 23;
 		else l = 15;
 
 		temp = tlogf2;
