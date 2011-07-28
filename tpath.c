@@ -33,10 +33,9 @@ char *path_link_read(const char *name)
 	int flag = 0;
 	char *temp = 0;
 	char *buff;
-	char *buff_dir, *buff_file;
 	
 	buff = memget2(max_char);
-	
+
 	/* resolve links until no more link */
 	strcpy2(&temp, name);
 	while (1){
@@ -54,13 +53,6 @@ char *path_link_read(const char *name)
 			 * then return original file name */
 			if (!flag) strcpy2(&buff, name);
 			free2(temp);
-			temp = 0; strcpy2(&temp, name);
-			buff_dir  = path_get_dir(temp);
-			buff_file = path_get_filename(buff);
-			free2(temp);
-			free2(buff);
-			buff = path_join(buff_dir, buff_file);
-			free2(buff_dir); free2(buff_file);
 			return buff;
 		}
 	}
