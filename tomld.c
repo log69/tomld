@@ -26,11 +26,13 @@ changelog:
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
                          - bugfix in processing log files (affects Tomoyo version 2.2)
+                         - bugfix in load() checking whether domain is an exception
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
                          - documentation fully revised in english, thanks to Andy Booth
                          - printing info about a domain with --info option can now be used simultaneously
                            while there is another runnin tomld daemon
+                         - add [noexe] tag to tdomf.conf to specify extra executables _not_ to create domain for
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -2179,19 +2181,9 @@ void load()
 			if (name1){
 
 				/* check if it's not an exception domain */
-				int i = 0;
 				int flag = 0;
-				res2 = 0;
-				while(1){
-					res3 = tprogs_exc_manual[i++];
-					if (!res3) break;
-					strcpy2(&res2, "<kernel> ");
-					strcat2(&res2, res3);
-					if (string_search_keyword_first(name1, res2)){
-						flag = 1;
-						break;
-					}
-				}
+				res2 = domain_get_name(res);
+				if (string_search_line(tprogs_exc, res2) > -1) flag = 1;
 				free2(res2);
 				
 				/* skip cycle on a main exception domain */
@@ -3039,6 +3031,7 @@ void check_tomoyo()
 					if (string_search_keyword_first(res2, "[recursive]")){ flag_spec = 4; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[mail]")){      flag_spec = 5; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[exe]")){       flag_spec = 6; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[noexe]")){     flag_spec = 7; flag_ok = 0; }
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
@@ -3059,6 +3052,16 @@ void check_tomoyo()
 								/* store executable */
 								strcat2(&tprogs, res3);
 								strcat2(&tprogs, "\n");
+								free2(res3);
+							}
+						}
+						if (flag_spec == 7){
+							/* executable exists? */
+							char *res3 = which(res);
+							if (res3){
+								/* store executable as an exception */
+								strcat2(&tprogs_exc, res3);
+								strcat2(&tprogs_exc, "\n");
 								free2(res3);
 							}
 						}
@@ -4268,12 +4271,13 @@ void domain_get_log()
 									if (string_search_line(tprogs_learn_auto, prog) == -1){
 										strcat2(&tprogs_learn_auto, prog);
 										strcat2(&tprogs_learn_auto, "\n");
+
+										/* print info */
+										color(prog, blue); color(", ", clr);
+										color("switch to learning mode\n", clr);
 									}
 									/* do it only once per domain for speed */
 									flag_once = 1;
-									/* print info */
-									color(prog, blue); color(", ", clr);
-									color("switch to learning mode\n", clr);
 								}
 							}
 
