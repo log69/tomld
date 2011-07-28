@@ -28,6 +28,8 @@ changelog:
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
                          - documentation fully revised in english, thanks to Andy Booth
+                         - printing info about a domain with --info option can now be used simultaneously
+                           while there is another runnin tomld daemon
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -592,15 +594,15 @@ void help() {
 	printf ("USAGE: tomld [options] [executables]\n");
 	printf ("\n");
 	printf ("The following options are supported:\n");
-	printf ("    -h   --help             print this help\n");
-	printf ("    -v   --version          print version information\n");
+	printf ("    -h   --help             **print this help\n");
+	printf ("    -v   --version          **print version information\n");
 	printf ("    -c   --color            colorize output\n");
 	printf ("         --log       [file] redirect stderr and stdout to this file\n");
 	printf ("         --clear            clear domain configurations\n");
 	printf ("                            (all previously learnt rules will be backed up)\n");
 	printf ("         --reset            reinitialize domain configurations\n");
 	printf ("                            (all previously learnt rules will be backed up)\n");
-	printf ("    -i   --info   [pattern] print domains' rules by pattern\n");
+	printf ("    -i   --info   [pattern] **print domains' rules by pattern\n");
 	printf ("                            (without pattern, print a list of main domains)\n");
 	printf ("    -r   --remove [pattern] remove domains by pattern\n");
 	printf ("    -R   --recursive [dirs] replace subdirs of dirs with wildcards in rules\n");
@@ -608,7 +610,7 @@ void help() {
 	printf ("                            all old learning mode domains to enforcing mode\n");
 	printf ("    -k   --keep             don't change domain's mode for this session\n");
 	printf ("                            (learning mode domains will stay so on exit)\n");
-	printf ("    -l   --learn            request temporary learning mode\n");
+	printf ("    -l   --learn            **request temporary learning mode\n");
 	printf ("                            (this is the recommended way if still necessary)\n");
 	printf ("         --learn-all        switch all domains back to learning mode\n");
 	printf ("                            (this is not advised, only for correction purposes)\n");
@@ -617,6 +619,8 @@ void help() {
 	printf ("         --yes              auto confirm everything with yes\n");
 	printf ("\n");
 	printf ("*executables are additional programs to create domains for\n");
+	printf ("\n");
+	printf ("**these options can be used simultaneously with a running tomld daemon\n");
 	printf ("\n");
 	printf ("REQUIREMENTS:\n");
 	printf ("Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)\n");
@@ -7185,6 +7189,12 @@ int main(int argc, char **argv)
 	/* check tomoyo status */
 	check_tomoyo();
 
+	/* on --info, print domain information */
+	if (opt_info){
+		domain_info(opt_info2);
+		myexit(0);
+	}
+
 	/* check already running instance of the program */
 	check_instance();
 
@@ -7225,12 +7235,6 @@ int main(int argc, char **argv)
 		}
 	}
 	
-	/* on --info, print domain information */
-	if (opt_info){
-		domain_info(opt_info2);
-		myexit(0);
-	}
-
 	/* this is a single tomld process here and
 	 * on --learn, request temporary learning mode for this process */
 	if (opt_learn){
