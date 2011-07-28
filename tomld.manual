@@ -96,7 +96,7 @@ request temporary learning mode
 (this is the recommended way if still necessary)
 .TP
      \fB\-\-learn-all\fR
-switch learning mode back for all domains
+switch all domains back to learning mode
 .br
 (this is not advised, only for correction purposes)
 .TP
