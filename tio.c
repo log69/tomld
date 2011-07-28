@@ -419,6 +419,7 @@ char *which(const char *name)
 	/* fle exists in the current dir? */
 	if (!getcwd(full, max_char)){
 		error("error: could not get current working directory\n"); exit(1); }
+	strlenset2(&full);
 	strcat2(&full, "/");
 	strcat2(&full, name);
 	if (file_exist(full)){
