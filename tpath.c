@@ -54,8 +54,10 @@ char *path_link_read(const char *name)
 			 * then return original file name */
 			if (!flag) strcpy2(&buff, name);
 			free2(temp);
-			buff_dir  = path_get_dir(name);
+			temp = 0; strcpy2(&temp, name);
+			buff_dir  = path_get_dir(temp);
 			buff_file = path_get_filename(buff);
+			free2(temp);
 			free2(buff);
 			buff = path_join(buff_dir, buff_file);
 			free2(buff_dir); free2(buff_file);
