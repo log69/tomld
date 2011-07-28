@@ -58,13 +58,13 @@ The following options are supported:
                             (without pattern, print a list of main domains)
     -r   --remove [pattern] remove domains by pattern
     -R   --recursive [dirs] replace subdirs of dirs with wildcards in rules
-    -m   --manual           exiting from tomld for the second time turns
-                            all old learning mode domains into enforcing mode
+    -m   --manual           exiting from tomld for the second time switches
+                            all old learning mode domains to enforcing mode
     -k   --keep             don't change domain's mode for this session
                             (learning mode domains will stay so on exit)
     -l   --learn            request temporary learning mode
                             (this is the recommended way if still necessary)
-         --learn-all        turn learning mode back for all domains
+         --learn-all        switch learning mode back for all domains
                             (this is not advised, only for correction purposes)
          --mail     [users] send mail to users with recent deny logs
     -1   --once             quit after first cycle
