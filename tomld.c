@@ -27,6 +27,7 @@ changelog:
                          - bugfix in domain_get()
                          - bugfix in processing log files (affects Tomoyo version 2.2)
                          - bugfix in load() checking whether domain is an exception
+                         - bugfix in path_link_read() and path_link_read()
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
                          - documentation fully revised in english, thanks to Andy Booth
@@ -3038,7 +3039,8 @@ void check_tomoyo()
 						/* add "/" char to the end of dirs if missing
 						 * if last tag was not [mail] */
 						long l = strlen2(&res);
-						if (flag_spec != 5 && flag_spec != 6 && l > 0){ if (res[l - 1] != '/') strcat2(&res, "/"); }
+						if (flag_spec != 5 && flag_spec != 6 && flag_spec != 7 && l > 0){
+							if (res[l - 1] != '/') strcat2(&res, "/"); }
 						/* store line */
 						if (flag_spec == 1){ strcat2(&spec_exception2, res); strcat2(&spec_exception2, "\n"); }
 						if (flag_spec == 2){ strcat2(&spec_wildcard2,  res); strcat2(&spec_wildcard2,  "\n"); }
@@ -3059,9 +3061,13 @@ void check_tomoyo()
 							/* executable exists? */
 							char *res3 = which(res);
 							if (res3){
-								/* store executable as an exception */
-								strcat2(&tprogs_exc, res3);
-								strcat2(&tprogs_exc, "\n");
+								char *res4 = path_link_read(res3);
+								if (res4){
+									/* store executable as an exception */
+									strcat2(&tprogs_exc, res4);
+									strcat2(&tprogs_exc, "\n");
+									free2(res4);
+								}
 								free2(res3);
 							}
 						}
