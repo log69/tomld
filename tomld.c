@@ -28,12 +28,14 @@ changelog:
                          - bugfix in processing log files (affects Tomoyo version 2.2)
                          - bugfix in load() checking whether domain is an exception
                          - bugfix in path_link_read() and path_link_read()
+                         - bugfix in which()
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
                          - documentation fully revised in english, thanks to Andy Booth
                          - printing info about a domain with --info option can now be used simultaneously
                            while there is another runnin tomld daemon
-                         - add [noexe] tag to tdomf.conf to specify extra executables _not_ to create domain for
+                         - add [nodomain] tag to tdomf.conf to specify extra executables _not_ to create domain for
+                         - rename [exe] tag to [extra] in tdomf.conf
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -454,7 +456,9 @@ int opt_recursive	= 0;
 int opt_once		= 0;
 int opt_mail		= 0;
 int opt_log			= 0;
+int opt_nodomain	= 0;
 
+char *opt_nodomain2	= 0;
 char *opt_log2		= 0;
 char *opt_info2		= 0;
 char *opt_remove2	= 0;
@@ -598,29 +602,30 @@ void help() {
 	printf ("USAGE: tomld [options] [executables]\n");
 	printf ("\n");
 	printf ("The following options are supported:\n");
-	printf ("    -h   --help             **print this help\n");
-	printf ("    -v   --version          **print version information\n");
-	printf ("    -c   --color            colorize output\n");
-	printf ("         --log       [file] redirect stderr and stdout to this file\n");
-	printf ("         --clear            clear domain configurations\n");
-	printf ("                            (all previously learnt rules will be backed up)\n");
-	printf ("         --reset            reinitialize domain configurations\n");
-	printf ("                            (all previously learnt rules will be backed up)\n");
-	printf ("    -i   --info   [pattern] **print domains' rules by pattern\n");
-	printf ("                            (without pattern, print a list of main domains)\n");
-	printf ("    -r   --remove [pattern] remove domains by pattern\n");
-	printf ("    -R   --recursive [dirs] replace subdirs of dirs with wildcards in rules\n");
-	printf ("    -m   --manual           exiting from tomld for the second time switches\n");
-	printf ("                            all old learning mode domains to enforcing mode\n");
-	printf ("    -k   --keep             don't change domain's mode for this session\n");
-	printf ("                            (learning mode domains will stay so on exit)\n");
-	printf ("    -l   --learn            **request temporary learning mode\n");
-	printf ("                            (this is the recommended way if still necessary)\n");
-	printf ("         --learn-all        switch all domains back to learning mode\n");
-	printf ("                            (this is not advised, only for correction purposes)\n");
-	printf ("         --mail     [users] send mail to users with recent deny logs\n");
-	printf ("    -1   --once             quit after first cycle\n");
-	printf ("         --yes              auto confirm everything with yes\n");
+	printf ("    -h   --help              **print this help\n");
+	printf ("    -v   --version           **print version information\n");
+	printf ("    -c   --color             colorize output\n");
+	printf ("         --log        [file] redirect stderr and stdout to this file\n");
+	printf ("         --no-domain [files] don't create domains for these executables\n");
+	printf ("         --clear             clear domain configurations\n");
+	printf ("                             (all previously learnt rules will be backed up)\n");
+	printf ("         --reset             reinitialize domain configurations\n");
+	printf ("                             (all previously learnt rules will be backed up)\n");
+	printf ("    -i   --info    [pattern] **print domains' rules by pattern\n");
+	printf ("                             (without pattern, print a list of main domains)\n");
+	printf ("    -r   --remove  [pattern] remove domains by pattern\n");
+	printf ("    -R   --recursive  [dirs] replace subdirs of dirs with wildcards in rules\n");
+	printf ("    -m   --manual            exiting from tomld for the second time switches\n");
+	printf ("                             all old learning mode domains to enforcing mode\n");
+	printf ("    -k   --keep              don't change domain's mode for this session\n");
+	printf ("                             (learning mode domains will stay so on exit)\n");
+	printf ("    -l   --learn             **request temporary learning mode\n");
+	printf ("                             (this is the recommended way if still necessary)\n");
+	printf ("         --learn-all         switch all domains back to learning mode\n");
+	printf ("                             (this is not advised, only for correction purposes)\n");
+	printf ("         --mail      [users] send mail to users with recent deny logs\n");
+	printf ("    -1   --once              quit after first cycle\n");
+	printf ("         --yes               auto confirm everything with yes\n");
 	printf ("\n");
 	printf ("*executables are additional programs to create domains for\n");
 	printf ("\n");
@@ -647,6 +652,7 @@ void myfree()
 	free2(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 	if (dirs_recursive_sub)		free(dirs_recursive_sub);
+	free2(opt_nodomain2);
 	free2(opt_log2);
 	free2(opt_info2);
 	free2(opt_remove2);
@@ -2838,6 +2844,7 @@ void check_options(int argc, char **argv){
 
 			if (!strcmp(myarg, "--mail" ))	{ opt_mail  = 1; flag_ok = 5; }
 			if (!strcmp(myarg, "--log"  ))	{ opt_log   = 1; flag_ok = 6; }
+			if (!strcmp(myarg, "--no-domain"  ))	{ opt_nodomain   = 1; flag_ok = 7; }
 			if (!strcmp(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
@@ -2878,9 +2885,27 @@ void check_options(int argc, char **argv){
 					strcat2(&mail_users, myarg);
 					strcat2(&mail_users, " ");
 				}
-				/* if last option arg was --mail, then this belongs to it */
+				/* if last option arg was --log, then this belongs to it */
 				if (flag_type == 6){
 					strcpy2(&opt_log2, myarg);
+				}
+				/* if last option arg was --no-domain, then this belongs to it */
+				if (flag_type == 7){
+					int flag_ok_path = 0;
+					char *res4 = which(myarg);
+					if (res4){
+						char *res5 = path_link_read(res4);
+						if (res5){
+							strcat2(&opt_nodomain2, res5);
+							strcat2(&opt_nodomain2, "\n");
+							free2(res5);
+							flag_ok_path = 1;
+						}
+						free2(res4);
+					}
+					if (!flag_ok_path){
+						error("error: wrong argument: "); error(myarg); newl_();
+						free2(myarg); myexit(1); }
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (flag_type == 1 || flag_type == 99){
@@ -2919,6 +2944,8 @@ void check_options(int argc, char **argv){
 		if (opt_mail && !mail_users){ error("error: argument missing for --mail option\n"); myexit(1); }
 		/* fail if no arguments for --log option */
 		if (opt_log && !opt_log2){ error("error: argument missing for --log option\n"); myexit(1); }
+		/* fail if no arguments for --no-domain option */
+		if (opt_nodomain && !opt_nodomain2){ error("error: argument missing for --no-domain option\n"); myexit(1); }
 		/* fail if no arguments for --recursive option */
 		if (opt_recursive && !dirs_recursive){ error("error: argument missing for --recursive option\n"); myexit(1); }
 
@@ -3031,8 +3058,8 @@ void check_tomoyo()
 					if (string_search_keyword_first(res2, "[replace]")){   flag_spec = 3; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[recursive]")){ flag_spec = 4; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[mail]")){      flag_spec = 5; flag_ok = 0; }
-					if (string_search_keyword_first(res2, "[exe]")){       flag_spec = 6; flag_ok = 0; }
-					if (string_search_keyword_first(res2, "[noexe]")){     flag_spec = 7; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[extra]")){       flag_spec = 6; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[nodomain]")){     flag_spec = 7; flag_ok = 0; }
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
@@ -6795,6 +6822,9 @@ void check_exceptions()
 		strcat2(&tprogs_exc, my_exe_path);
 		strcat2(&tprogs_exc, "\n");
 	}
+	
+	/* add command line exceptions to the list */
+	strcat2(&tprogs_exc, opt_nodomain2);
 
 	/* sort exception list */
 	if (tprogs_exc){
@@ -7202,6 +7232,7 @@ int main(int argc, char **argv)
 
 	/* check tomoyo status */
 	check_tomoyo();
+
 
 	/* on --info, print domain information */
 	if (opt_info){
