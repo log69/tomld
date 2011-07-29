@@ -49,6 +49,7 @@ int string_count_lines(const char *text)
 void newl()
 {
 	printf("\n");
+	fflush(stdout);
 }
 
 
