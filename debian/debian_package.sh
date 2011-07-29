@@ -28,12 +28,25 @@ dh_make -f ../tomld_"$VER".orig.tar.gz --single -e mail@log69.com -p tomld -c gp
 cd debian
 
 
-#rm -f compat watch.ex init.d.ex postinst.ex
+#rm -f compat watch.ex init.d.ex postinst.ex menu.ex
 rm -f postrm.ex preinst.ex prerm.ex
 rm -f tomld.default.ex tomld.doc-base.EX cron.d.ex
 rm -f emacsen-install.ex emacsen-remove.ex emacsen-startup.ex
 rm -f init.d.ex init.d.lsb.ex manpage.1.ex manpage.sgml.ex manpage.xml.ex
-rm -f menu.ex README.Debian README.source tomld.cron.d.ex
+rm -f README.Debian README.source tomld.cron.d.ex
+
+
+# create application menu with .desktop file
+#cp ../tomld.desktop .
+#echo "" >> rules
+#echo "tomld.desktop:" >> rules
+#echo "dh_install tomld.desktop usr/share/applications" >> rules
+#echo "dh_installmenu" >> rules
+
+# create debian menu
+echo -n '?package(tomld):needs="text" section="Applications/System/Administration"' > menu.ex
+echo ' title="Tomld learning mode" command="so-to-root -X -- /usr/sbin/tomld --learn"' >> menu.ex
+mv menu.ex menu
 
 # manage postinst
 grep -E -m 1 -B 1000 "^ *configure\)" postinst.ex > postinst
@@ -42,11 +55,14 @@ grep -E -m 1 -A 1000 "^ *configure\)" postinst.ex | tail -n+2 >> postinst
 rm postinst.ex
 
 
+
 > dirs
 echo "usr/sbin" 			>> dirs
 echo "etc/init.d" 			>> dirs
 echo "etc/tomld" 			>> dirs
 echo "usr/share/man/man1" 	>> dirs
+echo "usr/share/applications" 	>> dirs
+
 
 # AUTHORS and COPYRIGHT not needed because of copyright file
 # COPYING and LICENSE not needed either
@@ -155,6 +171,6 @@ cp -f build/"$NAME" "$DEB"/
 cd
 
 
-rm -rf "$TEMP" "$TEMP2"
+#rm -rf "$TEMP" "$TEMP2"
 
 exit 0
