@@ -55,6 +55,9 @@ The following options are supported:
                              (all previously learnt rules will be backed up)
          --reset             reinitialize domain configurations
                              (all previously learnt rules will be backed up)
+    -l   --learn  [patterns] **request temporary learning mode for all domains,
+                             or for those domains that match the patterns
+                             (this is the recommended way if still necessary)
     -i   --info    [pattern] **print domains' rules by pattern
                              (without pattern, print a list of main domains)
     -r   --remove  [pattern] remove domains by pattern
@@ -63,8 +66,6 @@ The following options are supported:
                              all old learning mode domains to enforcing mode
     -k   --keep              don't change domain's mode for this session
                              (learning mode domains will stay so on exit)
-    -l   --learn             **request temporary learning mode
-                             (this is the recommended way if still necessary)
          --learn-all         switch all domains back to learning mode
                              (this is not advised, only for correction purposes)
          --mail      [users] send mail to users with recent deny logs
