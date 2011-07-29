@@ -44,9 +44,9 @@ rm -f README.Debian README.source tomld.cron.d.ex
 #echo "dh_installmenu" >> rules
 
 # create debian menu
-echo -n '?package(tomld):needs="text" section="Applications/System/Administration"' > menu.ex
-echo ' title="Tomld learning mode" command="so-to-root -X -- /usr/sbin/tomld --learn"' >> menu.ex
-mv menu.ex menu
+#echo -n '?package(tomld):needs="text" section="Applications/System/Administration"' > menu.ex
+#echo ' title="Tomld learning mode" command="so-to-root -X -- /usr/sbin/tomld --learn"' >> menu.ex
+#mv menu.ex menu
 
 # manage postinst
 grep -E -m 1 -B 1000 "^ *configure\)" postinst.ex > postinst
