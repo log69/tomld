@@ -28,12 +28,12 @@ dh_make -f ../tomld_"$VER".orig.tar.gz --single -e mail@log69.com -p tomld -c gp
 cd debian
 
 
-#rm -f compat watch.ex init.d.ex postinst.ex menu.ex
+#rm -f compat watch.ex init.d.ex postinst.ex
 rm -f postrm.ex preinst.ex prerm.ex
 rm -f tomld.default.ex tomld.doc-base.EX cron.d.ex
 rm -f emacsen-install.ex emacsen-remove.ex emacsen-startup.ex
 rm -f init.d.ex init.d.lsb.ex manpage.1.ex manpage.sgml.ex manpage.xml.ex
-rm -f README.Debian README.source tomld.cron.d.ex
+rm -f README.Debian README.source tomld.cron.d.ex menu.ex
 
 
 # create application menu with .desktop file
