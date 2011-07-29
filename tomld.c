@@ -42,6 +42,7 @@ changelog:
                          - add possibility to use domain names with --learn option switch, so it switches back
                            only those domains to learning mode which we ask for, and the given patterns match the domain name
                            (thanks to muczy for the idea)
+                         - add feature to --info option to print enforcing mode domains in different colors or with a star sing
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -3423,7 +3424,8 @@ void domain_info(const char *pattern)
 
 	/* list domain names only */	
 	else{
-		char *tdomf2, *res, *res2, *res_temp;
+		char *tdomf2, *res, *res2, *temp, *temp2;
+		char *c1, *c2;
 		char *texcf_new = 0;
 		
 		tdomf2 = tdomf;
@@ -3433,22 +3435,62 @@ void domain_info(const char *pattern)
 			/* exit on end */
 			if (!res) break;
 
-			res_temp = res;
-			/* get first line */
-			/* here res2 should be something, so i don't check data availability */
-
-			res2 = string_get_next_wordn(&res_temp, 1);
+			/* get main domain name */
+			res2 = domain_get_name(res);
 			if (res2){
+				if (domain_get_profile(res) == 3){
+					strcat2(&texcf_new, "1 ");
+				}
+				else{
+					strcat2(&texcf_new, "2 ");
+				}
 				strcat2(&texcf_new, res2);
 				strcat2(&texcf_new, "\n");
 				free2(res2);
 			}
 			free2(res);
 		}
-		
+
+		/* sort list */		
 		res = string_sort_uniq_lines(texcf_new);
-		newl(); color(res, blue); newl();
-		free2(res);
+		free2(texcf_new); texcf_new = res;
+
+		newl();
+
+		/* print list
+		 * it has 2 columns, first is a number; 1 is for enforcing mode domains
+		 * and 2 is for the rest */
+		temp = texcf_new;
+		while(1){
+			/* get next line */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			
+			/* first column */
+			temp2 = res;
+			c1 = string_get_next_word(&temp2);
+			if (c1){
+				c2 = string_get_next_word(&temp2);
+				if (c2){
+					/* color option is on? if not, then print '*' char before enforcing mode domains */
+					if (opt_color){
+						/* enforcing mode domain? */
+						if (!strcmp(c1, "1")){ color(c2, purple); newl(); }
+						else{ color(c2, blue); newl(); }
+					}
+					else{
+						/* enforcing mode domain? */
+						if (!strcmp(c1, "1")){ color("*", clr); color(c2, purple); newl(); }
+						else{ color(c2, blue); newl(); }
+					}
+					free2(c2);
+				}
+				free2(c1);
+			}
+			
+			free2(res);
+		}
+
 		free2(texcf_new);
 	}
 }
