@@ -22,13 +22,14 @@
 
 changelog:
 -----------
-28/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
+29/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
                          - bugfix in processing log files (affects Tomoyo version 2.2)
                          - bugfix in load() checking whether domain is an exception
                          - bugfix in path_link_read() and path_link_read()
                          - bugfix in which()
+                         - bugfix in check_instance() to not let more than 1 instances of tomld running together
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
                          - documentation fully revised in english, thanks to Andy Booth
@@ -36,6 +37,7 @@ changelog:
                            while there is another runnin tomld daemon
                          - add [nodomain] tag to tdomf.conf to specify extra executables _not_ to create domain for
                          - rename [exe] tag to [extra] in tdomf.conf
+                         - run check() within 2 secs if tomld is in temporary learning mode and the mod time of syslog changes
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -2669,11 +2671,13 @@ void check_instance(){
 			/* set temporary learning mode flag */
 			file_write(tlearn, "1");
 			color("* sent user request to running daemon for temporary learning mode\n", green);
+			flag_pid = 0;
 			myexit(0);
 		}
 		else{
 			error("error: tomld is already running\n");
 			free2(mypid); free(pid_list);
+			flag_pid = 0;
 			myexit(1);
 		}
 	}
@@ -2694,6 +2698,7 @@ void check_instance(){
 	if (flag_manual){
 		error("error: tomld is already running\n");
 		free2(mypid); free(pid_list);
+		flag_pid = 0;
 		myexit(1);
 	}
 	/* if first tomld is in automatic mode and second is in manual,
@@ -2705,6 +2710,7 @@ void check_instance(){
 			if (kill(p, SIGTERM)){
 				error("error: could not terminate other tomld process\n");
 				free2(mypid); free(pid_list);
+				flag_pid = 0;
 				myexit(1);
 			}
 			color("waiting for other tomld process to terminate...\n", clr);
@@ -2719,14 +2725,14 @@ void check_instance(){
 			}
 			/* hasn't process terminated succesfully? */
 			if (!c){
-				flag_pid = 0;
 				free2(mypid); free(pid_list);
+				flag_pid = 0;
 				myexit(1);
 			}
 		}
 		else{
-			flag_pid = 0;
 			free2(mypid); free(pid_list);
+			flag_pid = 0;
 			myexit(1);
 		}
 	}
@@ -7344,16 +7350,22 @@ int main(int argc, char **argv)
 	t2 = 0;
 
 	while(1){
+		int tlogf_mod_time2;
 
 		/* check running processes */
 		check_processes();
-
 		/* check signal of user request for learning mode */
 		check_learn();
+		/* check modification time of log file and read its content only if modified */
+		tlogf_mod_time2 = file_get_mod_time(tlog);
 
-		/* run policy check from time to time or at once if temporary learning mode is requested,
+		/* run policy check from time to time
+		 * or at once if temporary learning mode is requested,
+		 * or if mod time of syslog changed and tomld is having temporary learning mode,
 		 * and not 30 sec later */
-		if ((mytime() - t) >= const_time_check || flag_learn3){
+		if ((mytime() - t) >= const_time_check || flag_learn3 ||
+			(flag_learn && tlogf_mod_time != tlogf_mod_time2)){
+
 			flag_safe = 0;
 			flag_learn3 = 0;
 
