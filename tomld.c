@@ -38,6 +38,10 @@ changelog:
                          - add [nodomain] tag to tdomf.conf to specify extra executables _not_ to create domain for
                          - rename [exe] tag to [extra] in tdomf.conf
                          - run check() within 2 secs if tomld is in temporary learning mode and the mod time of syslog changes
+                         - change creation time to last change time in message when switching a domain to enforcing mode
+                         - add possibility to use domain names with --learn option switch, so it switches back
+                           only those domains to learning mode which we ask for, and the given patterns match the domain name
+                           (thanks to muczy for the idea)
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -427,12 +431,15 @@ char *tmarkf = 0;
 /* tomld pid file */
 char *tpid	= "/var/run/tomld/tomld.pid";
 int flag_pid = 0;
-/* file to signal user request for learning mode */
+/* file to signal user request for learning mode for already running tomld daemon */
 char *tlearn = "/var/run/tomld/tomld.learn";
+/* file to give a list to already running tomld daemon about required domains
+ * to switch them to learning mode, but only these ones */
+char *tlearn_list = "/var/run/tomld/tomld.learn.list";
 /* flags to signal temporary learning mode
  * flag_learn is to signal if there was a deny log already since user requested temporary learning mode
  * flag_learn2 is to signal if the 1 hour interval of temporary learning mode is still on or ended already
- * flag_learn2 is to run check() at once, but only once */
+ * flag_learn3 is to run check() at once, but only once */
 int flag_learn  = 0;
 int flag_learn2 = 0;
 int flag_learn3 = 0;
@@ -460,6 +467,7 @@ int opt_mail		= 0;
 int opt_log			= 0;
 int opt_nodomain	= 0;
 
+char *opt_learn2	= 0;
 char *opt_nodomain2	= 0;
 char *opt_log2		= 0;
 char *opt_info2		= 0;
@@ -613,6 +621,9 @@ void help() {
 	printf ("                             (all previously learnt rules will be backed up)\n");
 	printf ("         --reset             reinitialize domain configurations\n");
 	printf ("                             (all previously learnt rules will be backed up)\n");
+	printf ("    -l   --learn  [patterns] **request temporary learning mode for all domains,\n");
+	printf ("                             or for those domains that match the patterns\n");
+	printf ("                             (this is the recommended way if still necessary)\n");
 	printf ("    -i   --info    [pattern] **print domains' rules by pattern\n");
 	printf ("                             (without pattern, print a list of main domains)\n");
 	printf ("    -r   --remove  [pattern] remove domains by pattern\n");
@@ -621,8 +632,6 @@ void help() {
 	printf ("                             all old learning mode domains to enforcing mode\n");
 	printf ("    -k   --keep              don't change domain's mode for this session\n");
 	printf ("                             (learning mode domains will stay so on exit)\n");
-	printf ("    -l   --learn             **request temporary learning mode\n");
-	printf ("                             (this is the recommended way if still necessary)\n");
 	printf ("         --learn-all         switch all domains back to learning mode\n");
 	printf ("                             (this is not advised, only for correction purposes)\n");
 	printf ("         --mail      [users] send mail to users with recent deny logs\n");
@@ -654,6 +663,7 @@ void myfree()
 	free2(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 	if (dirs_recursive_sub)		free(dirs_recursive_sub);
+	free2(opt_learn2);
 	free2(opt_nodomain2);
 	free2(opt_log2);
 	free2(opt_info2);
@@ -2668,8 +2678,16 @@ void check_instance(){
 		 * on --learn, set temporary learning mode form this tomld process
 		 * for the other running automatic mode tomld */
 		if (opt_learn){
-			/* set temporary learning mode flag */
-			file_write(tlearn, "1");
+			/* is there any pattern for learn? */
+			if (!opt_learn2){
+				/* set temporary learning mode flag */
+				file_write(tlearn, "1");
+			}
+			else{
+				/* set temporary learning mode flag with list */
+				file_write(tlearn, "2");
+				file_write(tlearn_list, opt_learn2);
+			}
 			color("* sent user request to running daemon for temporary learning mode\n", green);
 			flag_pid = 0;
 			myexit(0);
@@ -2841,16 +2859,17 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "-1") || !strcmp(myarg, "--once" ))	{ opt_once    = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "-k") || !strcmp(myarg, "--keep" ))	{ opt_keep    = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	{ opt_learn   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "-m") || !strcmp(myarg, "--manual"))	{ opt_manual  = 1; flag_ok = 1; }
 
 			if (!strcmp(myarg, "-i") || !strcmp(myarg, "--info"     ))	{ opt_info       = 1; flag_ok = 2; }
 			if (!strcmp(myarg, "-r") || !strcmp(myarg, "--remove"   ))	{ opt_remove     = 1; flag_ok = 3; }
 			if (!strcmp(myarg, "-R") || !strcmp(myarg, "--recursive"))	{ opt_recursive  = 1; flag_ok = 4; }
+			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	    { opt_learn      = 1; flag_ok = 8; }
 
 			if (!strcmp(myarg, "--mail" ))	{ opt_mail  = 1; flag_ok = 5; }
 			if (!strcmp(myarg, "--log"  ))	{ opt_log   = 1; flag_ok = 6; }
 			if (!strcmp(myarg, "--no-domain"  ))	{ opt_nodomain   = 1; flag_ok = 7; }
+
 			if (!strcmp(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
@@ -2912,6 +2931,11 @@ void check_options(int argc, char **argv){
 					if (!flag_ok_path){
 						error("error: wrong argument: "); error(myarg); newl_();
 						free2(myarg); myexit(1); }
+				}
+				/* if last option arg was --learn, then this belongs to it */
+				if (flag_type == 8){
+					strcat2(&opt_learn2, myarg);
+					strcat2(&opt_learn2, "\n");
 				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (flag_type == 1 || flag_type == 99){
@@ -3895,7 +3919,7 @@ void domain_check_enforcing(char *domain)
 						color(name, blue);
 						color(", ", clr);
 						color("switch to enforcing mode", purple);
-						res = mytime_get_sec_human(d_create);
+						res = mytime_get_sec_human(d_change);
 						color(" after ", clr);
 						color(res, clr);
 						newl();
@@ -4218,10 +4242,47 @@ void domain_get_log()
 					/* check if there was a user requested for temporary learning mode,
 					 * and if so, then allow rules from deny logs */
 					if (flag_learn){
-						/* add rules to new rules */
-						strcat2(&prog_rules_new, res);
-						strcat2(&prog_rules_new, "\n");
-						color("  add rules? (y)\n", clr);
+						int flag_rules_added = 0;
+						
+						/* if there a list with domain pattern? */
+						if (!opt_learn2){
+							/* add rules to new rules */
+							strcat2(&prog_rules_new, res);
+							strcat2(&prog_rules_new, "\n");
+							color("  add rules? (y)\n", clr);
+							flag_rules_added = 1;
+						}
+						else{
+							/* yes, there is a list */
+							int flag = 0;
+							char *res6, *temp6;
+							temp6 = opt_learn2;
+							while(1){
+								/* get next pattern */
+								res6 = string_get_next_line(&temp6);
+								if (!res6) break;
+								/* does any pattern match the prog name? */
+								if (string_search_keyword(prog, res6) > -1){ flag = 1; break; }
+								free2(res6);
+							}
+							/* was there a match? if so, then add rules */
+							if (flag){
+								/* add rules to new rules */
+								strcat2(&prog_rules_new, res);
+								strcat2(&prog_rules_new, "\n");
+								color("  add rules? (y)\n", clr);
+								flag_rules_added = 1;
+							}
+							/* else don't add rules */
+							else{
+								color("  add rules? (n)\n", clr);
+							}
+						}
+
+						/* clear learn flag, because i want to allow temporary learning mode only for those domains,
+						 * that had access deny logs just now,
+						 * the rest of the enforcing mode domains should stay as the are for security reasons */
+						if (flag_rules_added) flag_learn = 0;
 					}
 					else{
 						color("  add rules? (n)\n", clr);
@@ -4264,10 +4325,6 @@ void domain_get_log()
 				free2(mail_body);
 			}
 			
-			/* clear learn flag, because i want to allow temporary learning mode only for those domains,
-			 * that had access deny logs just now,
-			 * the rest of the enforcing mode domains should stay as the are for security reasons */
-			flag_learn = 0;
 			
 			/* are there any new rules after confirmation? */
 			if (strlen2(&prog_rules)){
@@ -4334,7 +4391,7 @@ void domain_get_log()
 				}
 				free2(rules_new);
 				
-				color("* switched domains with new rules to learning mode\n", red);
+				color("* switch domains with new rules to learning mode\n", red);
 
 				/* replace old policy with new one */
 				free2(tdomf);
@@ -6703,10 +6760,30 @@ void check_learn()
 					f = file_read(tlearn, 1);
 					/* check if length is not null */
 					if (strlen2(&f)){
+						/* clear list */
+						free2(opt_learn2); opt_learn2 = 0;
+						/* is there a list for learn with domain pattern? */
+						if (!strcmp(f, "2")){
+							/* load list with domain pattern */
+							opt_learn2 = file_read(tlearn_list, 0);
+						}
 						/* set starting time */
 						t = mytime();
 						color("* user request for temporary learning mode (max 1 hour) ", yellow);
 						mytime_print_date(); newl();
+						if (opt_learn2){
+							char *temp6;
+							color("  for domains matching patterns:", yellow);
+							temp6 = opt_learn2;
+							while(1){
+								char *res6 = string_get_next_line(&temp6);
+								if (!res6) break;
+								color(" ", red);
+								color(res6, red);
+								free2(res6);
+							}
+							newl();
+						}
 						/* clear temporary learning mode flag file */
 						file_write(tlearn, 0);
 						/* set flag for temporary learning mode */
@@ -7211,6 +7288,8 @@ void myinit()
 	string_add_line_uniq(&tomld_path, res); free2(res);
 	res = path_get_dir(tlearn);
 	string_add_line_uniq(&tomld_path, res); free2(res);
+	res = path_get_dir(tlearn_list);
+	string_add_line_uniq(&tomld_path, res); free2(res);
 	res = path_get_dir(tspec);
 	string_add_line_uniq(&tomld_path, res); free2(res);
 }
@@ -7289,8 +7368,16 @@ int main(int argc, char **argv)
 	/* this is a single tomld process here and
 	 * on --learn, request temporary learning mode for this process */
 	if (opt_learn){
-		/* set temporary learning mode flag */
-		file_write(tlearn, "1");
+		/* is there any pattern for learn? */
+		if (!opt_learn2){
+			/* set temporary learning mode flag */
+			file_write(tlearn, "1");
+		}
+		else{
+			/* set temporary learning mode flag with list */
+			file_write(tlearn, "2");
+			file_write(tlearn_list, opt_learn2);
+		}
 	}
 	else{
 		/* clear temporary learning mode flag file on start */
@@ -7361,7 +7448,8 @@ int main(int argc, char **argv)
 
 		/* run policy check from time to time
 		 * or at once if temporary learning mode is requested,
-		 * or if mod time of syslog changed and tomld is having temporary learning mode,
+		 * or also at once if mod time of syslog changed and tomld is having temporary learning mode
+		 * (only with temp learn mode or else a process could DoS the tomld process),
 		 * and not 30 sec later */
 		if ((mytime() - t) >= const_time_check || flag_learn3 ||
 			(flag_learn && tlogf_mod_time != tlogf_mod_time2)){
