@@ -30,6 +30,7 @@ changelog:
                          - bugfix in path_link_read() and path_link_read()
                          - bugfix in which()
                          - bugfix in check_instance() to not let more than 1 instances of tomld running together
+                         - bugifx in domain_get_log() to reread domain data after i change its profile
                          - bugfix: switch domain with all its subdomains too to learning mode when managing deny logs
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
@@ -1503,18 +1504,19 @@ int domain_get_profile(char *text)
 
 
 /* set profile number (0-3) of a domain at text position from the beginning of domain policy */
-void domain_set_profile(char *text, int profile)
+void domain_set_profile(char **text, int profile)
 {
-	int p;
+	char p;
 	char *key = "use_profile ";
 	int keyl = 12;
-	char *res, *orig;
+	char *res, *orig, *temp;
 	
+	temp = *text;
 	while(1){
-		orig = text;
+		orig = temp;
 
 		/* get next line */
-		res = string_get_next_line(&text);
+		res = string_get_next_line(&temp);
 		if (!res) break;
 
 		/* search for the keyword */
@@ -1547,7 +1549,7 @@ void domain_set_profile_for_prog(const char *prog, int profile)
 		if (res2){
 
 			/* if so, then set its profile mode */
-			if (!strcmp(prog, res2)) domain_set_profile(orig, profile);
+			if (!strcmp(prog, res2)) domain_set_profile(&orig, profile);
 		}
 
 		free2(res2);
@@ -3648,7 +3650,7 @@ void domain_set_learn_all()
 		res = domain_get_next(&temp);
 		if (!res) break;
 		/* switch domain to learning mode */
-		domain_set_profile(orig, 1);
+		domain_set_profile(&orig, 1);
 		/* reset cpu time counter for prog because of learning mode */
 		/* get domain names */
 		name     = domain_get_name(res);
@@ -4289,15 +4291,13 @@ void domain_get_log()
 					/* check if there was a user requested for temporary learning mode,
 					 * and if so, then allow rules from deny logs */
 					if (flag_learn){
-						int flag_rules_added = 0;
-						
+
 						/* if there a list with domain pattern? */
 						if (!opt_learn2){
 							/* add rules to new rules */
 							strcat2(&prog_rules_new, res);
 							strcat2(&prog_rules_new, "\n");
 							color("  add rules? (y)\n", clr);
-							flag_rules_added = 1;
 						}
 						else{
 							/* yes, there is a list */
@@ -4318,18 +4318,12 @@ void domain_get_log()
 								strcat2(&prog_rules_new, res);
 								strcat2(&prog_rules_new, "\n");
 								color("  add rules? (y)\n", clr);
-								flag_rules_added = 1;
 							}
 							/* else don't add rules */
 							else{
 								color("  add rules? (n)\n", clr);
 							}
 						}
-
-						/* clear learn flag, because i want to allow temporary learning mode only for those domains,
-						 * that had access deny logs just now,
-						 * the rest of the enforcing mode domains should stay as the are for security reasons */
-						if (flag_rules_added) flag_learn = 0;
 					}
 					else{
 						color("  add rules? (n)\n", clr);
@@ -4373,6 +4367,12 @@ void domain_get_log()
 			}
 			
 			
+
+			/* clear learn flag, because i want to allow temporary learning mode only for those domains,
+			 * that had access deny logs just now,
+			 * the rest of the enforcing mode domains should stay as the are for security reasons */
+			flag_learn = 0;
+
 			/* are there any new rules after confirmation? */
 			if (strlen2(&prog_rules)){
 
@@ -4383,6 +4383,7 @@ void domain_get_log()
 				temp = tdomf;
 				while(1){
 					/* get next domain policy */
+					orig = temp;
 					res = domain_get_next(&temp);
 					if (!res) break;
 					/* get subdomain name */
@@ -4407,6 +4408,11 @@ void domain_get_log()
 								if (!flag_once){
 									/* switch domain to learning mode */
 									domain_set_profile_for_prog(prog, 1);
+									/* reread domain because it changed when i changed its profile just now
+									 * in 'tdomf', and the old one was in 'res' */
+									free2(res);
+									temp = orig;
+									res = domain_get_next(&temp);
 									/* reset cpu time counter for prog because of switching it to learning mode,
 									 * or else it would switch back to enforcing mode immediately */
 									process_get_cpu_time_all(prog, 1);
@@ -7352,7 +7358,7 @@ int main(int argc, char **argv)
 
 	/* some initializations */
 	myinit();
-
+	
 	/* check command line options */
 	check_options(argc, argv);
 
