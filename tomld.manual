@@ -6,7 +6,7 @@
 tomld - tomoyo learning daemon, fully automatic MAC configuration
 
 .SH SYNOPSYS
-\fBtomld\fR [\fB\-h\fR|\fB\-v\fR|\fB\-c\fR] [\fB\-m\fR|\fB\-k\fR] [\fB\-\-clear\fR|\fB\-\-reset\fR|\fB\-l\fR] [\fB\-i\fR PATTERN|\fB\-r\fR PATTERN|\fB\-R\fR DIRS] [\fB\-\-log\fR FILE|\fB\-\-mail\fR USERS] [\fB\-\-no\-domain\fR FILES] [executable[s]]
+\fBtomld\fR [\fB\-h\fR|\fB\-v\fR|\fB\-c\fR] [\fB\-m\fR|\fB\-k\fR] [\fB\-\-learn\fR PATTERNS] [\fB\-\-clear\fR|\fB\-\-reset\fR] [\fB\-i\fR PATTERN|\fB\-r\fR PATTERN|\fB\-R\fR DIRS] [\fB\-\-log\fR FILE|\fB\-\-mail\fR USERS] [\fB\-\-no\-domain\fR FILES] [executable[s]]
 
 .SH DESCRIPTION
 
@@ -72,6 +72,13 @@ reinitialize domain configurations and run
 .br
 (all previously learnt rules will be backed up)
 .TP
+\fB\-l\fR   \fB\-\-learn [patterns]\fR
+**request temporary learning mode for all domains,
+.br
+or for those domains that match the patterns
+.br
+(this is the recommended way if still necessary)
+.TP
 \fB\-i\fR   \fB\-\-info [pattern]\fR
 **print domains' rules by pattern
 .br
@@ -92,11 +99,6 @@ all old learning mode domains to enforcing mode
 don't change domain's mode for this session
 .br
 (learning mode domains will stay so on exit)
-.TP
-\fB\-l\fR   \fB\-\-learn\fR
-**request temporary learning mode
-.br
-(this is the recommended way if still necessary)
 .TP
      \fB\-\-learn-all\fR
 switch all domains back to learning mode
