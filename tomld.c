@@ -30,6 +30,7 @@ changelog:
                          - bugfix in path_link_read() and path_link_read()
                          - bugfix in which()
                          - bugfix in check_instance() to not let more than 1 instances of tomld running together
+                         - bugfix: switch domain with all its subdomains too to learning mode when managing deny logs
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
                          - documentation fully revised in english, thanks to Andy Booth
@@ -3334,8 +3335,8 @@ void domain_info(const char *pattern)
 	}
 	
 	if (flag_pattern){
-		char *tdomf2, *res, *res2, *res_temp;
-		int i;
+		char *tdomf2, *res, *res2, *temp;
+		int i, prof;
 		int count = 0;
 		int flag_first = 0;
 		
@@ -3345,11 +3346,14 @@ void domain_info(const char *pattern)
 			res = domain_get_next(&tdomf2);
 			/* exit on end */
 			if (!res) break;
-			res_temp = res;
 
+			/* get profile */
+			prof = domain_get_profile(res);
+			
 			/* get first line */
 			/* here res2 should be something, so i don't check data availability */
-			res2 = string_get_next_line(&res_temp);
+			temp = res;
+			res2 = string_get_next_line(&temp);
 			
 			/* search for a keyword */
 			i = string_search_keyword(res2, pattern);
@@ -3365,16 +3369,17 @@ void domain_info(const char *pattern)
 				/* print new line to stderr only once for header */
 				if (!flag_first){ newl_(); flag_first = 1; }
 				else newl();
-				/* print header part in blue */
-				color(res2, blue); newl();
+				/* print header part in purple if domain is in enforcing mode or else in blue */
+				if (prof == 3){ color(res2, purple); newl(); }
+				else{ color(res2, blue); newl(); }
 				free2(res2);
 				/* print use_profile here too */
-				res2 = string_get_next_line(&res_temp);
+				res2 = string_get_next_line(&temp);
 				color(res2, green); newl();
 				free2(res2);
 				
 				/* sort the rest of the policy text */
-				text_new = string_sort_uniq_lines(res_temp);
+				text_new = string_sort_uniq_lines(temp);
 				text_temp = text_new;
 
 				/* print the rest of the domain part */
@@ -4394,14 +4399,14 @@ void domain_get_log()
 							rule = string_get_next_line(&temp2);
 							if (!rule){ free2(prog); break; }
 
-							/* compare prog name to subdomain name */
+							/* is it a main domain? (compare prog name to subdomain name) */
 							if (!strcmp(prog, res2)){
 								/* if match, add rule to domain policy */
 								strcat2(&rules_new, rule);
 								strcat2(&rules_new, "\n");
 								if (!flag_once){
 									/* switch domain to learning mode */
-									domain_set_profile(res, 1);
+									domain_set_profile_for_prog(prog, 1);
 									/* reset cpu time counter for prog because of switching it to learning mode,
 									 * or else it would switch back to enforcing mode immediately */
 									process_get_cpu_time_all(prog, 1);
