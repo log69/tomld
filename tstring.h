@@ -103,7 +103,7 @@ char *string_get_diff(char *new, char *old);
 
 int string_search_keyword_first(char *text, char *key);
 
-int string_search_keyword_first_all(char **text, char *key);
+int string_search_keyword_first_all(char *text, char *key);
 
 int string_search_keyword_last(const char *text, const char *key);
 
