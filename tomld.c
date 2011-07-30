@@ -764,25 +764,27 @@ void check_notify()
 							if (file_exist(tlog2_lock)){
 								res = file_read(tlog2_lock, 1); }
 							if (!strlen2(&res)){
-								
-								/* store command */
-								char *temp = opt_notify2;
-								char *comm = string_get_next_line(&temp);
+									
 								/* read message */
 								res2 = file_read(tlog2, 0);
-								color(res2, clr);
-								/* add message */
-								strcat2(&comm, " \"");
-								strcat2(&comm, res2);
-								strcat2(&comm, "\"");
-								free2(res2);
+								if (strlen2(&res2)){
+									/* store command */
+									char *temp = opt_notify2;
+									char *comm = string_get_next_line(&temp);
+									color(res2, clr);
+									/* add message */
+									strcat2(&comm, " \"");
+									strcat2(&comm, res2);
+									strcat2(&comm, "\"");
+									free2(res2);
 
-								/* run command */
-								system(comm);
-								free2(comm);
-								
-								free2(res);
-								break;
+									/* run command */
+									system(comm);
+									free2(comm);
+									
+									free2(res);
+									break;
+								}
 							}
 							free2(res);
 
@@ -803,15 +805,11 @@ void check_notify()
 void notify(char *text)
 {
 	if (opt_notify){
-		char *text2 = 0;
-
 		/* lock file */
 		file_write(tlog2_lock, "1");
 
-		strcpy2(&text2, text);
-		strcat2(&text2, "\n");
-		file_write(tlog2, text2);
-		free2(text2);
+		/* write message */
+		file_write(tlog2, text);
 
 		/* unlock file */
 		file_write(tlog2_lock, 0);
