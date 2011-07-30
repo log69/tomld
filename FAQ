@@ -102,6 +102,8 @@ Every tag has values under it, one per line. Spaces and empty lines don't matter
 
 [mail] Tomld will send e-mails to the persons specified below with all the recent deny logs. If unset, you can also use the file /var/log/tomld.log for checking the logs. 
 
+[notify] Tomld will run the following command expanding it with its info message when important event happens. 
+
 [exception] The files in the directories specified won't get automatically wildcarded. If the file is a temporary file, then only its random part will be wildcarded. The idea behind it is to not to let all files be read automatically in these directories, for instance .gnupg in the home directory or /etc/passwd. 
 
 [wildcard] The files in these directories will always be wildcarded, regardless of the type of the rule, whether it is a writing rule or just a reading one (the idea of tomld is to wildcard all files in "writing" rules, like create, rename, truncate etc., and leave the rest untouched). This is useful to have it in not so important directories, so the chance of a final rule and the completion of learning mode is higher. 
@@ -110,9 +112,9 @@ Every tag has values under it, one per line. Spaces and empty lines don't matter
 
 [recursive] Everything will be recursively wildcarded in these directories. It may make sense to place a directory here that tomld couldn't create a general rule for and as a result it keeps generating new rules continually (like new randomly-named directories). Direcories like '/home/user/.mozilla' or the directories of samba shares may also be inserted here. Note that this option should be used with caution as over-enthusiastic recursive wildcarding negates the usefulness of Tomoyo. 
 
-[noexe] All the entries below this will be interpreted as extra executables _not_ to create domain for. 
+[nodomain] All the entries below this will be interpreted as extra executables _not_ to create domain for. 
 
-[exe] All the entries below this will be interpreted as extra executables to create domain for. 
+[extra] All the entries below this will be interpreted as extra executables to create domain for. 
 
 
 Why are all shell binaries marked as exceptions?
