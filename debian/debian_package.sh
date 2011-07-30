@@ -60,6 +60,14 @@ cat ../postrm.sh | tail -n+4 >> postrm
 grep -E -m 1 -A 1000 "^ *purge.remove.*\)" postrm.ex | tail -n+2 >> postrm
 rm postrm.ex
 
+# manage .desktop files (in rules file, lines must start with tabulator and not space)
+cp ../tomld_learn.desktop .
+cp ../tomld_notify.desktop .
+echo "" >> rules
+echo "override_dh_auto_install:" >> rules
+echo "	dh_install ./tomld_learn.desktop usr/share/applications" >> rules
+echo "	dh_install ./tomld_notify.desktop usr/share/applications" >> rules
+echo "	dh_auto_install" >> rules
 
 
 
