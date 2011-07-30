@@ -56,6 +56,11 @@ The following options are supported:
 \fB\-c\fR   \fB\-\-color\fR
 colorize output
 .TP
+\fB\-n\fR   \fB\-\-notify [command]\fR
+run the command with appended info messages
+.br
+(should be run on a desktop as normal user)
+.TP
      \fB\-\-log [file]\fR
 redirect stderr and stdout to this file
 .TP
