@@ -46,6 +46,10 @@ changelog:
                            only those domains to learning mode which we ask for, and the given patterns match the domain name
                            (thanks to muczy for the idea)
                          - add feature to --info option to print enforcing mode domains in different colors or with a star sing
+                         - add tab as a separator beside space character in string functions
+                         - don't let several instance of tomld processes with root privileges run together
+                           normal privileged processes can run simultanously
+                         - add --notifx switch for better GUI integration and the ability to notify users through desktop
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -440,6 +444,11 @@ char *tlearn = "/var/run/tomld/tomld.learn";
 /* file to give a list to already running tomld daemon about required domains
  * to switch them to learning mode, but only these ones */
 char *tlearn_list = "/var/run/tomld/tomld.learn.list";
+/* contains the last info messages and it always gets overwritten with the next message */
+char *tlog2      = "/var/run/tomld/tomld.message";
+/* lock file for the former one */
+char *tlog2_lock = "/var/run/tomld/tomld.message.lock";
+int tlog2_mod_time = -1;
 /* flags to signal temporary learning mode
  * flag_learn is to signal if there was a deny log already since user requested temporary learning mode
  * flag_learn2 is to signal if the 1 hour interval of temporary learning mode is still on or ended already
@@ -470,7 +479,9 @@ int opt_once		= 0;
 int opt_mail		= 0;
 int opt_log			= 0;
 int opt_nodomain	= 0;
+int opt_notify		= 0;
 
+char *opt_notify2	= 0;
 char *opt_learn2	= 0;
 char *opt_nodomain2	= 0;
 char *opt_log2		= 0;
@@ -619,6 +630,8 @@ void help() {
 	printf ("    -h   --help              **print this help\n");
 	printf ("    -v   --version           **print version information\n");
 	printf ("    -c   --color             colorize output\n");
+	printf ("    -n   --notify  [command] run the command with appended info messages\n");
+	printf ("                             (should be run on a desktop as normal user)\n");
 	printf ("         --log        [file] redirect stderr and stdout to this file\n");
 	printf ("         --no-domain [files] don't create domains for these executables\n");
 	printf ("         --clear             clear domain configurations\n");
@@ -667,6 +680,7 @@ void myfree()
 	free2(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 	if (dirs_recursive_sub)		free(dirs_recursive_sub);
+	free2(opt_notify2);
 	free2(opt_learn2);
 	free2(opt_nodomain2);
 	free2(opt_log2);
@@ -716,6 +730,86 @@ void color(const char *text, const char *col)
 	else{
 		fprintf(stdout, "%s", text);
 		fflush(stdout);
+	}
+}
+
+
+/* check for notification messages stored in tlog2 file
+ * and send them to a notification daemon if any */
+void check_notify()
+{
+	/* run client side only if i am non-root */
+	if (getuid()){
+		if (opt_notify && opt_notify2){
+			int tlog2_mod_time2;
+			char *res, *res2;
+
+			color("*listening to messages from tomld daemom...\n", yellow);
+
+			/* infinite cycle */
+			while(1){
+				/* check modification time of log2 file and read its content only if modified */
+				if (file_exist(tlog2)){
+					tlog2_mod_time2 = file_get_mod_time(tlog2);
+					if (tlog2_mod_time != tlog2_mod_time2){
+						/* store new time */
+						tlog2_mod_time = tlog2_mod_time2;
+						
+						/* is log2 file locked? if yes, then reread it 2 sec later */
+						while(1){
+							res = file_read(tlog2_lock, 1);
+							if (!strlen2(&res)){
+								
+								/* store command */
+								char *temp = opt_notify2;
+								char *comm = string_get_next_line(&temp);
+								/* read message */
+								res2 = file_read(tlog2, 0);
+								color(res2, clr);
+								/* add message */
+								strcat2(&comm, " \"");
+								strcat2(&comm, res2);
+								strcat2(&comm, "\"");
+								free2(res2);
+
+								/* run command */
+								system(comm);
+								free2(comm);
+								
+								free2(res);
+								break;
+							}
+							free2(res);
+
+							/* sleep 2 sec */
+							usleep(2000000);
+						}
+					}
+				}
+				/* sleep 2 sec */
+				usleep(2000000);
+			}
+		}
+	}
+}
+
+
+/* store messages for notify */
+void notify(char *text)
+{
+	if (opt_notify){
+		char *text2 = 0;
+
+		/* lock file */
+		file_write(tlog2_lock, "1");
+
+		strcpy2(&text2, text);
+		strcat2(&text2, "\n");
+		file_write(tlog2, text2);
+		free2(text2);
+
+		/* unlock file */
+		file_write(tlog2_lock, 0);
 	}
 }
 
@@ -1883,7 +1977,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					strcat2(&name2, " ");
 
 					/* domain cpu time list minus entry exists? */
-					i = string_search_keyword_first_all(&domain_cputime_list_minus, name2);
+					i = string_search_keyword_first_all(domain_cputime_list_minus, name2);
 					if (i > -1){
 						if (flag_clear){
 							/* update it by removing old entry and adding current one */
@@ -1906,7 +2000,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					}
 					else{
 						/* if whole entry doesn't exist, then check if same pid exists */
-						i = string_search_keyword_first_all(&domain_cputime_list_minus, mypid2);
+						i = string_search_keyword_first_all(domain_cputime_list_minus, mypid2);
 						if (i > -1){
 							/* if wrong pid exists, then remove it */
 							res2 = string_remove_line_from_pos(domain_cputime_list_minus, i);
@@ -1938,7 +2032,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					strcat2(&name2, " ");
 
 					/* domain cpu time list plus entry exists? */
-					i = string_search_keyword_first_all(&domain_cputime_list_plus, name2);
+					i = string_search_keyword_first_all(domain_cputime_list_plus, name2);
 					if (i > -1){
 						/* update it by removing old entry and adding new one */
 						res2 = string_remove_line_from_pos(domain_cputime_list_plus, i);
@@ -1980,7 +2074,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 		if (i > -1){
 			/* if match, then search for my uid of cpu time */
 			temp = tdomf + i;
-			i2 = string_search_keyword_first_all(&temp, myuid_cputime);
+			i2 = string_search_keyword_first_all(temp, myuid_cputime);
 			if (i2 > -1){
 				/* if match, then jump to end of line, and rewrite number with null and spaces */
 				temp = tdomf + i + i2;
@@ -2598,7 +2692,7 @@ void check_instance(){
 	char *mypid;
 	char *cmd;
 	char *pid2;
-	int  p;
+	int  i, i2, p;
 	int  *pid_list;
 	int  len;
 	int  flag_pid_file;
@@ -2616,6 +2710,60 @@ void check_instance(){
 		error("error: unknown problem, zero instance of tomld seem to be running\n");
 		myexit(1);
 	}
+	
+	/* remove all pids from list that don't belong to a tomld process running with root priv */
+	i = 0;
+	while(1){
+		int i2;
+		char *path = 0, *res;
+		int p = pid_list[i];
+		if (!p) break;
+
+		/* create path */
+		res = string_itos(p);
+		strcpy2(&path, "/proc/");
+		strcat2(&path, res);
+		strcat2(&path, "/status");
+		free2(res);
+		
+		/* read in /proc/PID/status file */
+		res = file_read(path, -1);
+		free2(path);
+		if (res){
+			/* search for UID: line */
+			i2 = string_search_keyword_first_all(res, "Uid:");
+			if (i2 > -1){
+				/* get UID: line */
+				char *temp = res + i2;
+				char *res2 = string_get_next_wordn(&temp, 1);
+				char *num = string_get_number(res2);
+				/* convert uid to integer */
+				int n = atoi(num);
+				free2(num);
+				free2(res2);
+				
+				/* remove PID from list if PID is non-zero */
+				if (n) pid_list[i] = -1;
+			}
+			free2(res);
+		}
+		i++;
+	}
+	/* reorder pid_list removing values of -1 */
+	i = 0;
+	i2 = 0;
+	while(1){
+		int p = pid_list[i2];
+		if (!p) break;
+		if (p != -1){
+			int n = pid_list[i2];
+			pid_list[i] = n;
+			i++; i2++;
+		}
+		else i2++;
+	}
+	pid_list[i] = 0;
+
 
 	/* get my pid number and convert it to string */
 	mypid = string_itos(getpid());
@@ -2870,6 +3018,7 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "-r") || !strcmp(myarg, "--remove"   ))	{ opt_remove     = 1; flag_ok = 3; }
 			if (!strcmp(myarg, "-R") || !strcmp(myarg, "--recursive"))	{ opt_recursive  = 1; flag_ok = 4; }
 			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	    { opt_learn      = 1; flag_ok = 8; }
+			if (!strcmp(myarg, "-n") || !strcmp(myarg, "--notify"))	    { opt_notify     = 1; flag_ok = 9; }
 
 			if (!strcmp(myarg, "--mail" ))	   { opt_mail     = 1; flag_ok = 5; }
 			if (!strcmp(myarg, "--log"  ))	   { opt_log      = 1; flag_ok = 6; }
@@ -2938,6 +3087,29 @@ void check_options(int argc, char **argv){
 					strcat2(&opt_learn2, myarg);
 					strcat2(&opt_learn2, "\n");
 				}
+				/* if last option arg was --notify, then this belongs to it */
+				if (flag_type == 9){
+					/* store only the first command */
+					if (!opt_notify2){
+						/* get only exe */
+						char *temp3 = myarg;
+						char *res3 = string_get_next_word(&temp3);
+						if (res3){
+							char *res4 = which(res3);
+							if (res4){
+								/* get rest of parameters */
+								char *res6 = string_get_next_line(&temp3);
+								/* store it */
+								strcpy2(&opt_notify2, res4);
+								strcat2(&opt_notify2, " ");
+								strcat2(&opt_notify2, res6);
+								free2(res6);
+								free2(res4);
+							}
+							free2(res3);
+						}
+					}
+				}
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (flag_type == 1 || flag_type == 99){
 					char *res;
@@ -2988,7 +3160,6 @@ void check_options(int argc, char **argv){
 void check_tomoyo()
 {
 	char *cmd;
-	char *mydir;
 	int tver;
 
 	/* check availability of tomoyo system compiled into the kernel above 2.6.36 */
@@ -3051,18 +3222,15 @@ void check_tomoyo()
 		}
 		free2(tdomf); tdomf = 0;
 	}
+}
 
-	/* create tomoyo dir if it doesn't exist yet */
-	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
 
-	/* create tomld dirs if they don't exist yet */
-	mydir = path_get_parent_dir(tpid);
-	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
-	free2(mydir);
-	mydir = path_get_parent_dir(tmark);
-	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
-	free2(mydir);
-	
+/* check and load config data from /etc/tomld/tomld.config file */
+void check_config()
+{
+	char *mydir;
+	char mode[] = "0755";
+
 	/* load tomld config of special dirs */
 	if (file_exist(tspec)){
 		char *res, *res2, *temp, *temp2;
@@ -3091,13 +3259,14 @@ void check_tomoyo()
 					if (string_search_keyword_first(res2, "[mail]")){      flag_spec = 5; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[extra]")){     flag_spec = 6; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[nodomain]")){  flag_spec = 7; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[notify]")){    flag_spec = 8; flag_ok = 0; }
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
 						/* add "/" char to the end of dirs if missing
 						 * if last tag was not [mail] */
 						long l = strlen2(&res);
-						if ((flag_spec < 5 || flag_spec > 7) && l > 0){
+						if ((flag_spec < 5 || flag_spec > 8) && l > 0){
 							if (res[l - 1] != '/') strcat2(&res, "/"); }
 						/* store line */
 						if (flag_spec == 1){ strcat2(&spec_exception2, res); strcat2(&spec_exception2, "\n"); }
@@ -3125,6 +3294,28 @@ void check_tomoyo()
 								free2(res3);
 							}
 						}
+						if (flag_spec == 8){
+							/* store only the first command */
+							if (!opt_notify2){
+								/* get only exe */
+								char *temp3 = res;
+								char *res3 = string_get_next_word(&temp3);
+								if (res3){
+									char *res4 = which(res3);
+									if (res4){
+										/* get rest of parameters */
+										char *res6 = string_get_next_line(&temp3);
+										/* store it */
+										strcpy2(&opt_notify2, res4);
+										strcat2(&opt_notify2, " ");
+										strcat2(&opt_notify2, res6);
+										free2(res6);
+										free2(res4);
+									}
+									free2(res3);
+								}
+							}
+						}
 					}
 				}
 				free2(res2);
@@ -3140,8 +3331,23 @@ void check_tomoyo()
 	if (!spec_replace2)   spec_replace2   = array_copy_to_string_list(spec_replace);
 	if (dirs_recursive)   opt_recursive   = 1;
 	if (mail_users)       opt_mail        = 1;
-}
+	if (opt_notify2)      opt_notify      = 1;
 
+	/* create tomoyo dir if it doesn't exist yet */
+	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
+
+	/* create tomld dirs if they don't exist yet */
+	mydir = path_get_parent_dir(tpid);
+	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
+	/* chmod 0755 dir */
+	if (chmod (mydir, strtol(mode, 0, 8)) < 0)
+	free2(mydir);
+	mydir = path_get_parent_dir(tmark);
+	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
+	/* chmod 0755 dir */
+	if (chmod (mydir, strtol(mode, 0, 8)) < 0)
+	free2(mydir);
+}
 
 /* disable all domains and delete all rules from kernel memory */
 void domain_delete_all()
@@ -3725,6 +3931,9 @@ void domain_set_enforce_old()
 							if (!flag_turned){
 								flag_turned = 1;
 								color("* switch old domains back to enforcing mode\n", red);
+								
+								/* notification */
+								notify("switch old domains back to enforcing mode");
 							}
 							/* switch domain and all its subdomains to enforcing mode */
 							color(prog, blue); newl();
@@ -3770,6 +3979,7 @@ void domain_set_enforce_old()
 							if (string_search_line(tprogs_learn_auto, prog) > -1){
 								/* check if not an exception domain */
 								if (string_search_line(tprogs_exc, prog_sub) == -1){
+									char *nn = 0;
 
 									/* print info once */
 									if (!flag_turned){
@@ -3780,6 +3990,10 @@ void domain_set_enforce_old()
 									color(prog, blue); color(", ", clr);
 									color("switch to enforcing mode\n", purple);
 									domain_set_profile_for_prog(prog, 3);
+									
+									/* notification */
+									strcpy2(&nn, prog); strcat2(&nn, ", switch to enforcing mode");
+									notify(nn); free2(nn);
 									
 									/* remove domain from temporary list */
 									res2 = string_remove_line(tprogs_learn_auto, prog);
@@ -3910,7 +4124,7 @@ void domain_check_enforcing(char *domain)
 						/* convert cputime integer to string */
 						ptime = string_itos(cputime_all_percent);
 						/* domain cpu time list current entry exists? */
-						i = string_search_keyword_first_all(&domain_cputime_list_current, name);
+						i = string_search_keyword_first_all(domain_cputime_list_current, name);
 						if (i > -1){
 							/* read old value */
 							temp = domain_cputime_list_current + i;
@@ -3956,6 +4170,7 @@ void domain_check_enforcing(char *domain)
 						/* **************************************************************** */
 					}
 					if (flag_enforcing){
+						char *nn = 0;
 
 						/* switch domain to enforcing mode */
 						color(name, blue);
@@ -3967,6 +4182,10 @@ void domain_check_enforcing(char *domain)
 						newl();
 						free2(res);
 						domain_set_profile_for_prog(name, 3);
+
+						/* notification */
+						strcpy2(&nn, name); strcat2(&nn, ", switch to enforcing mode");
+						notify(nn); free2(nn);
 					}
 				}
 			}
@@ -4245,7 +4464,7 @@ void domain_get_log()
 
 		if (prog_rules){
 			char *tdomf_new, *prog, *rule, *rules_new = 0, *prog_rules_new = 0;
-			char *mail_body = 0;
+			char *log_recent = 0;
 
 			/* sort and unique rules */
 			res = string_sort_uniq_lines(prog_rules);
@@ -4315,17 +4534,17 @@ void domain_get_log()
 							/* else don't add rules */
 							else{
 								color("  add rules? (n)\n", clr);
+								/* store recent deny logs */
+								strcat2(&log_recent, res);
+								strcat2(&log_recent, "\n");
 							}
 						}
 					}
 					else{
 						color("  add rules? (n)\n", clr);
-
-						/* store deny logs for mail */
-						if (opt_mail){
-							strcat2(&mail_body, res);
-							strcat2(&mail_body, "\n");
-						}
+						/* store recent deny logs */
+						strcat2(&log_recent, res);
+						strcat2(&log_recent, "\n");
 					}
 				}
 
@@ -4335,16 +4554,21 @@ void domain_get_log()
 			}
 			free2(prog_rules);
 			prog_rules = prog_rules_new;
+
 			
-			/* on --mail, send mail to user if there were deny logs */
-			if (mail_body){
+			if (log_recent){
+
+				/* notification */
+				notify(log_recent);
+
+				/* on --mail, send mail about recent deny logs to user too */
 				if (opt_mail){
 					char *comm = 0;
 					char *text = 0;
 
 					/* create message */
 					strcat2(&text, "Subject: deny logs from tomld\n");
-					strcat2(&text, mail_body);
+					strcat2(&text, log_recent);
 
 					/* create command */
 					strcat2(&comm, mail_mta);
@@ -4356,8 +4580,8 @@ void domain_get_log()
 					free2(comm);
 					free2(text);
 				}
-				free2(mail_body);
 			}
+			free2(log_recent);
 			
 			
 
@@ -4411,12 +4635,18 @@ void domain_get_log()
 									process_get_cpu_time_all(prog, 1);
 									/* add domain to temporary list */
 									if (string_search_line(tprogs_learn_auto, prog) == -1){
+										char *nn;
+										
 										strcat2(&tprogs_learn_auto, prog);
 										strcat2(&tprogs_learn_auto, "\n");
 
 										/* print info */
 										color(prog, blue); color(", ", clr);
 										color("switch to learning mode\n", clr);
+
+										/* notification */
+										strcpy2(&nn, prog);	strcat2(&nn, ", switch to learning mode");
+										notify(nn); free2(nn);
 									}
 									/* do it only once per domain for speed */
 									flag_once = 1;
@@ -6817,6 +7047,10 @@ void check_learn()
 						t = mytime();
 						color("* user request for temporary learning mode (max 1 hour) ", yellow);
 						mytime_print_date(); newl();
+						
+						/* notification */
+						notify("temporary learning mode (max 1 hour)");
+						
 						if (opt_learn2){
 							char *temp6;
 							color("  for domains matching patterns:", yellow);
@@ -6849,6 +7083,9 @@ void check_learn()
 				flag_learn2 = 0;
 				color("* time ended for temporary learning mode ", yellow);
 				mytime_print_date(); newl();
+				
+				/* notification */
+				notify("time ended for temporary learning mode");
 				/* switch back to enforcing mode */
 				domain_set_enforce_old();
 			}
@@ -7354,6 +7591,18 @@ int main(int argc, char **argv)
 	
 	/* check command line options */
 	check_options(argc, argv);
+
+	/* check and load config */
+	check_config();
+
+	/* if --notify option is on and user is non-root, then
+	 * check for notification messages stored in tlog2 file
+	 * and send them to a notification daemon if any
+	 * this is an infinite cycle */
+	check_notify();
+	/* clear log */
+	file_write(tlog2, 0);
+
 
 	/* check if i am root */
 	if (getuid()) { error("error: root privilege needed\n"); myexit(1); }
