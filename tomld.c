@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-29/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
+30/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
                          - bugfix in processing log files (affects Tomoyo version 2.2)
@@ -32,6 +32,7 @@ changelog:
                          - bugfix in check_instance() to not let more than 1 instances of tomld running together
                          - bugifx in domain_get_log() to reread domain data after i change its profile
                          - bugfix: switch domain with all its subdomains too to learning mode when managing deny logs
+                         - more tiny fixes
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
                          - documentation fully revised in english, thanks to Andy Booth
@@ -2870,14 +2871,14 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "-R") || !strcmp(myarg, "--recursive"))	{ opt_recursive  = 1; flag_ok = 4; }
 			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	    { opt_learn      = 1; flag_ok = 8; }
 
-			if (!strcmp(myarg, "--mail" ))	{ opt_mail  = 1; flag_ok = 5; }
-			if (!strcmp(myarg, "--log"  ))	{ opt_log   = 1; flag_ok = 6; }
-			if (!strcmp(myarg, "--no-domain"  ))	{ opt_nodomain   = 1; flag_ok = 7; }
+			if (!strcmp(myarg, "--mail" ))	   { opt_mail     = 1; flag_ok = 5; }
+			if (!strcmp(myarg, "--log"  ))	   { opt_log      = 1; flag_ok = 6; }
+			if (!strcmp(myarg, "--no-domain")) { opt_nodomain = 1; flag_ok = 7; }
 
-			if (!strcmp(myarg, "--yes"  ))	{ opt_yes   = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "--clear"))	{ opt_clear = 1; flag_ok = 1; }
-			if (!strcmp(myarg, "--reset"))	{ opt_reset = 1; flag_reset = 1;  flag_ok = 1; }
-			if (!strcmp(myarg, "--learn-all"))	{ opt_learn_all = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "--yes"  ))	   { opt_yes       = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "--clear"))	   { opt_clear     = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "--reset"))	   { opt_reset     = 1; flag_reset = 1;  flag_ok = 1; }
+			if (!strcmp(myarg, "--learn-all")) { opt_learn_all = 1; flag_ok = 1; }
 
 			/* after -- option everything belongs to exebutables */
 			if (flag_type == 99) flag_ok = 0;
@@ -2923,13 +2924,9 @@ void check_options(int argc, char **argv){
 					int flag_ok_path = 0;
 					char *res4 = which(myarg);
 					if (res4){
-						char *res5 = path_link_read(res4);
-						if (res5){
-							strcat2(&opt_nodomain2, res5);
-							strcat2(&opt_nodomain2, "\n");
-							free2(res5);
-							flag_ok_path = 1;
-						}
+						strcat2(&opt_nodomain2, res4);
+						strcat2(&opt_nodomain2, "\n");
+						flag_ok_path = 1;
 						free2(res4);
 					}
 					if (!flag_ok_path){
@@ -3092,15 +3089,15 @@ void check_tomoyo()
 					if (string_search_keyword_first(res2, "[replace]")){   flag_spec = 3; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[recursive]")){ flag_spec = 4; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[mail]")){      flag_spec = 5; flag_ok = 0; }
-					if (string_search_keyword_first(res2, "[extra]")){       flag_spec = 6; flag_ok = 0; }
-					if (string_search_keyword_first(res2, "[nodomain]")){     flag_spec = 7; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[extra]")){     flag_spec = 6; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[nodomain]")){  flag_spec = 7; flag_ok = 0; }
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
 						/* add "/" char to the end of dirs if missing
 						 * if last tag was not [mail] */
 						long l = strlen2(&res);
-						if (flag_spec != 5 && flag_spec != 6 && flag_spec != 7 && l > 0){
+						if ((flag_spec < 5 || flag_spec > 7) && l > 0){
 							if (res[l - 1] != '/') strcat2(&res, "/"); }
 						/* store line */
 						if (flag_spec == 1){ strcat2(&spec_exception2, res); strcat2(&spec_exception2, "\n"); }
@@ -3122,13 +3119,9 @@ void check_tomoyo()
 							/* executable exists? */
 							char *res3 = which(res);
 							if (res3){
-								char *res4 = path_link_read(res3);
-								if (res4){
-									/* store executable as an exception */
-									strcat2(&tprogs_exc, res4);
-									strcat2(&tprogs_exc, "\n");
-									free2(res4);
-								}
+								/* store executable as an exception */
+								strcat2(&tprogs_exc, res3);
+								strcat2(&tprogs_exc, "\n");
 								free2(res3);
 							}
 						}
