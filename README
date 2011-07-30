@@ -49,6 +49,8 @@ The following options are supported:
     -h   --help              **print this help
     -v   --version           **print version information
     -c   --color             colorize output
+    -n   --notify  [command] run the command with appended info messages
+                             (should be run on a desktop as normal user)
          --log        [file] redirect stderr and stdout to this file
          --no-domain [files] don't create domains for these executables
          --clear             clear domain configurations
