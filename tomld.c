@@ -740,9 +740,12 @@ void check_notify()
 {
 	/* run client side only if i am non-root */
 	if (getuid()){
-		if (opt_notify && opt_notify2){
+		if (opt_notify){
 			int tlog2_mod_time2;
 			char *res, *res2;
+
+			if (!opt_notify2){
+				error("error: commands for notification missing\n"); myexit(1); }
 
 			color("*listening to messages from tomld daemom...\n", yellow);
 
