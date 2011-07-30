@@ -760,7 +760,9 @@ void check_notify()
 						
 						/* is log2 file locked? if yes, then reread it 2 sec later */
 						while(1){
-							res = file_read(tlog2_lock, 1);
+							res = 0;
+							if (file_exist(tlog2_lock)){
+								res = file_read(tlog2_lock, 1); }
 							if (!strlen2(&res)){
 								
 								/* store command */
