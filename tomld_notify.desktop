@@ -1,0 +1,9 @@
+
+[Desktop Entry]
+Type=Application
+Name=tomld_notify.desktop
+GenericName=Security tool
+Comment=Show tomld messages in notification area
+Exec=/usr/sbin/tomld --notify
+Terminal=true
+Categories=System;

@@ -1,0 +1,9 @@
+
+[Desktop Entry]
+Type=Application
+Name=tomld_learn.desktop
+GenericName=Security tool
+Comment=Request temporary learning mode from running tomld service
+Exec=gksu -- /usr/sbin/tomld --learn
+Terminal=false
+Categories=System;
