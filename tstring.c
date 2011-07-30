@@ -565,7 +565,7 @@ char *string_get_next_word(char **text)
 	while (1){
 		c = (*text)[i];
 		if (!c || c == '\n') return 0;
-		if (c != ' ') break;
+		if (c != ' ' && c != '\t') break;
 		i++;
 	}
 
@@ -574,7 +574,7 @@ char *string_get_next_word(char **text)
 		/* get next char */
 		c = (*text)[i];
 		/* exit on new line */
-		if (!c || c == '\n' || c == ' ') break;
+		if (!c || c == '\n' || c == ' ' || c == '\t') break;
 		i++;
 	}
 	
@@ -595,7 +595,7 @@ char *string_get_next_word(char **text)
 	i = start + l;
 	while (1){
 		c = (*text)[i];
-		if (c != ' ') break;
+		if (c != ' ' && c != '\t') break;
 		i++;
 	}
 	(*text) += i;
@@ -625,7 +625,7 @@ char *string_get_next_wordn(char **text, int num)
 			c = (*text)[i];
 			/* exit on end */
 			if (!c || c == '\n') return 0;
-			if (c != ' ') break;
+			if (c != ' ' && c != '\t') break;
 			i++;
 		}
 
@@ -638,7 +638,7 @@ char *string_get_next_wordn(char **text, int num)
 				if (num > 0) return 0;
 				else break;
 			}
-			if (c == ' ') break;
+			if (c == ' ' || c == '\t') break;
 			i++;
 		}
 	}
@@ -660,7 +660,7 @@ char *string_get_next_wordn(char **text, int num)
 	i = start + l;
 	while (1){
 		c = (*text)[i];
-		if (c != ' ') break;
+		if (c != ' ' && c != '\t') break;
 		i++;
 	}
 	(*text) += i;
@@ -685,7 +685,7 @@ char *string_get_last_word(char **text)
 		c = (*text)[i];
 		/* exit on end */
 		if (!c || c == '\n') return 0;
-		if (c != ' ') break;
+		if (c != ' ' && c != '\t') break;
 		i++;
 	}
 
@@ -702,7 +702,7 @@ char *string_get_last_word(char **text)
 	end = i;
 	while(1){
 		c = (*text)[i];
-		if (c == ' ' || i < start) break;
+		if (c == ' ' || c == '\t' || i < start) break;
 		i--;
 	}
 	i++;
@@ -792,13 +792,13 @@ int string_search_keyword_first(char *text, char *key)
 
 /* search for a keyword from the beginning of the lines in a string */
 /* return char position if success or -1 on fail */
-int string_search_keyword_first_all(char **text, char *key)
+int string_search_keyword_first_all(char *text, char *key)
 {
 	char *res, *temp, *orig;
 	
-	if (!(*text)) return -1;
+	if (!text) return -1;
 
-	temp = *text;
+	temp = text;
 	while(1){
 		orig = temp;
 		/* get next line */
@@ -806,7 +806,7 @@ int string_search_keyword_first_all(char **text, char *key)
 		if (!res) break;
 		if (string_search_keyword_first(res, key)){
 			free2(res);
-			return (orig - (*text));
+			return (orig - text);
 		}
 		free2(res);
 	}
