@@ -49,7 +49,7 @@ changelog:
                          - add tab as a separator beside space character in string functions
                          - don't let several instance of tomld processes with root privileges run together
                            normal privileged processes can run simultanously
-                         - add --notifx switch for better GUI integration and the ability to notify users through desktop
+                         - add --notify switch for better GUI integration and the ability to notify users through desktop
 26/07/2011 - tomld v0.38 - add --log switch to redirect stderr and stdout to a log file
                          - some minor fixes
                          - change default 0.5 sec cycle to 2 sec and 10 sec check() to 30 sec to decrease load
@@ -741,6 +741,7 @@ void check_notify()
 	/* run client side only if i am non-root */
 	if (getuid()){
 		if (opt_notify){
+			static int flag_firstrun_notify = 0;
 			int tlog2_mod_time2;
 			char *res, *res2;
 
@@ -751,6 +752,23 @@ void check_notify()
 
 			/* infinite cycle */
 			while(1){
+				/* print my welcome message on first run */
+				if (!flag_firstrun_notify){
+					char *comm, *temp;
+					flag_firstrun_notify = 1;
+					
+					/* store command */
+					temp = opt_notify2;
+					comm = string_get_next_line(&temp);
+					/* add message */
+					strcat2(&comm, " \"Tomld notification service started\"");
+					/* run command */
+					system(comm);
+					free2(comm);
+
+					/* store modification date to not read the current value, but only from now on */
+					tlog2_mod_time = file_get_mod_time(tlog2);
+				}
 				/* check modification time of log2 file and read its content only if modified */
 				if (file_exist(tlog2)){
 					tlog2_mod_time2 = file_get_mod_time(tlog2);
