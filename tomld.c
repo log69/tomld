@@ -33,6 +33,7 @@ changelog:
                          - bugifx in domain_get_log() to reread domain data after i change its profile
                          - bugfix: switch domain with all its subdomains too to learning mode when managing deny logs
                          - bugfix in domain_reshape_rules_create_double(), space was inserted after parameter2 and not before
+                         - bugfix in save(): save log mark only if it's not empty
                          - more tiny fixes
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
@@ -2661,7 +2662,7 @@ void save()
 		/* store backup */
 		strcpy2(&tmarkf_bak3, tmarkf);
 		/* save config to disk */
-		file_write(tmark, tmarkf);
+		if (tmarkf) file_write(tmark, tmarkf);
 	}
 	else{
 		if (tmarkf){
