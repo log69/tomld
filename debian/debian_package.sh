@@ -17,7 +17,8 @@ echo
 echo "* creating tomld.tgz..."
 (make clean) &>/dev/null
 mkdir "$TEMP"/tomld-"$VER"
-cp ./* "$TEMP"/tomld-"$VER"/
+cp --preserve=all ./* "$TEMP"/tomld-"$VER"/
+cp -a ./extras "$TEMP"/tomld-"$VER"/
 cd "$TEMP"
 tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER" --exclude ".git"
 
@@ -63,14 +64,12 @@ rm postrm.ex
 # manage .desktop files (in rules file, lines must start with tabulator and not space)
 cp ../tomld_learn.desktop .
 cp ../tomld_notify.desktop .
-cp ../tomld_icon.svg tomld_learn.svg
-cp ../tomld_icon.svg tomld_notify.svg
+cp ../tomld.svg .
 echo "" >> rules
 echo "override_dh_auto_install:" >> rules
 echo "	dh_install ./tomld_learn.desktop usr/share/applications" >> rules
 echo "	dh_install ./tomld_notify.desktop usr/share/applications" >> rules
-echo "	dh_install ./tomld_learn.svg usr/share/pixmaps" >> rules
-echo "	dh_install ./tomld_notify.svg usr/share/pixmaps" >> rules
+echo "	dh_install ./tomld.svg usr/share/pixmaps" >> rules
 echo "	dh_auto_install" >> rules
 
 
@@ -80,6 +79,7 @@ echo "usr/sbin" 			>> dirs
 echo "etc/init.d" 			>> dirs
 echo "etc/tomld" 			>> dirs
 echo "usr/share/man/man1" 	>> dirs
+echo "usr/share/pixmaps" 	>> dirs
 echo "usr/share/applications" 	>> dirs
 
 
