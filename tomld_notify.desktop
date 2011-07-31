@@ -4,6 +4,7 @@ Type=Application
 Name=Tomld notification
 GenericName=Security tool
 Comment=Show tomld messages in notification area
+Icon=tomld.svg
 Exec=/usr/sbin/tomld --notify
 Terminal=false
 Categories=System;
