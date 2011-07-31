@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-30/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
+31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
                          - bugfix in processing log files (affects Tomoyo version 2.2)
@@ -32,6 +32,7 @@ changelog:
                          - bugfix in check_instance() to not let more than 1 instances of tomld running together
                          - bugifx in domain_get_log() to reread domain data after i change its profile
                          - bugfix: switch domain with all its subdomains too to learning mode when managing deny logs
+                         - bugfix in domain_reshape_rules_create_double(), space was inserted after parameter2 and not before
                          - more tiny fixes
                          - simplify messages and code in domain creation
                          - speed up domain_get_profile()
@@ -6641,8 +6642,8 @@ void domain_reshape_rules_create_double()
 			strcat2(&tdomf_new, "allow_create ");
 			strcat2(&tdomf_new, param1);
 			if (param2){
-				strcat2(&tdomf_new, param2);
 				strcat2(&tdomf_new, " ");
+				strcat2(&tdomf_new, param2);
 			}
 			else{
 				if (kernel_version() >= 263600){
