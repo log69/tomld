@@ -23,6 +23,8 @@ How easy is it to use?
 
 Installing tomld from a .deb package is pretty much all that is necessary. Only one reboot may still be needed to activate Tomoyo if it's not active yet, and that covers everything. Tomld will run as a service and do the rest from there. 
 
+There's no need to use the command line even on the desktop. The package creates two icons. One is for starting the notification service and the second for requesting temporary learning mode in case any problem happens. 
+
 
 What are the requirements?
 
@@ -30,8 +32,12 @@ Tomld is a Linux only solution, so you need a Linux kernel version 2.6.30 or abo
 
 On a Debian or Ubuntu system, install tomoyo-tools package. 
 
+The tomld package itself depends on two other packages: libnotify-bin and gksu for the better desktop integration, but these are not necessary. 
+
 
 What are the features?
+
+- 1 click solution, no need to use command line either 
 
 - analysis of the current rules without storing much extra information externally in a database or any other way 
 
@@ -68,7 +74,7 @@ The line between security and usability must be drawn, tomld provides good secur
 
 How secure is it?
 
-The tomld service does not call any external application while running, except the tomoyo-loadpolicy binary on the first run to allow itself permission to modify Tomoyo domains later. 
+The tomld service does not call any external application while running (without --mail and --notify options), except the tomoyo-loadpolicy binary on the first run to allow itself permission to modify Tomoyo domains later. 
 
 It doesn't listen on any sockets and you cannot communicate with it except requesting temporary learning mode through the /var/run/tomld/tomld.learn file by running 'tomld --learn' (domains do not have access to tomld's working directory). 
 
@@ -141,7 +147,13 @@ Other remarks
 
 - using the --clear or --reset switch config files will be backed up and former log entries will be ignored, this is equivalent to a start from a clean set up 
 
-- tomld files: /var/local/tomld.logmark (this contains a mark to identify the end of the recently read message logs), /var/run/tomld.pid (pid file to avoid multiple instances of the program running at the same time), /var/run/tomld/tomld.learn (file to signal a request for temporary learning mode to the running daemon), /etc/tomld/tomld.conf (settings file) 
+- tomld files:
+/var/local/tomld.logmark (this contains a mark to identify the end of the recently read message logs)
+/var/run/tomld.pid (pid file to avoid multiple instances of the program running at the same time)
+/var/run/tomld/tomld.learn (file to signal a request for temporary learning mode to the running daemon)
+/var/run/tomld/tomld.message (file containing the important recent logs for notification service)
+/var/run/tomld/tomld.message.lock (lock file for former one)
+/etc/tomld/tomld.conf (settings file) 
 
 - in case an application or its settings change with a new version, the rules can be regenerated easily 
 
