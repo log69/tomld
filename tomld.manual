@@ -125,6 +125,24 @@ auto confirm everything with yes
 .TP
 **these options can be used simultaneously with a running tomld daemon
 
+.SH FILES
+.br
+/var/local/tomld.logmark (this contains a mark to identify the end of the
+recently read message logs)
+.br
+/var/run/tomld.pid (pid file to avoid multiple instances of the program running at the same time)
+.br
+/var/run/tomld/tomld.learn (file to signal a request for temporary learning mode to the running daemon)
+.br
+/var/run/tomld/tomld.learn.list (pattern list for the temporary learning mode for those domains that match these patterns)
+.br
+/var/run/tomld/tomld.message (file containing important recent logs for the notification service)
+.br
+/var/run/tomld/tomld.message.lock (lock file for former one)
+.br
+/etc/tomld/tomld.conf (settings file)
+.br
+
 .SH AUTHORS
 .br
 tomoyo learning daemon
