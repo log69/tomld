@@ -289,9 +289,9 @@ flow chart:
 #include "tio.h"
 
 
-#define max_char	4096
-#define max_num		68
-#define max_proc	1000
+#define MAX_CHAR	4096
+#define MAX_NUM		68
+#define MAX_PROC	1000
 
 
 
@@ -338,7 +338,7 @@ int const_domain_complexity_factor = 2;
 char *my_exe_path = 0;
 
 /* number of max entries in profile config */
-#define max_mem "10000"
+#define MAX_MEM "10000"
 
 /* tomoyo kernel parameter */
 char *tkern = "security=tomoyo";
@@ -361,25 +361,25 @@ char *texcf = 0;
 char *tprof22 = ""
 	"0-COMMENT=-----Disabled Mode-----\n"
 	"0-MAC_FOR_FILE=disabled\n"
-	"0-MAX_ACCEPT_ENTRY="max_mem"\n"
+	"0-MAX_ACCEPT_ENTRY="MAX_MEM"\n"
 	"0-TOMOYO_VERBOSE=disabled\n"
 	"1-COMMENT=-----Learning Mode-----\n"
 	"1-MAC_FOR_FILE=learning\n"
-	"1-MAX_ACCEPT_ENTRY="max_mem"\n"
+	"1-MAX_ACCEPT_ENTRY="MAX_MEM"\n"
 	"1-TOMOYO_VERBOSE=disabled\n"
 	"2-COMMENT=-----Permissive Mode-----\n"
 	"2-MAC_FOR_FILE=permissive\n"
-	"2-MAX_ACCEPT_ENTRY="max_mem"\n"
+	"2-MAX_ACCEPT_ENTRY="MAX_MEM"\n"
 	"2-TOMOYO_VERBOSE=enabled\n"
 	"3-COMMENT=-----Enforcing Mode-----\n"
 	"3-MAC_FOR_FILE=enforcing\n"
-	"3-MAX_ACCEPT_ENTRY="max_mem"\n"
+	"3-MAX_ACCEPT_ENTRY="MAX_MEM"\n"
 	"3-TOMOYO_VERBOSE=enabled\n";
 
 char *tprof23 = ""
 	"PROFILE_VERSION=20090903\n"
 	"PREFERENCE::enforcing={ verbose=yes }\n"
-	"PREFERENCE::learning={ verbose=no max_entry="max_mem" }\n"
+	"PREFERENCE::learning={ verbose=no max_entry="MAX_MEM" }\n"
 	"PREFERENCE::permissive={ verbose=yes }\n"
 	"0-COMMENT=-----Disabled Mode-----\n"
 	"0-CONFIG={ mode=disabled }\n"
@@ -1549,7 +1549,7 @@ char *domain_get_list()
 	char *tdomf2, *res, *res2, *list, *list2;
 	
 	/* alloc mem for new list */
-	list = memget2(max_char);
+	list = memget2(MAX_CHAR);
 
 	/* collect domain names */
 	tdomf2 = tdomf;
@@ -1586,7 +1586,7 @@ int domain_exist(const char *text)
 	int i;
 	char *temp;
 	
-	temp = memget2(max_char);
+	temp = memget2(MAX_CHAR);
 	strcpy2(&temp, "<kernel> ");
 	strcat2(&temp, text);
 	i = string_search_line(tdomf, temp);
@@ -1683,7 +1683,7 @@ void domain_add_rule(char *prog, char *rule)
 	char *res, *res2, *temp, *temp2, *tdomf_new;
 
 	/* alloc mem for new policy */	
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	
 	/* cycle through the domains */
 	temp = tdomf;
@@ -1776,7 +1776,7 @@ int process_get_pid(const char *name)
 /* returned value must be freed by caller */
 int *process_get_pid_list(const char *name)
 {
-	long list_length = max_proc;
+	long list_length = MAX_PROC;
 	int list_counter = 0;
 	int *list;
 	DIR *mydir;
@@ -2170,7 +2170,7 @@ char *process_get_path(int pid)
 {
 	char *path, *str, *res;
 
-	path = memget2(max_char);
+	path = memget2(MAX_CHAR);
 	strcpy2(&path, "/proc/");
 
 	/* create path */
@@ -2266,7 +2266,7 @@ void load()
 
 
 	/* remove disabled mode entries so runtime will be faster */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	temp = tdomf;
 	while(1){
 		/* get next domain */
@@ -2285,7 +2285,7 @@ void load()
 		
 
 	/* remove quota_exceeded entries */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	temp = tdomf;
 	while(1){
 		/* get next line */
@@ -2306,7 +2306,7 @@ void load()
 	/* merge similar domains' rules to my domain
 	 * these are active domains with running processes
 	 * that will transit into my domain after process restart */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	temp = tdomf;
 	while(1){
 		/* get next domain */
@@ -2413,7 +2413,7 @@ void reload()
 	int i;
 
 	/* alloc mem for transitions */
-	myappend = memget2(max_char);
+	myappend = memget2(MAX_CHAR);
 
 	/* load old policy from kernel */
 	texcf_old = file_read(texck, -1);
@@ -2824,7 +2824,7 @@ void check_instance(){
 	}
 	/* if pid from pid file didn't match the list, then add it to the list */
 	if (p && !flag_pid_file){
-		if (len < max_proc){
+		if (len < MAX_PROC){
 			pid_list[len++] = p;
 			pid_list[len] = 0;
 		}
@@ -3777,7 +3777,7 @@ void domain_remove(const char *pattern)
 			free2(res);
 			
 			/* alloc mem for new domain policy */
-			tdomf_new = memget2(max_char);
+			tdomf_new = memget2(MAX_CHAR);
 			
 			temp = tdomf;
 			while(1){
@@ -4618,7 +4618,7 @@ void domain_get_log()
 			if (strlen2(&prog_rules)){
 
 				/* alloc mem for new domain policy */
-				tdomf_new = memget2(max_char);
+				tdomf_new = memget2(MAX_CHAR);
 
 				/* cycle through domains to add new rules */
 				temp = tdomf;
@@ -5175,8 +5175,8 @@ int compare_paths(char *path1, char *path2)
 	if (is_dir != path_is_dir(path2)) return 0;
 	
 	/* alloc mem for subdir names */
-	s1 = memget2(max_char);
-	s2 = memget2(max_char);
+	s1 = memget2(MAX_CHAR);
+	s2 = memget2(MAX_CHAR);
 	
 	/* compare paths only */
 	i1 = 1;
@@ -5557,8 +5557,8 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 	/* get path param 2 */
 	path2 = string_get_next_word(&temp);
 
-	path_new1 = memget2(max_char);
-	path_new2 = memget2(max_char);
+	path_new1 = memget2(MAX_CHAR);
+	path_new2 = memget2(MAX_CHAR);
 	count1 = 0;
 	count2 = 0;
 
@@ -5671,7 +5671,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 	}
 	
 	/* alloc mem for temp dir name */
-	rules_new = memget2(max_char);
+	rules_new = memget2(MAX_CHAR);
 
 	/* add new rules with recursive wildcard if any match */
 	/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
@@ -5847,9 +5847,9 @@ char *domain_sort_uniq_rules(char *rules)
 	int c, c1, c2, co, cn;
 
 	/* alloc mem for new rules */
-	rules_new = memget2(max_char);
-	old = memget2(max_char);
-	new = memget2(max_char);
+	rules_new = memget2(MAX_CHAR);
+	old = memget2(MAX_CHAR);
+	new = memget2(MAX_CHAR);
 	
 	/* cycle through rules and compare each to themselves */
 	i1 = 0;
@@ -5965,9 +5965,9 @@ void domain_cleanup()
 	int c;
 	
 	/* alloc mem for new policy */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	/* alloc mem for sorted rules */
-	rules = memget2(max_char);
+	rules = memget2(MAX_CHAR);
 	
 	/* cycle through domains and sort and make unique the rules of each */
 	temp = tdomf;
@@ -6021,11 +6021,11 @@ void domain_cleanup()
 
 
 	/* alloc mem for new policy */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	/* alloc mem for sorted rules */
-	rules = memget2(max_char);
-	rules_temp = memget2(max_char);
-	rule_type = memget2(max_char);
+	rules = memget2(MAX_CHAR);
+	rules_temp = memget2(MAX_CHAR);
+	rule_type = memget2(MAX_CHAR);
 
 	/* cycle through domains and sort and make unique the rules within the same type */
 	temp = tdomf;
@@ -6152,7 +6152,7 @@ void domain_merge_same()
 	char *name1, *name2, *tdomf_new, *list = 0;
 	
 	/* get mem for new policy */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	
 	/* cycle through domains */
 	temp1 = tdomf;
@@ -6225,10 +6225,10 @@ void domain_reshape_rules_recursive_dirs()
 	if (!dirs_recursive) return;
 
 	/* alloc mem for new policy */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	/* alloc mem for new rule */
-	rules  = memget2(max_char);
-	rules2 = memget2(max_char);
+	rules  = memget2(MAX_CHAR);
+	rules2 = memget2(MAX_CHAR);
 	
 	/* cycle through domains and change all subdir names of all recursive dirs to fully wildcarded */
 	temp = tdomf;
@@ -6413,7 +6413,7 @@ void domain_reshape_rules_wildcard_spec()
 	}
 
 	/* alloc mem for new policy */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 
 	/* cycle through rules of all domains and reshape them */
 	temp = tdomf;
@@ -6621,7 +6621,7 @@ void domain_reshape_rules_create_double()
 		"allow_truncate", 0};
 		
 	/* alloc mem for new policy */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	
 	/* cycle through rules of all domains and on create rules, add create, read/write,
 	 * unlink and truncate too */
@@ -6694,7 +6694,7 @@ void domain_remove_tomld_dir()
 	char *tdomf_new;
 	
 	/* alloc mem for new policy */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	
 	/* cycle through rules of all domains */
 	temp = tdomf;
@@ -6790,7 +6790,7 @@ void domain_update_change_time()
 	
 	/* if backup policy exists but it doesn't match to current policy,
 	 * then update change times in current one and copy it to backup */
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	temp = tdomf;
 	while(1){
 		/* get next domain from backup */
@@ -6912,7 +6912,7 @@ void domain_update_cpu_time_all()
 	char *temp, *temp2, *temp3;
 	int flag_list_match, flag_rule_match, t;
 	
-	tdomf_new = memget2(max_char);
+	tdomf_new = memget2(MAX_CHAR);
 	
 	/* update cpu times in all domains */
 	temp = tdomf;
@@ -7288,7 +7288,7 @@ void check_processes()
 		
 		/* read up all net stat files and create a list of inode numbers (column 10)
 		   of all processes using network */
-		netf2 = memget2(max_char);
+		netf2 = memget2(MAX_CHAR);
 		i = 0;
 		while (1){
 			char *res, *res2, *res3, *temp, *temp2;
@@ -7334,13 +7334,13 @@ void check_processes()
 		while((mydir_entry = readdir(mydir))) {
 			char *myprog, *mypid;
 			/* get my pid number from dir name in /proc */
-			mypid = memget2(max_num);
+			mypid = memget2(MAX_NUM);
 			strcpy2(&mypid, mydir_entry->d_name);
 			/* does it contain only numbers meaning they are pids? */
 			if (string_is_number(mypid)) {
 				char *mydir_name;
 				/* create dirname like /proc/pid/exe */
-				mydir_name = memget2(max_char);
+				mydir_name = memget2(MAX_CHAR);
 				strcpy2(&mydir_name, "/proc/");
 				strcat2(&mydir_name, mypid);
 				strcat2(&mydir_name, "/exe");
@@ -7351,7 +7351,7 @@ void check_processes()
 					struct dirent *mydir_entry2;
 					char *myfd;
 					/* create dir name like /proc/pid/fd/ */
-					myfd = memget2(max_char);
+					myfd = memget2(MAX_CHAR);
 					strcpy2(&myfd, "/proc/");
 					strcat2(&myfd, mypid);
 					strcat2(&myfd, "/fd/");
@@ -7363,7 +7363,7 @@ void check_processes()
 							char *mysock;
 							char *mydir_name2;
 							/* create dirname like /proc/pid/fd/4 */
-							mydir_name2 = memget2(max_char);
+							mydir_name2 = memget2(MAX_CHAR);
 							strcpy2(&mydir_name2, myfd);
 							strcat2(&mydir_name2, mydir_entry2->d_name);
 							/* resolv the links from the /proc/pid/fd/ dir */
