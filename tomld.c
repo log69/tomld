@@ -23,6 +23,7 @@
 changelog:
 -----------
 03/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+                         - bugfix: manage access denies for subdomains too beside main domains
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -1575,6 +1576,73 @@ char *domain_get_list()
 		list = list2;
 	}
 
+	return list;
+}
+
+
+/* return a new string containing a list of all main and subdomain names */
+/* returned value must be freed by caller */
+char *domain_get_list_full()
+{
+	char *tdomf2, *res, *res2, *list, *list2;
+	
+	/* alloc mem for new list */
+	list = memget2(MAX_CHAR);
+
+	/* collect domain names */
+	tdomf2 = tdomf;
+	while(1){
+		/* get next domain */
+		res = domain_get_next(&tdomf2);
+		/* exit on end */
+		if (!res) break;
+		/* get domain name */
+		res2 = domain_get_name_full(res);
+		if (res2){
+			strcat2(&list, res2);
+			strcat2(&list, "\n");
+			free2(res2);
+		}
+		free2(res);
+	}
+
+	/* sort and unique list because there many same entries because of subdomains */
+	if (strlen2(&list)){
+		list2 = string_sort_uniq_lines(list);
+		free2(list);
+		list = list2;
+	}
+
+	return list;
+}
+
+
+/* return a list containing all main domains the subdomain belongs to */
+/* return 0 if domain does not exist */
+char *domain_get_subdomain_belong(const char *name)
+{
+	char *list = 0, *dlist, *res, *temp;
+	
+	/* get a list with all domains and subdomains with full names */
+	dlist = domain_get_list_full();
+	
+	temp = dlist;
+	while(1){
+		/* get next full domain name */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		/* domain name contains subdomain name? */
+		if (string_search_keyword_last(res, name)){
+			/* add main domain name to the list */
+			strcat2(&list, res);
+			strcat2(&list, "\n");
+		}
+		
+		free2(res);
+	}
+	
+	free2(dlist);
 	return list;
 }
 
@@ -4224,7 +4292,7 @@ void domain_check_enforcing(char *domain)
 void domain_get_log()
 {
 	/* vars */
-	char *res, *res2, *temp, *temp2, *temp3, *orig, *dlist;
+	char *res, *res2, *res3, *temp, *temp2, *temp3, *orig, *dlist = 0;
 	char *start, *tlogf2 = 0, *tlogf3 = 0;
 	char *rules = 0, *prog_rules = 0;
 	char *key = 0;
@@ -4364,9 +4432,6 @@ void domain_get_log()
 		/* ----- convert logs to rules ----- */
 		/* --------------------------------- */
 
-		/* get a list of all subdomains, so later i add those rules only whose domains exist */
-		dlist = domain_get_list();
-
 		if (tomoyo_version() <= 2299) l = 23;
 		else l = 15;
 
@@ -4466,20 +4531,29 @@ void domain_get_log()
 				myexit(1);
 			}
 			/* add rule to list only if binary name belongs to an existing domain */
-			if (string_search_line(dlist, res2) > -1){
-				/* create text for sorting in a format like "binary allow_ rule" */
-				strcat2(&prog_rules, res2);
-				strcat2(&prog_rules, " ");
-				strcat2(&prog_rules, rules);
-				strcat2(&prog_rules, "\n");
-				free2(res2);
+			dlist = domain_get_subdomain_belong(res2);
+			if (dlist){
+				temp3 = dlist;
+				while(1){
+					/* get next full domain name the denied domain belong to */
+					res3 = string_get_next_line(&temp3);
+					if (!res3) break;
+					
+					/* create text for sorting in a format like "binary allow_ rule" */
+					strcat2(&prog_rules, res3);
+					strcat2(&prog_rules, " ");
+					strcat2(&prog_rules, rules);
+					strcat2(&prog_rules, "\n");
+
+					free2(res3);
+				}
+				free2(dlist);
 			}
-			
+
+			free2(res2);
 			free2(res);
 		}
-
 		free2(rules);
-		free2(dlist);
 
 
 		/* ------------------------------- */
@@ -4487,7 +4561,7 @@ void domain_get_log()
 		/* ------------------------------- */
 
 		if (prog_rules){
-			char *tdomf_new, *prog, *rule, *rules_new = 0, *prog_rules_new = 0;
+			char *tdomf_new, *prog, *prog_main, *rule, *rules_new = 0, *prog_rules_new = 0;
 			char *log_recent = 0;
 
 			/* sort and unique rules */
@@ -4503,13 +4577,24 @@ void domain_get_log()
 			/* cycle through new rules and ask for confirmation to add it to domain policy */
 			temp = prog_rules;
 			while(1){
+				int i3;
 				/* get next rule */
 				res = string_get_next_line(&temp);
 				if (!res) break;
+
 				/* get prog name and its rules */
-				temp2 = res;
-				prog = string_get_next_word(&temp2);
+				/* the format is:
+				 * /bin/main_domain /bin/subdomain allow_rule /path/to/param1 /path/to/param2 */
+				i3 = string_search_keyword(res, "allow_");
+				prog = 0;
+				strcpy2(&prog, res);
+				prog[i3 - 1] = 0;
+				strlenset3(&prog, i3 - 1);
+				temp2 = prog;
+				prog_main = string_get_next_word(&temp2);
+				temp2 = res + i3;
 				rule = string_get_next_line(&temp2);
+
 				/* print and confirm */
 				color(prog, blue);
 				color("  ", clr);
@@ -4545,7 +4630,7 @@ void domain_get_log()
 								res6 = string_get_next_line(&temp6);
 								if (!res6) break;
 								/* does any pattern match the prog name? */
-								if (string_search_keyword(prog, res6) > -1){ flag = 1; break; }
+								if (string_search_keyword(prog_main, res6) > -1){ flag = 1; break; }
 								free2(res6);
 							}
 							/* was there a match? if so, then add rules */
@@ -4573,6 +4658,7 @@ void domain_get_log()
 				}
 
 				free2(prog);
+				free2(prog_main);
 				free2(rule);
 				free2(res);
 			}
@@ -4635,20 +4721,30 @@ void domain_get_log()
 						strnull2(&rules_new);
 
 						while(1){
-							/* get prog name and its rules */
-							prog = string_get_next_word(&temp2);
-							if (!prog) break;
-							rule = string_get_next_line(&temp2);
-							if (!rule){ free2(prog); break; }
+							int i3;
+							/* get next line */
+							res3 = string_get_next_line(&temp2);
+							if (!res3) break;
 
-							/* is it a main domain? (compare prog name to subdomain name) */
-							if (!strcmp(prog, res2)){
+							/* get prog name and its rules */
+							i3 = string_search_keyword(res3, "allow_");
+							prog = 0;
+							strcpy2(&prog, res3);
+							prog[i3 - 1] = 0;
+							strlenset3(&prog, i3 - 1);
+							temp3 = prog;
+							prog_main = string_get_next_word(&temp3);
+							temp3 = res3 + i3;
+							rule = string_get_next_line(&temp3);
+
+							/* subdomains match? (compare prog's subdomain name to other subdomain name) */
+							if (!strcmp(prog_main, res2)){
 								/* if match, add rule to domain policy */
 								strcat2(&rules_new, rule);
 								strcat2(&rules_new, "\n");
 								if (!flag_once){
 									/* switch domain to learning mode */
-									domain_set_profile_for_prog(prog, 1);
+									domain_set_profile_for_prog(prog_main, 1);
 									/* reread domain because it changed when i changed its profile just now
 									 * in 'tdomf', and the old one was in 'res' */
 									free2(res);
@@ -4656,20 +4752,20 @@ void domain_get_log()
 									res = domain_get_next(&temp);
 									/* reset cpu time counter for prog because of switching it to learning mode,
 									 * or else it would switch back to enforcing mode immediately */
-									process_get_cpu_time_all(prog, 1);
+									process_get_cpu_time_all(prog_main, 1);
 									/* add domain to temporary list */
-									if (string_search_line(tprogs_learn_auto, prog) == -1){
+									if (string_search_line(tprogs_learn_auto, prog_main) == -1){
 										char *nn = 0;
 										
-										strcat2(&tprogs_learn_auto, prog);
+										strcat2(&tprogs_learn_auto, prog_main);
 										strcat2(&tprogs_learn_auto, "\n");
 
 										/* print info */
-										color(prog, blue); color(", ", clr);
+										color(prog_main, blue); color(", ", clr);
 										color("switch to learning mode\n", clr);
 
 										/* notification */
-										strcpy2(&nn, prog);	strcat2(&nn, ", switch to learning mode");
+										strcpy2(&nn, prog_main); strcat2(&nn, ", switch to learning mode");
 										notify(nn); free2(nn);
 									}
 									/* do it only once per domain for speed */
@@ -4677,8 +4773,10 @@ void domain_get_log()
 								}
 							}
 
-							free2(rule);
+							free2(prog_main);
 							free2(prog);
+							free2(rule);
+							free2(res3);
 						}
 						free2(res2);
 					}
