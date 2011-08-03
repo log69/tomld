@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+03/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -299,7 +300,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.39";
+char *ver = "0.40";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -4658,7 +4659,7 @@ void domain_get_log()
 									process_get_cpu_time_all(prog, 1);
 									/* add domain to temporary list */
 									if (string_search_line(tprogs_learn_auto, prog) == -1){
-										char *nn;
+										char *nn = 0;
 										
 										strcat2(&tprogs_learn_auto, prog);
 										strcat2(&tprogs_learn_auto, "\n");
