@@ -27,6 +27,8 @@ changelog:
                          - fix some mem leaks
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - add special chars to look for in temporary names in path_wildcard_dir_temp_name()
+                         - improve path_wildcard_dir_temp_name() to consider "." char to be part of random part
+                           if its left and right sides are also random names
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -1234,17 +1236,20 @@ char *path_wildcard_home(char *path)
 /* wildcard random part of file name */
 /* i consider random part in a file name if it contains only lower and upper case, numbers
  * and some extra characters */
+/* the point is a special char - if the left and right side of the point are random names too
+ * (together longer than 6 chars), then i consider the point char to be a part of the random names,
+ * this is because apps divide random names from normal ones by a point in file names */
 /* if this condition doesn't meet, then i return the original name,
  * cause probably new random name will come later anyway */
 /* returned value must be freed by caller */
 char *path_wildcard_dir_temp_name(char *name)
 {
 	char *new = 0;
-	char *temp = 0;
+	char *temp = 0, *temp2 = 0;
 	char c, c2;
 	long l;
 	int i, i2, i3;
-	int flag_now, flag_lcase, flag_ucase, flag_num, flag_count;
+	int flag_point, flag_now, flag_lcase, flag_ucase, flag_num;
 	char *spec = "_-+";
 	
 	/* return null on null input */
@@ -1255,13 +1260,14 @@ char *path_wildcard_dir_temp_name(char *name)
 	if (!l) return 0;
 	
 	/* alloc mem for temporary name */
-	temp = memget2(l * 2);
+	temp  = memget2(l * 2);
+	temp2 = memget2(l * 2);
 	
 	/* search for random part in name */
+	flag_point = 0;
 	flag_lcase = 0;
 	flag_ucase = 0;
 	flag_num   = 0;
-	flag_count = 0;
 	i = 0;
 	i2 = 0;
 	while(1){
@@ -1269,7 +1275,7 @@ char *path_wildcard_dir_temp_name(char *name)
 		if (!c) break;
 		flag_now = 0;
 
-		/* is char special char? */
+		/* is char a special char? */
 		i3 = 0;
 		while(1){
 			c2 = spec[i3++];
@@ -1282,53 +1288,127 @@ char *path_wildcard_dir_temp_name(char *name)
 		if (c >= 'a' && c <= 'z'){ flag_now = 1; flag_lcase = 1; }
 		if (c >= 'A' && c <= 'Z'){ flag_now = 1;
 			/* upper case must be exist from the 2nd char */
-			if (flag_count >= 1) flag_ucase = 1;
+			if (i2 >= 1) flag_ucase = 1;
 		}
+
+		/* was last char a random char? */
 		if (flag_now){
-			if (!flag_count){
+			/* a new part starts to build? */
+			if (!i2){
+				/* store former part */
 				strcat2(&new, temp);
 				/* reset count */
 				i2 = 0;
 			}
-			/* increase random char count, must be at least 6 or more to success */
-			flag_count++;
-			/* add char to result */
+			/* increase random char count, must be at least 6 or more to success
+			 * and add char to result */
 			temp[i2++] = c; temp[i2] = 0;
 		}
 		else{
-			if (flag_count){
-				/* make a wildcard if random part was more or equal than 6 chars */
-				if (flag_count >= 6 && flag_lcase && flag_ucase && flag_num){
-					strcat2(&new, "\\*");
+			/* **************** */
+			/* is char a point? */
+			/* **************** */
+			if (c == '.'){
+				/* this part seemed random independently from the counter?
+				 * saying it otherwise:
+				 * was there a number and lower case alpha somewhere
+				 * and upper case alpha from the 2nd char? */
+				if (flag_lcase && flag_ucase && flag_num){
+					/* store and collect these parts before "." char for later */
+					strcat2(&temp2, temp);
 				}
-				/* store original sample if less than 6 chars */
 				else{
-					strcat2(&new, temp);
+					if (strlen2(&temp2) >= 6){
+						strcat2(&new, "\\*");
+						strcat2(&new, temp);
+					}
+					else{
+						strcat2(&new, temp2);
+						strcat2(&new, temp);
+					}
+					strnull2(&temp2);
 				}
-				/* reset counts */
+				/* reset */
 				flag_lcase = 0;
 				flag_ucase = 0;
 				flag_num   = 0;
-				flag_count = 0;
 				i2 = 0;
+				
+				/* add char to result */
+				temp[i2++] = c; temp[i2] = 0;
 			}
-			/* add char to result */
-			temp[i2++] = c; temp[i2] = 0;
+			else{
+
+				/* make a wildcard if random part was more or equal than 6 chars */
+				if (strlen2(&temp2) + i2 >= 6){
+					if (flag_lcase && flag_ucase && flag_num){
+						strcat2(&new, "\\*");
+					}
+					else{
+						if (strlen2(&temp2) >= 6){
+							strcat2(&new, "\\*");
+							strcat2(&new, temp);
+						}
+						else{
+							strcat2(&new, temp2);
+							strcat2(&new, temp);
+						}
+					}
+				}
+				/* store original sample if less than 6 chars */
+				else{
+					strcat2(&new, temp2);
+					strcat2(&new, temp);
+				}
+				/* reset counts and temps */
+				strnull2(&temp2);
+				flag_lcase = 0;
+				flag_ucase = 0;
+				flag_num   = 0;
+				i2 = 0;
+
+				/* add char to result */
+				temp[i2++] = c; temp[i2] = 0;
+
+			}
 		}
 	}
 
+	/* **************************************** */
 	/* run check once more after quitting cycle */
+	/* **************************************** */
 	
 	/* make a wildcard if random part was more or equal than 6 chars */
-	if (flag_count >= 6 && flag_lcase && flag_ucase && flag_num){
-		strcat2(&new, "\\*");
+	if (strlen2(&temp2) + i2 >= 6){
+		if (flag_lcase && flag_ucase && flag_num){
+			strcat2(&new, "\\*");
+		}
+		else{
+			if (strlen2(&temp2) >= 6){
+				strcat2(&new, "\\*");
+				strcat2(&new, temp);
+			}
+			else{
+				strcat2(&new, temp2);
+				strcat2(&new, temp);
+			}
+		}
 	}
 	/* store original sample if less than 6 chars */
 	else{
+		strcat2(&new, temp2);
 		strcat2(&new, temp);
 	}
+	/* reset counts and temps */
+	strnull2(&temp2);
+	flag_lcase = 0;
+	flag_ucase = 0;
+	flag_num   = 0;
+	i2 = 0;
+
 	
 	free2(temp);
+	free2(temp2);
 	
 	return new;
 }
