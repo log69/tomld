@@ -26,6 +26,7 @@ changelog:
                          - bugfix: manage access denies for subdomains too beside main domains
                          - fix some mem leaks
                          - add feature to --info to show completeness of domain's learning mode in percentage
+                         - add special chars to look for in temporary names in path_wildcard_dir_temp_name()
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -1231,7 +1232,8 @@ char *path_wildcard_home(char *path)
 
 
 /* wildcard random part of file name */
-/* i consider random part in a file name if it contains only lower and upper case, and numbers */
+/* i consider random part in a file name if it contains only lower and upper case, numbers
+ * and some extra characters */
 /* if this condition doesn't meet, then i return the original name,
  * cause probably new random name will come later anyway */
 /* returned value must be freed by caller */
@@ -1239,10 +1241,11 @@ char *path_wildcard_dir_temp_name(char *name)
 {
 	char *new = 0;
 	char *temp = 0;
-	char c;
+	char c, c2;
 	long l;
-	int i, i2;
+	int i, i2, i3;
 	int flag_now, flag_lcase, flag_ucase, flag_num, flag_count;
+	char *spec = "._-";
 	
 	/* return null on null input */
 	if (!name) return 0;
@@ -1264,8 +1267,17 @@ char *path_wildcard_dir_temp_name(char *name)
 	while(1){
 		c = name[i++];
 		if (!c) break;
-		/* is char alfanumeric char? */
 		flag_now = 0;
+
+		/* is char special char? */
+		i3 = 0;
+		while(1){
+			c2 = spec[i3++];
+			if (!c2) break;
+			if (c2 == c){ flag_now = 1; break; }
+		}
+
+		/* is char alfanumeric char? */
 		if (c >= '0' && c <= '9'){ flag_now = 1; flag_num   = 1; }
 		if (c >= 'a' && c <= 'z'){ flag_now = 1; flag_lcase = 1; }
 		if (c >= 'A' && c <= 'Z'){ flag_now = 1;
