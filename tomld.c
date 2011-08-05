@@ -1245,7 +1245,7 @@ char *path_wildcard_dir_temp_name(char *name)
 	long l;
 	int i, i2, i3;
 	int flag_now, flag_lcase, flag_ucase, flag_num, flag_count;
-	char *spec = "._-";
+	char *spec = "_-+";
 	
 	/* return null on null input */
 	if (!name) return 0;
