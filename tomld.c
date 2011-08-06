@@ -22,13 +22,17 @@
 
 changelog:
 -----------
-05/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+06/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
-                         - fix some mem leaks
+                         - bugfix: fix some mem leaks
+                         - bugfix: print lines under each other and not after each other on console with --notify option
+                         - bugfix: don't clear tlearn file with --learn option
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - add special chars to look for in temporary names in path_wildcard_dir_temp_name()
                          - improve path_wildcard_dir_temp_name() to consider "." char to be part of random part
                            if its left and right sides are also random names
+                         - add power saving mode to sleep more every cycle after all domains are in enforcing mode
+                         - print notification when all domains are finally switched to enforcing mode
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -322,12 +326,15 @@ char *home = "/home";
 
 
 /* interval of policy check to run in seconds */
-float const_time_check = 30;
+int const_time_check      = 2;
+int const_time_check_long = 30;
+int const_time_check2;
+int const_time_check_long2;
 /* interval of saving configs to disk in seconds */
-float const_time_save = 300;
+int const_time_save = 300;
 /* interval of maximum time in seconds to wait in temporary learning mode for domains with deny logs
  * (1 hour) */
-float const_time_max_learn = 60 * 60;
+int const_time_max_learn = 60 * 60;
 /* interval of maximum time in seconds that needs to pass since last domain change for tomld
  * to automatically switch domain to enforcing mode, otherwise it calculates it
  * to make a decision (2 weeks) */
@@ -747,17 +754,21 @@ void color(const char *text, const char *col)
  * and send them to a notification daemon if any */
 void check_notify()
 {
+	int len;
+	long pos = 0;
+
 	/* run client side only if i am non-root */
 	if (getuid()){
 		if (opt_notify){
 			static int flag_firstrun_notify = 0;
 			int tlog2_mod_time2;
+			int tlog2_mod_time3;
 			char *res, *res2;
 
 			if (!opt_notify2){
 				error("error: commands for notification missing\n"); myexit(1); }
 
-			color("*listening to messages from tomld daemom...\n", yellow);
+			color("* listening to messages from tomld daemom...\n", yellow);
 
 			/* infinite cycle */
 			while(1){
@@ -791,14 +802,53 @@ void check_notify()
 							if (file_exist(tlog2_lock)){
 								res = file_read(tlog2_lock, 1); }
 							if (!strlen2(&res)){
+								unsigned long len2;
+								char *buff;
+								FILE *f;
 									
+								/* store modification time */
+								tlog2_mod_time2 = file_get_mod_time(tlog2);
+								tlog2_mod_time3 = tlog2_mod_time2;
+
 								/* read message */
-								res2 = file_read(tlog2, 0);
-								if (strlen2(&res2)){
+								/* res2 = file_read(tlog2, 0); */
+								f = fopen(tlog2, "rb");
+								if (!f){
+									error("error: cannot read file ");
+									error(tlog2); newl_();
+									exit(1);
+								}
+								/* get length */
+								fseek(f, 0, SEEK_END);
+								len = ftell(f);
+								/* remember file position, because tlog2 is always appended */
+								if (pos >= len) pos = 0;
+								/* set file pointer to position to read only the end that is changed */
+								fseek(f, pos, SEEK_SET);
+								buff = memget2(len - pos);
+								len2 = fread(buff, len - pos, 1, f);
+								/* write null to the end of file */
+								buff[len - pos] = 0;
+								/* set dynamic string length */
+								strlenset3(&buff, len - pos);
+								fclose(f);
+								/* copy text */
+								res2 = 0;
+								strcpy2(&res2, buff);
+								free2(buff);
+								/* store new file pointer position */
+								pos = len;
+
+
+								/* file didn't get modified while reading? */
+								tlog2_mod_time2 = file_get_mod_time(tlog2);
+
+								/* ok if not null and not modified since read */
+								if (strlen2(&res2) && tlog2_mod_time3 == tlog2_mod_time2){
 									/* store command */
 									char *temp = opt_notify2;
 									char *comm = string_get_next_line(&temp);
-									color(res2, clr);
+									color(res2, clr); newl();
 									/* add message */
 									strcat2(&comm, " \"");
 									strcat2(&comm, res2);
@@ -831,12 +881,17 @@ void check_notify()
 /* store messages for notify */
 void notify(char *text)
 {
+	char *text2 = 0;
+	
 	if (opt_notify){
 		/* lock file */
 		file_write(tlog2_lock, "1");
 
 		/* write message */
-		file_write(tlog2, text);
+		strcpy2(&text2, text);
+		strcat2(&text2, "\n");
+		file_writea(tlog2, text2);
+		free2(text2);
 
 		/* unlock file */
 		file_write(tlog2_lock, 0);
@@ -1839,6 +1894,32 @@ void domain_set_profile_for_prog(const char *prog, int profile)
 }
 
 
+/* switch all domains with profile 2-3 back to learning mode */
+int domain_all_in_enforcing_yet()
+{
+	char *res, *temp;
+	int result = 1;
+
+	/* cycle through domains */
+	temp = tdomf;
+	while(1){
+		/* get next domain */
+		res = domain_get_next(&temp);
+		if (!res) break;
+
+		/* is domain in enforcing mode? */
+		if (domain_get_profile(res) != 3){
+			result = 0;
+			break;
+		}
+
+		free2(res);
+	}
+
+	return result;	
+}
+
+
 /* add rule to prog domain and subdomain */
 void domain_add_rule(char *prog, char *rule)
 {
@@ -2408,6 +2489,38 @@ int process_running(int pid)
 	free2(pid2);
 	free2(path);
 	return res;
+}
+
+
+/* set checking times short */
+void check_time_set_short()
+{
+	if (const_time_check2 != const_time_check ||
+	    const_time_check_long2 != const_time_check_long){
+
+		/* store short check times */
+		const_time_check2 = const_time_check;
+		const_time_check_long2 = const_time_check_long;
+		/* print notification */
+		notify("power saving off");
+	}
+}
+
+
+/* set checking times long */
+void check_time_set_long()
+{
+	const int factor = 10;
+
+	if (const_time_check2 != const_time_check * factor ||
+	    const_time_check_long2 != const_time_check_long * factor){
+
+		/* store long check times */
+		const_time_check2 = const_time_check * factor;
+		const_time_check_long2 = const_time_check_long * factor;
+		/* print notification */
+		notify("power saving on");
+	}
 }
 
 
@@ -3526,14 +3639,12 @@ void check_config()
 	mydir = path_get_parent_dir(tpid);
 	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
 	/* chmod 0755 dir */
-	if (chmod (mydir, strtol(mode, 0, 8)) < 0){
-		error("error: cannot change permission on directory "); error(mydir); free2(mydir); myexit(1); }
+	chmod (mydir, strtol(mode, 0, 8));
 	free2(mydir);
 	mydir = path_get_parent_dir(tmark);
 	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
 	/* chmod 0755 dir */
-	if (chmod (mydir, strtol(mode, 0, 8)) < 0){
-		error("error: cannot change permission on directory "); error(mydir); free2(mydir); myexit(1); }
+	chmod (mydir, strtol(mode, 0, 8));
 	free2(mydir);
 }
 
@@ -3710,6 +3821,16 @@ void clear()
 }
 
 
+/* check if all domains are in enforcing mode and if so, print notification about it */
+void notify_check_enforce_all()
+{
+	if (domain_all_in_enforcing_yet()){
+		color("* all domains are in enforcing mode\n", yellow);
+		notify("all domains are in enforcing mode");
+	}
+}
+
+
 /* check if time for enforcing mode has come for the domain and return its percentage */
 int domain_check_enforcing(char *domain, int flag_info)
 {
@@ -3791,7 +3912,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 						 * but if it is after reboot, then take uptime into account too
 						 * i calculate min time from time of check constant because this is the
 						 * intervall to check if domain has changed */
-						if (s_uptime > const_time_check * 2 && d_change < const_time_check * 2){
+						if (s_uptime > const_time_check_long2 * 2 && d_change < const_time_check_long2 * 2){
 							/* reset cpu times */
 							process_get_cpu_time_all(name, 1);
 							p_cputime = 0;
@@ -3885,6 +4006,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 							notify(nn); free2(nn);
 						}
 						domain_set_profile_for_prog(name, 3);
+						notify_check_enforce_all();
 					}
 				}
 			}
@@ -4327,6 +4449,7 @@ void domain_set_enforce_old()
 							/* switch domain and all its subdomains to enforcing mode */
 							color(prog, blue); newl();
 							domain_set_profile_for_prog(prog, 3);
+							notify_check_enforce_all();
 						}
 					}
 					free2(prog);
@@ -4379,6 +4502,7 @@ void domain_set_enforce_old()
 									color(prog, blue); color(", ", clr);
 									color("switch to enforcing mode\n", purple);
 									domain_set_profile_for_prog(prog, 3);
+									notify_check_enforce_all();
 									
 									/* notification */
 									strcpy2(&nn, prog); strcat2(&nn, ", switch to enforcing mode");
@@ -7313,6 +7437,9 @@ void check_learn()
 						flag_learn  = 1;
 						flag_learn2 = 1;
 						flag_learn3 = 1;
+
+						/* sleep less and run cycles faster if in temporary learning mode */				
+						check_time_set_short();
 					}
 					free2(f);
 				}
@@ -7326,6 +7453,11 @@ void check_learn()
 				flag_learn2 = 0;
 				color("* time ended for temporary learning mode ", yellow);
 				mytime_print_date(); newl();
+
+				/* check if all domains are in enforcing mode yet,
+				 * and if so, then sleep more every cycle for more power saving */
+				if (domain_all_in_enforcing_yet()) check_time_set_long();
+				else check_time_set_short();
 				
 				/* notification */
 				notify("time ended for temporary learning mode");
@@ -7365,6 +7497,11 @@ void check()
 		
 		/* domain update change times */
 		domain_update_change_time();
+		
+		/* check if all domains are in enforcing mode yet,
+		 * and if so, then sleep more every cycle for more power saving */
+		if (domain_all_in_enforcing_yet()) check_time_set_long();
+		else check_time_set_short();
 		
 		/* reload config files into memory */
 		sand_clock(0);
@@ -7462,6 +7599,7 @@ void check_exceptions()
 		}
 	}
 }
+
 
 
 /* ------------------------------------ */
@@ -7799,6 +7937,10 @@ void myinit()
 	/* store start time */
 	t_start = mytime();
 	
+	/* store check times */
+	const_time_check2 = const_time_check;
+	const_time_check_long2 = const_time_check_long;
+	
 	/* create my uids */
 	strcpy2(&myuid_create, myuid);
 	strcpy2(&myuid_change, myuid);
@@ -7831,7 +7973,7 @@ int main(int argc, char **argv)
 
 	/* some initializations */
 	myinit();
-	
+
 	/* check command line options */
 	check_options(argc, argv);
 
@@ -7844,7 +7986,7 @@ int main(int argc, char **argv)
 	 * this is an infinite cycle */
 	check_notify();
 	/* clear log */
-	file_write(tlog2, 0);
+	if (!opt_learn) file_write(tlog2, 0);
 
 
 	/* check if i am root */
@@ -7913,8 +8055,8 @@ int main(int argc, char **argv)
 		}
 		else{
 			/* set temporary learning mode flag with list */
-			file_write(tlearn, "2");
 			file_write(tlearn_list, opt_learn2);
+			file_write(tlearn, "2");
 		}
 	}
 	else{
@@ -7971,7 +8113,7 @@ int main(int argc, char **argv)
 	if (!file_exist(tdom) || !file_exist(texc) || opt_reset) clear();
 
 	/* store negatív reference time for check() function to make check() run at least once */	
-	t  = -const_time_check;
+	t  = -const_time_check_long2;
 	t2 = 0;
 
 	while(1){
@@ -7989,7 +8131,7 @@ int main(int argc, char **argv)
 		 * or also at once if mod time of syslog changed and tomld is having temporary learning mode
 		 * (only with temp learn mode or else a process could DoS the tomld process),
 		 * and not 30 sec later */
-		if ((mytime() - t) >= const_time_check || flag_learn3 ||
+		if ((mytime() - t) >= const_time_check_long2 || flag_learn3 ||
 			(flag_learn && tlogf_mod_time != tlogf_mod_time2)){
 
 			flag_safe = 0;
@@ -8013,6 +8155,7 @@ int main(int argc, char **argv)
 				flag_firstrun = 0;
 				color("* first whole running cycle took ", green);
 				printf("%.2fs\n", t3); fflush(stdout);
+				notify_check_enforce_all();
 				if (!opt_once){
 					color("(press q to quit)\n", red);
 				}
@@ -8034,7 +8177,7 @@ int main(int argc, char **argv)
 		}
 		
 		/* sleep some */
-		usleep(2000000);
+		usleep(const_time_check2 * 1000000);
 		/* exit if 'q' key is pressed */
 		if (key_get() == 'q') break;
 
