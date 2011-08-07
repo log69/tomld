@@ -22,11 +22,12 @@
 
 changelog:
 -----------
-06/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+07/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
-                         - bugfix: don't clear tlearn file with --learn option
+                         - bugfix: don't clear tomld.message file with --learn option
+                         - bugfix: several bugfixes regarding notification
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - add special chars to look for in temporary names in path_wildcard_dir_temp_name()
                          - improve path_wildcard_dir_temp_name() to consider "." char to be part of random part
