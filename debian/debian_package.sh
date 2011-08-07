@@ -121,6 +121,13 @@ echo "and is licensed under the GPL, see above." >> copyright.new
 mv copyright.new copyright
 
 
+echo -n "New release? [y/N] "; read -n1 KEY; echo
+if [ "$KEY" != "y" ]
+then
+
+	cp -f "$DEB"/changelog .
+
+else
 # changelog file
 
 	cp -f "$DEB"/changelog .
@@ -138,6 +145,10 @@ mv copyright.new copyright
 	ne changelog
 
 	cp changelog "$DEB"
+
+fi
+sed -i "0,/Andras Horvath <mail@log69.com>.*/s/Andras Horvath <mail@log69.com>.*/Andras Horvath <mail@log69.com>  $(date -R)/" changelog
+
 
 
 grep -i "^version=" watch.ex > watch
