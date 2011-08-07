@@ -4171,7 +4171,6 @@ void domain_info(const char *pattern)
 		res = string_sort_uniq_lines(texcf_new);
 		free2(texcf_new); texcf_new = res;
 
-		newl();
 
 		/* print list
 		 * it has 2 columns, first is a number; 1 is for enforcing mode domains
