@@ -28,6 +28,8 @@ changelog:
                          - bugfix: print lines under each other and not after each other on console with --notify option
                          - bugfix: don't clear tomld.message file with --learn option
                          - bugfix: several bugfixes regarding notification
+                         - bugfix: ask for root privileges before clearing tomld.message file
+                         - bugfix: don't set --notify option if [notify] tag is in config, only tomld client needs it
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - add special chars to look for in temporary names in path_wildcard_dir_temp_name()
                          - improve path_wildcard_dir_temp_name() to consider "." char to be part of random part
@@ -3632,7 +3634,7 @@ void check_config()
 	if (!spec_replace2)   spec_replace2   = array_copy_to_string_list(spec_replace);
 	if (dirs_recursive)   opt_recursive   = 1;
 	if (mail_users)       opt_mail        = 1;
-	if (opt_notify2)      opt_notify      = 1;
+	/*if (opt_notify2)      opt_notify      = 1;*/
 
 	/* create tomoyo dir if it doesn't exist yet */
 	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
@@ -7986,12 +7988,12 @@ int main(int argc, char **argv)
 	 * and send them to a notification daemon if any
 	 * this is an infinite cycle */
 	check_notify();
-	/* clear log */
-	if (!opt_learn) file_write(tlog2, 0);
-
 
 	/* check if i am root */
 	if (getuid()) { error("error: root privilege needed\n"); myexit(1); }
+
+	/* clear log (root priv needed from here) */
+	if (!opt_learn) file_write(tlog2, 0);
 
 	/* create exception list from program names and available shells */
 	check_exceptions();
