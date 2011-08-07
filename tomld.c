@@ -34,6 +34,7 @@ changelog:
                            if its left and right sides are also random names
                          - add power saving mode to sleep more every cycle after all domains are in enforcing mode
                          - print notification when all domains are finally switched to enforcing mode
+                         - add tomoyo-loadpolicy binary to the exceptions
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -556,7 +557,7 @@ char *mail_users = 0;
 /* arrays */
 char *tprogs = 0;
 char *tprogs_exc = 0;
-char *tprogs_exc_manual[] = {"/sbin/init", "/usr/sbin/sshd", 0};
+char *tprogs_exc_manual[] = {"/sbin/init", "/usr/sbin/tomoyo-loadpolicy", "/usr/sbin/sshd", 0};
 char *tprogs_learn = 0;
 
 char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6", 0};
@@ -3250,9 +3251,9 @@ void create_prof()
 		/* load config from disk to kernel */
 		strcpy2(&comm, tload);
 		strcat2(&comm, " m");
-		/* this system() call here is the only one and this is unavoidable
-		 * because only the external tomoyo-loadpolicy had the right to
-		 * upload my new manager.conf config to the kernel,
+		/* this system() call here is the only one by default and this is unavoidable
+		 * because only the external tomoyo-loadpolicy has the right to upload
+		 * my new manager.conf config to the kernel,
 		 * but from now on i have the right too to change policy through /sys */
 		ret = system(comm);
 		/* command failed? */
