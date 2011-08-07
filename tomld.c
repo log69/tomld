@@ -806,7 +806,7 @@ void check_notify()
 							if (file_exist(tlog2_lock)){
 								res = file_read(tlog2_lock, 1); }
 							if (!strlen2(&res)){
-								unsigned long len2;
+								long len2;
 								char *buff;
 								FILE *f;
 									
@@ -831,6 +831,8 @@ void check_notify()
 								fseek(f, pos, SEEK_SET);
 								buff = memget2(len - pos);
 								len2 = fread(buff, len - pos, 1, f);
+								if (len-pos > 0 && len2 < len-pos){
+									error("error: reading file failed: "); error(tlog2); }
 								/* write null to the end of file */
 								buff[len - pos] = 0;
 								/* set dynamic string length */
@@ -1308,7 +1310,7 @@ char *path_wildcard_dir_temp_name(char *name)
 	char c, c2;
 	long l;
 	int i, i2, i3;
-	int flag_point, flag_now, flag_lcase, flag_ucase, flag_num;
+	int flag_now, flag_lcase, flag_ucase, flag_num;
 	char *spec = "_-+";
 	
 	/* return null on null input */
@@ -1323,7 +1325,6 @@ char *path_wildcard_dir_temp_name(char *name)
 	temp2 = memget2(l * 2);
 	
 	/* search for random part in name */
-	flag_point = 0;
 	flag_lcase = 0;
 	flag_ucase = 0;
 	flag_num   = 0;
@@ -5253,13 +5254,12 @@ void domain_print_mode()
 				 * and if so, then switch domain to enforcing mode */
 				else{
 					if (!opt_manual){
-						int result = 0;
 						/* set position in domain policy to beginning of domain */
 						char *temp = tdomf + pos;
 						/* get domain policy */
 						char *res = domain_get_next(&temp);
 						/* check domain if it has to be switched to enforcing mode */
-						result = domain_check_enforcing(res, 1);
+						domain_check_enforcing(res, 1);
 						free2(res);
 					}
 				}
