@@ -37,7 +37,7 @@ The tomld package itself depends on two other packages: libnotify-bin and gksu f
 
 What are the features?
 
-- 1 click solution, no need to use command line either 
+- 1 click solution, no need to use the command line 
 
 - analysis of the current rules without storing much extra information externally in a database or any other way 
 
@@ -52,6 +52,10 @@ What are the features?
 - saves policy on reboot or on application closure 
 
 - relatively small memory footprint on a modern desktop or server 
+
+- saves hard disk I/O whenever possible 
+
+- switch to power saving mode after all domains in enforcing mode by sleeping 10 times more in every cycle 
 
 
 How to get it?
@@ -151,7 +155,8 @@ Other remarks
 /var/local/tomld.logmark (this contains a mark to identify the end of the recently read message logs)
 /var/run/tomld.pid (pid file to avoid multiple instances of the program running at the same time)
 /var/run/tomld/tomld.learn (file to signal a request for temporary learning mode to the running daemon)
-/var/run/tomld/tomld.message (file containing the important recent logs for notification service)
+/var/run/tomld/tomld.learn.list (pattern list for the temporary learning mode for those domains that match these patterns)
+/var/run/tomld/tomld.message (file containing important recent logs for the notification service)
 /var/run/tomld/tomld.message.lock (lock file for former one)
 /etc/tomld/tomld.conf (settings file) 
 
@@ -160,6 +165,8 @@ Other remarks
 - the running processes need to be restarted on newly created domains 
 
 - auto yes option is always disabled in manual mode regarding deny logs 
+
+- if someone doesn't want to run tomld all the time, it can simply be turned off and removed from the services after all domains' learning mode is over and it can be rerun anytime if needed 
 
 - the flow chart can be found in the beginning of the source code 
 
