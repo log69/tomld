@@ -75,6 +75,8 @@ char string_itoc(int i);
 
 char *string_itos(int num);
 
+char *string_itos_zeros(int num, int zeros);
+
 char *string_ltos(unsigned long num);
 
 char *string_get_number(const char *text);
