@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-07/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+08/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -31,6 +31,7 @@ changelog:
                          - bugfix: ask for root privileges before clearing tomld.message file
                          - bugfix: don't set --notify option if [notify] tag is in config, only tomld client needs it
                          - add feature to --info to show completeness of domain's learning mode in percentage
+                         - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_dir_temp_name()
                          - improve path_wildcard_dir_temp_name() to consider "." char to be part of random part
                            if its left and right sides are also random names
@@ -4149,18 +4150,18 @@ void domain_info(const char *pattern)
 			if (res2 && res3){
 				if (!strcmp(res2, res3)){
 					if (domain_get_profile(res) == 3){
-						strcat2(&texcf_new, "1 ");
+						strcat2(&texcf_new, "2 ");
 						strcat2(&texcf_new, res2);
 						strcat2(&texcf_new, "\n");
 					}
 					else{
-						char *percent = string_itos(domain_check_enforcing(res, 0));
+						char *percent = string_itos_zeros(domain_check_enforcing(res, 0), 4);
 						
-						strcat2(&texcf_new, "2 ");
-						strcat2(&texcf_new, res2);
-						strcat2(&texcf_new, " (");
+						strcat2(&texcf_new, "1 ");
 						strcat2(&texcf_new, percent);
-						strcat2(&texcf_new, "%)\n");
+						strcat2(&texcf_new, "%) ");
+						strcat2(&texcf_new, res2);
+						strcat2(&texcf_new, "\n");
 						
 						free2(percent);
 					}
@@ -4195,13 +4196,49 @@ void domain_info(const char *pattern)
 					/* color option is on? if not, then print '*' char before enforcing mode domains */
 					if (opt_color){
 						/* enforcing mode domain? */
-						if (!strcmp(c1, "1")){ color(c2, purple); newl(); }
-						else{ color(c2, blue); color(" ", clr); color(c3, red); newl(); }
+						if (!strcmp(c1, "2")){ color("     * ", clr); color(c2, purple); newl(); }
+						else{
+							/* remove leading zeros from percentage */
+							int i = 0;
+							int l = strlen2(&c2);
+							while(1){
+								char cc;
+								if (i > l - 1) break;
+								if (c2[i] != '0') break;
+								cc = c2[i + 1];
+								if (cc != '0'){
+									if (cc < '0' || cc > '9'){ if (i > 0) c2[i - 1] = '('; }
+									else                  c2[i] = '(';
+								}
+								else                  c2[i] = ' ';
+								i++;
+							}
+
+							color(c2, blue); color(" ", clr); color(c3, red); newl();
+						}
 					}
 					else{
 						/* enforcing mode domain? */
-						if (!strcmp(c1, "1")){ color("*", clr); color(c2, purple); newl(); }
-						else{ color(c2, blue); color(" ", clr); color(c3, red); newl(); }
+						if (!strcmp(c1, "2")){ color("     * ", clr); color(c2, purple); newl(); }
+						else{
+							/* remove leading zeros from percentage */
+							int i = 0;
+							int l = strlen2(&c2);
+							while(1){
+								char cc;
+								if (i > l - 1) break;
+								if (c2[i] != '0') break;
+								cc = c2[i + 1];
+								if (cc != '0'){
+									if (cc < '0' || cc > '9'){ if (i > 0) c2[i - 1] = '('; }
+									else                  c2[i] = '(';
+								}
+								else                  c2[i] = ' ';
+								i++;
+							}
+
+							color(c2, blue); color(" ", clr); color(c3, red); newl();
+						}
 					}
 					free2(c2);
 				}
