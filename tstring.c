@@ -306,6 +306,34 @@ char *string_itos(int num)
 }
 
 
+/* convert integer to string and expand it with leading zeros */
+/* returned value must be freed by caller */
+char *string_itos_zeros(int num, int zeros)
+{
+	int l;
+	char *res = memget2(max_num);
+	sprintf(res, "%d", num);
+	strlenset2(&res);
+
+	/* get length of string */
+	l = strlen2(&res);
+
+	/* is string length less than the number of the desired length with leading zeros? */
+	if (l < zeros){
+		/* add leading zeroes */
+		int c = zeros - l;
+		if (c > 0){
+			char *res2 = memget2(zeros);
+			while(c--) strcat2(&res2, "0");
+			strcat2(&res2, res);
+			free2(res); res = res2;
+		}
+	}
+	
+	return res;
+}
+
+
 /* convert long integer to string */
 /* returned value must be freed by caller */
 char *string_ltos(unsigned long num)
