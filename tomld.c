@@ -40,6 +40,7 @@ changelog:
                          - add tomoyo-loadpolicy binary to the exceptions
                          - add /var/run as an exception directory
                          - change myuid, so configuration needs to be regenerated entirely
+                         - print message about incompatible config file in the log too
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -523,6 +524,7 @@ int flag_check2		= 0;
 int flag_firstrun	= 1;
 int flag_safe		= 0;
 int flag_new_proc	= 0;
+int flag_incomp_conf = 0;
 
 /* time variables for statistics of check cycle time */
 float time_max_cycle = 0;
@@ -3531,7 +3533,8 @@ void check_tomoyo()
 		if (string_search_keyword(tdomf, myuid) == -1){
 			backup();
 			clear();
-			color("* warning: incompatible config files found, created new ones after backup\n", red);
+			/* set incompatibility flag to print message later, so it gets into the log file too */
+			flag_incomp_conf = 1;
 		}
 		free2(tdomf); tdomf = 0;
 	}
@@ -8072,6 +8075,10 @@ int main(int argc, char **argv)
 	/* print version info */
 	color("tomld (tomoyo learning daemon) ", clr); color(ver, clr); newl();
 	
+	/* print message about incompatible config file */
+	if (flag_incomp_conf){
+		color("* warning: incompatible config files found, created new ones after backup\n", red); }
+
 	/* create profile.conf and manager.conf files */
 	create_prof();
 
