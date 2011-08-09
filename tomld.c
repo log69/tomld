@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-08/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+09/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -352,7 +352,10 @@ int const_min_cputime = 100;
 int const_domain_complexity_factor = 2;
 
 
-/* path to my executable */
+/* path to my executable
+ * this path must exist in order to have right to change domains in kernel
+ * through /sys/kernel/security/tomoyo/
+ * if binary is missing, then Tomoyo doesn't let it change rules, even if still running */
 char *my_exe_path = 0;
 
 /* number of max entries in profile config */
@@ -1312,6 +1315,9 @@ char *path_wildcard_dir_temp_name(char *name)
 	long l;
 	int i, i2, i3;
 	int flag_now, flag_lcase, flag_ucase, flag_num;
+	/* base64 encoding may use extra 2 chars beside a-z A-Z and 0-9
+	 * these may vary, but common ones are - + _
+	 * http://en.wikipedia.org/wiki/Base64#Variants_summary_table */
 	char *spec = "_-+";
 	
 	/* return null on null input */
