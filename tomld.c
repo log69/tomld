@@ -38,6 +38,8 @@ changelog:
                          - add power saving mode to sleep more every cycle after all domains are in enforcing mode
                          - print notification when all domains are finally switched to enforcing mode
                          - add tomoyo-loadpolicy binary to the exceptions
+                         - add /var/run as an exception directory
+                         - change myuid
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -321,7 +323,7 @@ char *ver = "0.40";
 /* this is a remark in the policy for me to know if it's my config
  * and when the domain was created */
 /* echo $(echo "tomld" | openssl md5) "$ver" | openssl md5 */
-char *myuid = "allow_read /tomld/8c2537b34c2b0549b7342f5aea1db92d";
+char *myuid = "allow_read /tomld/0f86c727e2a4b82dd40446a12db7bdee";
 char *myuid_create = 0;
 char *myuid_change = 0;
 char *myuid_cputime = 0;
@@ -576,7 +578,7 @@ char *tshellf2 = 0;
 
 char *tspec = "/etc/tomld/tomld.conf";
 char *tspecf = 0;
-char *spec_exception[] = {"/", "/dev/", "/etc/", "/home/\\*/", "/root/", 0};
+char *spec_exception[] = {"/", "/dev/", "/var/run/", "/etc/", "/home/\\*/", "/root/", 0};
 char *spec_wildcard[] = {"/home/\\{\\*\\}/", "/usr/share/\\{\\*\\}/", "/etc/fonts/\\{\\*\\}/",
                 "/var/cache/\\{\\*\\}/", "/dev/pts/", 0};
 char *spec_replace[] = {"/var/run/gdm/auth-for-\\*/", 0};
