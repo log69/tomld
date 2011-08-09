@@ -39,7 +39,7 @@ changelog:
                          - print notification when all domains are finally switched to enforcing mode
                          - add tomoyo-loadpolicy binary to the exceptions
                          - add /var/run as an exception directory
-                         - change myuid
+                         - change myuid, so configuration needs to be regenerated entirely
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
