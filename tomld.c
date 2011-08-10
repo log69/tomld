@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-09/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+10/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -41,6 +41,7 @@ changelog:
                          - add /var/run as an exception directory
                          - change myuid, so configuration needs to be regenerated entirely
                          - print message about incompatible config file in the log too
+                         - print system info on startup (/proc/version)
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -8021,6 +8022,7 @@ void myinit()
 int main(int argc, char **argv)
 {
 	float t, t2, t3;
+	char *sysinfo;
 
 	/* some initializations */
 	myinit();
@@ -8074,6 +8076,10 @@ int main(int argc, char **argv)
 
 	/* print version info */
 	color("tomld (tomoyo learning daemon) ", clr); color(ver, clr); newl();
+	
+	/* print system info into log */
+	sysinfo = file_read("/proc/version", -1);
+	color(sysinfo, clr); free2(sysinfo);
 	
 	/* print message about incompatible config file */
 	if (flag_incomp_conf){
