@@ -8077,7 +8077,7 @@ int main(int argc, char **argv)
 	/* print version info */
 	color("tomld (tomoyo learning daemon) ", clr); color(ver, clr); newl();
 	
-	/* print system info into log */
+	/* print system info */
 	sysinfo = file_read("/proc/version", -1);
 	color(sysinfo, clr); free2(sysinfo);
 	
