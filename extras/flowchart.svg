@@ -60,7 +60,7 @@
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="1"
-     inkscape:snap-grids="true"
+     inkscape:snap-grids="false"
      inkscape:snap-page="false"
      inkscape:snap-to-guides="true">
     <inkscape:grid
@@ -108,7 +108,10 @@
        height="28.346466"
        width="70.907677"
        id="rect3750"
-       style="fill:#af0818;fill-opacity:1;stroke:none" />
+       style="fill:#af0818;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text3706"
@@ -116,7 +119,10 @@
        x="325.92749"
        style="font-size:6.3175683px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.99970699)"><tspan
+       transform="scale(1.0002931,0.99970699)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="334.5072"
          x="325.92749"
          sodipodi:role="line"
@@ -131,7 +137,10 @@
        width="70.907677"
        height="28.346466"
        x="290.55118"
-       y="251.57478" />
+       y="251.57478"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:11.46510696px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -139,7 +148,10 @@
        y="270.18121"
        id="text3712"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.99970701)"><tspan
+       transform="scale(1.0002931,0.99970701)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          id="tspan3714"
          x="325.50922"
@@ -150,7 +162,10 @@
        width="70.9077"
        height="28.346455"
        x="290.55118"
-       y="414.56689" />
+       y="414.56689"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:8.88272285px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -158,7 +173,10 @@
        y="428.31543"
        id="text3740"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan3744"
          sodipodi:role="line"
          x="325.79675"
@@ -167,24 +185,36 @@
        style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 347.27732,492.51961 c 0,10.62992 4.72719,21.25984 28.36308,21.25984"
        id="path3754"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <path
        sodipodi:nodetypes="cc"
        id="path4204"
        d="m 333.09579,492.51962 c 0,21.25983 7.09077,42.51968 42.54461,42.51968"
-       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <path
        style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 318.91426,492.51962 c 0,31.88975 9.45436,63.77953 56.72615,63.77953"
        id="path4206"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        y="471.25983"
        x="297.64194"
        height="21.259851"
        width="56.726158"
        id="rect4212"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4214"
@@ -192,7 +222,10 @@
        x="325.79739"
        style="font-size:6.63262796px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="483.72723"
          x="325.79739"
          sodipodi:role="line"
@@ -201,14 +234,20 @@
        sodipodi:nodetypes="cc"
        id="path4218"
        d="m 304.73271,492.51961 0,49.6063"
-       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        style="fill:#b3b300;fill-opacity:1;stroke:none"
        id="rect4220"
        width="28.363075"
        height="21.259851"
        x="290.55118"
-       y="542.12592" />
+       y="542.12592"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:4.3103261px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -216,7 +255,10 @@
        y="559.59991"
        id="text4222"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="304.63922"
          y="559.59991"
@@ -228,7 +270,10 @@
        x="304.45206"
        style="font-size:14.53056335px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4232"
          y="553.87915"
          x="304.45206"
@@ -237,14 +282,20 @@
        style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 304.73271,386.22041 0,28.34645"
        id="path4234"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        y="506.69287"
        x="375.64041"
        height="14.173232"
        width="28.363075"
        id="rect4236"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4240"
@@ -252,7 +303,10 @@
        x="389.72879"
        style="font-size:2.78488612px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="518.53662"
          x="389.72879"
          sodipodi:role="line"
@@ -264,7 +318,10 @@
        y="513.89496"
        id="text4248"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4250"
          sodipodi:role="line"
          x="389.77185"
@@ -275,7 +332,10 @@
        width="28.363075"
        height="14.173232"
        x="375.64041"
-       y="527.98773" />
+       y="527.98773"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:2.78488612px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -283,7 +343,10 @@
        y="539.83777"
        id="text4254"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4256"
          sodipodi:role="line"
          x="389.72879"
@@ -295,7 +358,10 @@
        x="389.77185"
        style="font-size:7.19343758px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="535.19611"
          x="389.77185"
          sodipodi:role="line"
@@ -306,7 +372,10 @@
        height="14.173232"
        width="28.363075"
        id="rect4262"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4264"
@@ -314,7 +383,10 @@
        x="389.72879"
        style="font-size:2.78488612px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="561.10382"
          x="389.72879"
          sodipodi:role="line"
@@ -326,7 +398,10 @@
        y="556.46216"
        id="text4268"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4270"
          sodipodi:role="line"
          x="389.77185"
@@ -337,7 +412,10 @@
        width="70.907677"
        height="28.346466"
        x="290.55118"
-       y="357.87396" />
+       y="357.87396"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:5.74696636px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -345,7 +423,10 @@
        y="379.80786"
        id="text4278"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="325.89548"
          y="379.80786"
@@ -354,7 +435,10 @@
        sodipodi:nodetypes="cc"
        id="path4292"
        d="m 361.45886,372.04718 35.45385,0 0,-70.86609 -35.45385,0"
-       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4294"
@@ -362,7 +446,10 @@
        x="311.6199"
        style="font-size:5.74696636px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4298"
          y="394.7392"
          x="311.6199"
@@ -374,7 +461,10 @@
        y="369.67584"
        id="text4302"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="369.73404"
          y="369.67584"
@@ -386,7 +476,10 @@
        x="325.91464"
        style="font-size:10.11186314px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4310"
          y="371.01544"
          x="325.91464"
@@ -395,24 +488,36 @@
        style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 404.00347,513.77946 14.18154,0"
        id="path4312"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <path
        sodipodi:nodetypes="cc"
        id="path4314"
        d="m 404.00347,535.03931 14.18154,0"
-       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <path
        style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 404.00347,556.29915 14.18154,0"
        id="path4316"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        style="fill:#b3b300;fill-opacity:1;stroke:none"
        id="rect4318"
        width="49.635353"
        height="14.173232"
        x="418.18503"
-       y="506.69287" />
+       y="506.69287"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4320"
@@ -420,7 +525,10 @@
        x="442.89536"
        style="font-size:5.6092267px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="515.47754"
          x="442.89536"
          sodipodi:role="line"
@@ -432,7 +540,10 @@
        x="325.81076"
        style="font-size:4.09219551px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="436.91284"
          x="325.81076"
          sodipodi:role="line"
@@ -443,7 +554,10 @@
        height="14.173232"
        width="49.635353"
        id="rect4328"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:5.6092267px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -451,7 +565,10 @@
        y="536.74365"
        id="text4330"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4332"
          sodipodi:role="line"
          x="442.89536"
@@ -462,12 +579,18 @@
        width="49.635353"
        height="35.433056"
        x="418.18503"
-       y="549.21259" />
+       y="549.21259"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <path
        style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 290.55118,556.29917 -14.18153,0 0,-70.86615 21.27229,0"
        id="path4346"
-       sodipodi:nodetypes="cccc" />
+       sodipodi:nodetypes="cccc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4350"
@@ -475,7 +598,10 @@
        x="442.89536"
        style="font-size:5.6092267px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="557.21246"
          x="442.89536"
          sodipodi:role="line"
@@ -484,14 +610,20 @@
        style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 432.36655,584.6456 0,14.17322"
        id="path4370"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        y="598.81885"
        x="418.18503"
        height="14.173232"
        width="49.635353"
        id="rect4372"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:5.6092267px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -499,7 +631,10 @@
        y="607.63055"
        id="text4374"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4376"
          sodipodi:role="line"
          x="442.89536"
@@ -510,7 +645,10 @@
        width="56.726158"
        height="14.173224"
        x="297.64194"
-       y="598.81885" />
+       y="598.81885"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:4.82525158px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -518,7 +656,10 @@
        y="607.41418"
        id="text4380"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4382"
          sodipodi:role="line"
          x="325.89536"
@@ -527,14 +668,20 @@
        sodipodi:nodetypes="cc"
        id="path4384"
        d="m 418.185,605.90545 -63.81692,0"
-       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        y="620.07867"
        x="297.64194"
        height="14.173206"
        width="56.726158"
        id="rect4394"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4396"
@@ -542,7 +689,10 @@
        x="325.89532"
        style="font-size:4.83453417px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="628.68286"
          x="325.89532"
          sodipodi:role="line"
@@ -553,7 +703,10 @@
        width="56.726158"
        height="14.173198"
        x="297.64194"
-       y="641.33856" />
+       y="641.33856"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:4.37835312px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -561,7 +714,10 @@
        y="649.82312"
        id="text4402"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.99970699)"><tspan
+       transform="scale(1.0002931,0.99970699)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4404"
          sodipodi:role="line"
          x="325.85657"
@@ -572,7 +728,10 @@
        height="21.259851"
        width="56.726158"
        id="rect4406"
-       style="fill:#b3b3b3;fill-opacity:1;stroke:none" />
+       style="fill:#b3b3b3;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4408"
@@ -580,7 +739,10 @@
        x="325.95908"
        style="font-size:6.15666389px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="671.87292"
          x="325.95908"
          sodipodi:role="line"
@@ -593,7 +755,10 @@
        sodipodi:nodetypes="cccc"
        id="path4414"
        d="m 297.64194,676.77156 -35.45384,0 0,-375.59046 28.36308,0"
-       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4416"
@@ -601,7 +766,10 @@
        x="288.99802"
        style="font-size:5.74696636px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4418"
          y="674.41022"
          x="288.99802"
@@ -613,7 +781,10 @@
        y="692.32361"
        id="text4420"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="311.97754"
          y="692.32361"
@@ -622,14 +793,20 @@
        sodipodi:nodetypes="cc"
        id="path4424"
        d="m 304.73271,683.85823 0,28.3464"
-       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        y="712.20465"
        x="297.64194"
        height="21.259851"
        width="56.726158"
        id="rect4426"
-       style="fill:#af0818;fill-opacity:1;stroke:none" />
+       style="fill:#af0818;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4428"
@@ -637,7 +814,10 @@
        x="325.74716"
        style="font-size:7.66359091px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="725.0271"
          x="325.74716"
          sodipodi:role="line"
@@ -646,19 +826,28 @@
        style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 467.82039,513.77947 14.18154,0 0,21.25985"
        id="path4432"
-       sodipodi:nodetypes="ccc" />
+       sodipodi:nodetypes="ccc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <path
        sodipodi:nodetypes="ccccc"
        id="path4434"
        d="m 467.82039,535.03932 c 79.84081,0 7.46396,0 14.18154,0 l 0,85.03936 -77.99846,0 0,-14.17323"
-       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        y="450"
        x="297.64194"
        height="14.173232"
        width="56.726151"
        id="rect4804"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:5.6092267px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -666,7 +855,10 @@
        y="458.76794"
        id="text4806"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="325.72873"
          y="458.76794"
@@ -675,14 +867,20 @@
        sodipodi:nodetypes="cccc"
        id="path4814"
        d="m 354.3681,726.37793 14.18153,0 0,-70.8662 14.18154,0"
-       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        y="648.42511"
        x="382.73117"
        height="14.173198"
        width="99.270744"
        id="rect4816"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4818"
@@ -690,7 +888,10 @@
        x="432.12759"
        style="font-size:5.40982103px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="657.19629"
          x="432.12759"
          sodipodi:role="line"
@@ -701,7 +902,10 @@
        width="99.270744"
        height="14.173198"
        x="382.73117"
-       y="669.68506" />
+       y="669.68506"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:5.40982103px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -709,7 +913,10 @@
        y="678.46246"
        id="text4824"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4826"
          sodipodi:role="line"
          x="432.12759"
@@ -720,7 +927,10 @@
        height="14.173198"
        width="99.270744"
        id="rect4828"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4830"
@@ -728,7 +938,10 @@
        x="432.12759"
        style="font-size:5.40982103px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.999707)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="699.72839"
          x="432.12759"
          sodipodi:role="line"
@@ -739,31 +952,43 @@
        width="99.270744"
        height="14.173198"
        x="382.73117"
-       y="712.20465" />
+       y="712.20465"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
-       style="font-size:5.40982103px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
-       x="432.12759"
-       y="720.99451"
+       style="font-size:4.32388306px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
+       x="432.15015"
+       y="720.69495"
        id="text4836"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.999707)"><tspan
+       transform="scale(1.0002931,0.99970699)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan4838"
          sodipodi:role="line"
-         x="432.12759"
-         y="720.99451">domain cleanup</tspan></text>
+         x="432.15015"
+         y="720.69495">remove tomld dirs and reshape temp dirs</tspan></text>
     <path
        style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 396.85039,747.63778 0,21.25978"
        id="path4840"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        style="fill:#b3b3b3;fill-opacity:1;stroke:none"
        id="rect4842"
        width="70.907684"
        height="21.259811"
        x="382.66885"
-       y="768.89764" />
+       y="768.89764"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        sodipodi:linespacing="125%"
        id="text4852"
@@ -771,7 +996,10 @@
        x="417.92163"
        style="font-size:5.27373362px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.99970699)"><tspan
+       transform="scale(1.0002931,0.99970699)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="777.91467"
          x="417.92163"
          sodipodi:role="line"
@@ -784,7 +1012,10 @@
        style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 297.6378,783.07086 -35.4497,0 0,-106.29933"
        id="path4866"
-       sodipodi:nodetypes="ccc" />
+       sodipodi:nodetypes="ccc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:5.74696636px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -792,7 +1023,10 @@
        y="780.57764"
        id="text5420"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.99970699)"><tspan
+       transform="scale(1.0002931,0.99970699)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="376.65826"
          y="780.57764"
@@ -804,7 +1038,10 @@
        x="404.06821"
        style="font-size:5.74696636px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.99970699)"><tspan
+       transform="scale(1.0002931,0.99970699)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan5426"
          y="798.65405"
          x="404.06821"
@@ -813,14 +1050,20 @@
        style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 396.85039,790.15746 0,28.3465"
        id="path5428"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        style="fill:#af0818;fill-opacity:1;stroke:none"
        id="rect5430"
        width="56.726158"
        height="28.346514"
        x="389.75964"
-       y="818.50385" />
+       y="818.50385"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        xml:space="preserve"
        style="font-size:5.81754303px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
@@ -828,7 +1071,10 @@
        y="827.34705"
        id="text5432"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.99970699)"><tspan
+       transform="scale(1.0002931,0.99970699)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="417.86041"
          y="827.34705"
@@ -840,7 +1086,10 @@
        y="271.10114"
        x="212.55269"
        style="font-size:4.95768785px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
-       xml:space="preserve"><tspan
+       xml:space="preserve"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="271.10114"
          x="212.55269"
          sodipodi:role="line"
@@ -849,14 +1098,20 @@
        style="fill:none;stroke:#000000;stroke-width:0.50073254;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 382.65224,783.07086 -28.38385,0"
        id="path3082"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <rect
        style="fill:#af0818;fill-opacity:1;stroke:none"
        id="rect3084"
        width="56.726158"
        height="21.259851"
        x="297.57547"
-       y="768.89764" />
+       y="768.89764"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        transform="scale(1.0002931,0.99970699)"
        xml:space="preserve"
@@ -864,7 +1119,10 @@
        x="325.79306"
        y="778.03052"
        id="text3086"
-       sodipodi:linespacing="125%"><tspan
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan3088"
          sodipodi:role="line"
          x="325.79306"
@@ -879,19 +1137,25 @@
        height="14.173198"
        width="99.270744"
        id="rect3092"
-       style="fill:#b3b300;fill-opacity:1;stroke:none" />
+       style="fill:#b3b300;fill-opacity:1;stroke:none"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        transform="scale(1.0002931,0.99970699)"
        sodipodi:linespacing="125%"
        id="text3094"
-       y="742.26068"
-       x="432.07361"
-       style="font-size:5.40982103px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
-       xml:space="preserve"><tspan
-         y="742.26068"
-         x="432.07361"
+       y="741.83319"
+       x="432.0441"
+       style="font-size:3.86036682px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
+       xml:space="preserve"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
+         y="741.83319"
+         x="432.0441"
          sodipodi:role="line"
-         id="tspan3096">reload new policy to kernel</tspan></text>
+         id="tspan3096">domain cleanup and reload new policy to kernel</tspan></text>
     <text
        transform="scale(1.0002931,0.99970699)"
        sodipodi:linespacing="125%"
@@ -899,7 +1163,10 @@
        y="842.13483"
        x="417.70425"
        style="font-size:15.97067356px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
-       xml:space="preserve"><tspan
+       xml:space="preserve"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan3102"
          y="842.13483"
          x="417.70425"
@@ -911,7 +1178,10 @@
        y="261.0051"
        id="text3115"
        sodipodi:linespacing="125%"
-       transform="scale(1.0002931,0.99970699)"><tspan
+       transform="scale(1.0002931,0.99970699)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          id="tspan3117"
          sodipodi:role="line"
          x="219.38567"
@@ -923,7 +1193,10 @@
        x="443.00333"
        style="font-size:4.24921846px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;fill:#ffffff;fill-opacity:1;stroke:none;font-family:DejaVu Sans;-inkscape-font-specification:DejaVu Sans"
        xml:space="preserve"
-       transform="scale(1.0002931,0.99970699)"><tspan
+       transform="scale(1.0002931,0.99970699)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          y="564.8045"
          x="443.00333"
          sodipodi:role="line"
@@ -946,7 +1219,10 @@
        width="70.907677"
        height="28.346466"
        x="290.55118"
-       y="287.00784" />
+       y="287.00784"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        transform="scale(1.0002931,0.99970699)"
        xml:space="preserve"
@@ -954,7 +1230,10 @@
        x="325.89548"
        y="299.26297"
        id="text2960"
-       sodipodi:linespacing="125%"><tspan
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          id="tspan2962"
          x="325.89548"
@@ -967,7 +1246,10 @@
        style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
        d="m 290.55118,334.61123 -21.25984,0 0,94.12892 21.25984,0"
        id="path2974"
-       sodipodi:nodetypes="cc" />
+       sodipodi:nodetypes="cc"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        transform="scale(1.0002931,0.99970699)"
        xml:space="preserve"
@@ -975,7 +1257,10 @@
        x="281.62869"
        y="342.22385"
        id="text2976"
-       sodipodi:linespacing="125%"><tspan
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="281.62869"
          y="342.22385"
@@ -987,7 +1272,10 @@
        x="440.11453"
        y="590.36505"
        id="text2995"
-       sodipodi:linespacing="125%"><tspan
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="440.11453"
          y="590.36505"
@@ -996,7 +1284,10 @@
        sodipodi:nodetypes="ccc"
        id="path2999"
        d="m 418.11024,577.55902 -14.18154,0 0,28.34646"
-       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)" />
+       style="fill:none;stroke:#000000;stroke-width:0.5007326;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;marker-end:url(#Arrow1Lend)"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001" />
     <text
        transform="scale(1.0002931,0.99970699)"
        xml:space="preserve"
@@ -1004,7 +1295,10 @@
        x="411.46216"
        y="574.88153"
        id="text3001"
-       sodipodi:linespacing="125%"><tspan
+       sodipodi:linespacing="125%"
+       inkscape:export-filename="/home/andras/development/Dhtml/log69_3/www/images/tomld_flowchart.png"
+       inkscape:export-xdpi="212.74001"
+       inkscape:export-ydpi="212.74001"><tspan
          sodipodi:role="line"
          x="411.46216"
          y="574.88153"
