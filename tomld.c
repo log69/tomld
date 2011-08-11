@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-10/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+11/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -30,10 +30,12 @@ changelog:
                          - bugfix: several bugfixes regarding notification
                          - bugfix: ask for root privileges before clearing tomld.message file
                          - bugfix: don't set --notify option if [notify] tag is in config, only tomld client needs it
+                         - bugfix: never create or copy more than one change_time and cpu_time entry of any domain
+                         - bugfix: don't add rules with myuid entries when merging domains on load()
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
-                         - add special chars to look for in temporary names in path_wildcard_dir_temp_name()
-                         - improve path_wildcard_dir_temp_name() to consider "." char to be part of random part
+                         - add special chars to look for in temporary names in path_wildcard_temp_name()
+                         - improve path_wildcard_temp_name() to consider "." char to be part of random part
                            if its left and right sides are also random names
                          - add power saving mode to sleep more every cycle after all domains are in enforcing mode
                          - print notification when all domains are finally switched to enforcing mode
@@ -42,6 +44,8 @@ changelog:
                          - change myuid, so configuration needs to be regenerated entirely
                          - print message about incompatible config file in the log too
                          - print system info on startup (/proc/version)
+                         - print a warning message if running cycles take too long
+                         - wildcard subdirectory names in paths containing random names or only numbers
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -337,6 +341,9 @@ char *home = "/home";
 /* interval of policy check to run in seconds */
 int const_time_check      = 2;
 int const_time_check_long = 30;
+/* the time of one check cycle above which i send a warning log */
+int const_time_check_warning = 30;
+/* temp vars */
 int const_time_check2;
 int const_time_check_long2;
 /* interval of saving configs to disk in seconds */
@@ -1305,14 +1312,14 @@ char *path_wildcard_home(char *path)
 
 /* wildcard random part of file name */
 /* i consider random part in a file name if it contains only lower and upper case, numbers
- * and some extra characters */
+ * and some extra characters, and upper case also from 2nd char - or only numbers */
 /* the point is a special char - if the left and right side of the point are random names too
  * (together longer than 6 chars), then i consider the point char to be a part of the random names,
  * this is because apps divide random names from normal ones by a point in file names */
 /* if this condition doesn't meet, then i return the original name,
  * cause probably new random name will come later anyway */
 /* returned value must be freed by caller */
-char *path_wildcard_dir_temp_name(char *name)
+char *path_wildcard_temp_name(char *name)
 {
 	char *new = 0;
 	char *temp = 0, *temp2 = 0;
@@ -1488,7 +1495,7 @@ char *path_wildcard_dir_temp_name(char *name)
 
 /* wildcard temporary (random type) file name in path */
 /* returned value must be freed by caller */
-char *path_wildcard_dir_temp(char *path)
+char *path_wildcard_temp_dir(char *path)
 {
 	char *new = 0;
 	
@@ -1496,7 +1503,7 @@ char *path_wildcard_dir_temp(char *path)
 	if (!path_is_dir(path)){
 		char *mydir   = path_get_parent_dir(path);
 		char *myname  = path_get_filename(path);
-		char *myname2 = path_wildcard_dir_temp_name(myname);
+		char *myname2 = path_wildcard_temp_name(myname);
 		
 		strcpy2(&new, mydir);
 		strcat2(&new, myname2);
@@ -1638,7 +1645,7 @@ int domain_main_exist(char *prog)
 		res = domain_get_next(&temp);
 		if (!res) break;
 		/* get main domain name */
-		res2 = domain_get_name(res);
+		res2 = domain_get_name_full(res);
 		if (res2){
 			/* if prog names matches main domain name, then prog exists as a main domain and success */
 			if (!strcmp(prog, res2)){
@@ -1666,7 +1673,7 @@ char *domain_get(char *prog)
 		res = domain_get_next(&temp);
 		if (!res) break;
 		/* get main domain name */
-		res2 = domain_get_name_sub(res);
+		res2 = domain_get_name_full(res);
 		if (res2){
 			/* if prog names matches main domain name, then success */
 			if (!strcmp(prog, res2)){
@@ -1709,7 +1716,7 @@ int domain_get_creation_time(char *prog)
 }
 
 
-/* return a new string containing a list of all domain names */
+/* return a new string containing a list of all main domain names */
 /* returned value must be freed by caller */
 char *domain_get_list()
 {
@@ -1898,11 +1905,16 @@ void domain_set_profile_for_prog(const char *prog, int profile)
 		res = domain_get_next(&temp);
 		if (!res) break;
 		/* check if domain is a main or subdomain of what i'm looking for */
-		res2 = domain_get_name(res);
+		res2 = domain_get_name_full(res);
 		if (res2){
 
 			/* if so, then set its profile mode */
-			if (!strcmp(prog, res2)) domain_set_profile(&orig, profile);
+			if (!strcmp(prog, res2)){
+				domain_set_profile(&orig, profile);
+				free2(res2);
+				free2(res);
+				break;
+			}
 		}
 
 		free2(res2);
@@ -1934,46 +1946,6 @@ int domain_all_in_enforcing_yet()
 	}
 
 	return result;	
-}
-
-
-/* add rule to prog domain and subdomain */
-void domain_add_rule(char *prog, char *rule)
-{
-	char *res, *res2, *temp, *temp2, *tdomf_new;
-
-	/* alloc mem for new policy */	
-	tdomf_new = memget2(MAX_CHAR);
-	
-	/* cycle through the domains */
-	temp = tdomf;
-	while(1){
-		/* get next domain policy */
-		res = domain_get_next(&temp);
-		if (!res) break;
-		/* add domain policy to new policy */
-		strcat2(&tdomf_new, res);
-		strcat2(&tdomf_new, "\n");
-		/* check if this is what i'm looking for */
-		temp2 = res;
-		res2 = domain_get_name_sub(temp2);
-		if (res2){
-			/* prog name matches subdomain name? */
-			if (!strcmp(prog, res2)){
-				/* if so, then add rule to new policy */
-				strcat2(&tdomf_new, rule);
-				strcat2(&tdomf_new, "\n");
-			}
-			free2(res2);
-		}
-		free2(res);
-		/* add new line to new policy */
-		strcat2(&tdomf_new, "\n");
-	}
-	
-	/* replace old policy with new one */
-	free2(tdomf);
-	tdomf = tdomf_new;
 }
 
 
@@ -2595,7 +2567,7 @@ void load()
 	tdomf = tdomf_new;
 
 
-	/* merge similar domains' rules to my domain
+	/* merge similar domains' rules to my domain without myuid entries
 	 * these are active domains with running processes
 	 * that will transit into my domain after process restart */
 	tdomf_new = memget2(MAX_CHAR);
@@ -2653,9 +2625,18 @@ void load()
 											/* skip "use_profile" line, this is the next line */
 											res3 = string_get_next_line(&temp4);
 											free2(res3);
-											/* add rules */
-											strcat2(&tdomf_new, temp4);
-											strcat2(&tdomf_new, "\n");
+											/* add rules without myuid entries */
+											while(1){
+												/* get next rule */
+												res3 = string_get_next_line(&temp4);
+												if (!res3) break;
+												/* isn't rule one of my uid entry? */
+												if (!string_search_keyword_first(res3, myuid)){
+													strcat2(&tdomf_new, res3);
+													strcat2(&tdomf_new, "\n");
+												}
+												free2(res3);
+											}
 										}
 									}
 								}
@@ -4157,7 +4138,7 @@ void domain_info(const char *pattern)
 
 			/* get main domain name */
 			res2 = domain_get_name(res);
-			res3 = domain_get_name_sub(res);
+			res3 = domain_get_name_full(res);
 			/* is domain a main domain? */
 			if (res2 && res3){
 				if (!strcmp(res2, res3)){
@@ -4442,7 +4423,7 @@ void domain_set_learn_all()
 /* switch old domains only with profile 1-2 to enforcing mode */
 void domain_set_enforce_old()
 {
-	char *res, *res2, *prog, *prog_sub, *temp, *orig;
+	char *res, *res2, *prog, *prog_sub, *prog_full, *temp, *orig;
 	int m;
 	int flag_old = 0;
 	int flag_turned = 0;
@@ -4483,13 +4464,14 @@ void domain_set_enforce_old()
 					/* get domain name */
 					prog = domain_get_name(res);
 					prog_sub = domain_get_name_sub(res);
+					prog_full = domain_get_name_full(res);
 
 					/* check if it's not a newly created domain */
 					if (string_search_line(tprogs_learn, prog_sub) == -1){
 						int i = string_search_line(tprogs_exc, prog_sub);
 						/* check if not an exception domain */
 						/* or if an exception domain, check if it's not a main domain */
-						if ((i == -1) || (i != -1 && !domain_main_exist(prog))){
+						if ((i == -1) || (i != -1 && strcmp(prog, prog_full))){
 
 							/* print info once */
 							if (!flag_turned){
@@ -4507,6 +4489,7 @@ void domain_set_enforce_old()
 					}
 					free2(prog);
 					free2(prog_sub);
+					free2(prog_full);
 				}
 				free2(res);
 			}
@@ -4535,15 +4518,16 @@ void domain_set_enforce_old()
 				if (m == 1 || m == 2){
 					/* get domain name */
 					prog = domain_get_name(res);
-					prog_sub = domain_get_name_full(res);
-					if (prog && prog_sub){
+					prog_sub = domain_get_name_sub(res);
+					prog_full = domain_get_name_full(res);
+					if (prog && prog_full){
 
 						/* is it a main domain? */
-						if (!strcmp(prog, prog_sub)){
+						if (!strcmp(prog, prog_full)){
 							/* is domain in temporary list? */
 							if (string_search_line(tprogs_learn_auto, prog) > -1){
 								/* check if not an exception domain */
-								if (string_search_line(tprogs_exc, prog_sub) == -1){
+								if (string_search_line(tprogs_exc, prog) == -1){
 									char *nn = 0;
 
 									/* print info once */
@@ -4571,6 +4555,7 @@ void domain_set_enforce_old()
 					}
 					free2(prog);
 					free2(prog_sub);
+					free2(prog_full);
 				}
 				free2(res);
 			}
@@ -6657,11 +6642,14 @@ void domain_reshape_rules_recursive_dirs()
 					strcat2(&rules, res2);
 					strcat2(&rules, "\n");
 					
-					/* get a modified rule by recursive dirs if any */
-					res3 = domain_get_rules_with_recursive_dirs(res2);
-					if (res3){
-						strcat2(&rules, res3);
-						free2(res3);
+					/* do not run check on my uid entries */
+					if (!string_search_keyword_first(res2, myuid)){
+						/* get a modified rule by recursive dirs if any */
+						res3 = domain_get_rules_with_recursive_dirs(res2);
+						if (res3){
+							strcat2(&rules, res3);
+							free2(res3);
+						}
 					}
 
 					free2(res2);
@@ -6732,8 +6720,8 @@ void domain_reshape_rules_wildcard_spec()
 		res = string_get_next_line(&temp);
 		if (!res) break;
 		
-		/* is it a rule starting with "allow_" tag? */
-		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ")){
+		/* is it a rule starting with "allow_" tag and not my uid entry? */
+		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ") && !string_search_keyword_first(res, myuid)){
 
 			/* get rule type */
 			temp2 = res;
@@ -6818,7 +6806,7 @@ void domain_reshape_rules_wildcard_spec()
 		if (!res) break;
 		
 		/* is it a rule starting with "allow_" tag? */
-		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ")){
+		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ") && !string_search_keyword_first(res, myuid)){
 
 			/* get rule type */
 			temp2 = res;
@@ -6936,7 +6924,7 @@ void domain_reshape_rules_wildcard_spec()
 							
 							/* path is in spec_ex */
 							if (flag_ex){
-								res2 = path_wildcard_dir_temp(param);
+								res2 = path_wildcard_temp_dir(param);
 								free2(param); param = res2;
 							}
 							
@@ -7033,7 +7021,7 @@ void domain_reshape_rules_create_double()
 		param2 = string_get_next_word(&temp2);
 
 		/* is the rule any of the create rule type? */
-		if (array_search_keyword(cre, rule_type)){
+		if (!string_search_keyword_first(res, myuid) && array_search_keyword(cre, rule_type)){
 
 			/* allow_create can have second parameter from kernel 2.6.36 and above */
 			strcat2(&tdomf_new, "allow_create ");
@@ -7081,7 +7069,7 @@ void domain_reshape_rules_create_double()
 
 
 /* remove all entries that contains a path that matches any of tomld's working directory */
-void domain_remove_tomld_dir()
+void domain_reshape_rules_remove_tomld_dir()
 {
 	/* vars */
 	char *res, *temp, *temp2;
@@ -7099,7 +7087,7 @@ void domain_remove_tomld_dir()
 		if (!res) break;
 		
 		/* is it a rule? */
-		if (string_search_keyword_first(res, "allow_")){
+		if (!string_search_keyword_first(res, myuid) && string_search_keyword_first(res, "allow_")){
 			
 			/* get rule type and params */
 			temp2 = res;
@@ -7133,6 +7121,243 @@ void domain_remove_tomld_dir()
 }
 
 
+/* wildcard a subdir name if the following conditions meet:
+ * - paths of rules following each other have the same length
+ * - have more than 2 subdirs
+ * - their first 2 subdirs match
+ * - only one subdir of them differs and it is continous string
+ * - the different subdir contains only numbers or it's a temporary random name
+ * - at least 5 following rules match the criteria above */
+void domain_reshape_rules_temp_dir()
+{
+	/* vars */
+	char *res, *temp, *temp2, *temp3;
+	char *rule_type, *param1, *param2, *param1_old = 0;
+	char *tdomf_new;
+	int match_counter = 0;
+	int start_old = -1;
+	int end_old = -1;
+	int flag_match;
+	
+	/* alloc mem for new policy */
+	tdomf_new = memget2(MAX_CHAR);
+
+
+//	tdomf = file_read("/home/andras/temp/tomld_test_feedback/tomoyo.feedback2/d2", 0);
+
+	/* cycle through rules of domains */
+	temp = tdomf;
+	while(1){
+		/* get next rule */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		/* is it a rule? */
+		if (string_search_keyword_first(res, "allow_")){
+			/* do not run check on my uid entries */
+			if (!string_search_keyword_first(res, myuid)){
+				
+				/* get rule type and params */
+				temp2 = res;
+				rule_type = string_get_next_word(&temp2);
+				/* use only param1 and not param2, domain cleanup will replace paths
+				 * with the wildcarded path later */
+				param1 = string_get_next_word(&temp2);
+				param2 = string_get_next_word(&temp2);
+
+				flag_match = 0;
+
+				/* run check only on path params */
+				if (path_is_path(param1)){
+					/* compare params' length */
+					if (strlen2(&param1) == strlen2(&param1_old)){
+						/* params differ and they're not totally the same? */
+						if (strcmp(param1, param1_old)){
+							/* do params have same number of subdirs more than 2? */
+							int s1 = path_count_subdirs_name(param1);
+							int s2 = path_count_subdirs_name(param1_old);
+							if (s1 == s2 && s1 > 2 && s2 > 2){
+								/* create a diff of the params to see their differences in their names */
+								int i;
+								int start = -1;
+								int end   = -1;
+								char c1, c2;
+								int flag_slash;
+								/* get lengths */
+								long l = strlen2(&param1);
+								char *diff = 0, *diff1 = 0, *diff2 = 0, *new = 0;
+								/* cycle through every char and set minimum start
+								 * and maximum end position of diff part */
+								i = 0;
+								while(1){
+									/* get next char */
+									c1 = param1[i];
+									if (!c1) break;
+									c2 = param1_old[i];
+									/* do chars differ? */
+									if (c1 != c2){
+										/* store fist start position of diff */
+										if (start == -1) start = i;
+										/* store last end position of diff */
+										end = i;
+									}
+									i++;
+								}
+								/* check if diff is within a subdir of any of the params,
+								 * so check if there is any "/" char between start and end position */
+								i = start;
+								flag_slash = 0;
+								while(1){
+									if (i > end) break;
+									c1 = param1[i];
+									c2 = param1_old[i];
+									if (c1 == '/' || c2 == '/'){
+										flag_slash = 1;
+										break;
+									}
+									i++;
+								}
+								/* isn't there a "/" char in diff part? */
+								if (!flag_slash){
+
+									/* get whole subdir that has differing part in it by
+									 * going backward to the first "/" char for start position,
+									 * and going forward to the next "/" char for end posotion */
+									while(1){
+										if (start < 0){ start = 0; break; }
+										if (param1[start] == '/'){ start++; break; }
+										start--;
+									}
+									while(1){
+										if (end >= l){ break; }
+										if (param1[end] == '/'){ break; }
+										end++;
+									}
+									
+									/* do positions match to former ones? */
+									if (start != start_old || end != end_old){
+										start_old = start;
+										end_old = end;
+									}
+									else{
+									
+										/* copy only the differing subdirs */
+										temp3 = param1_old + start;
+										strcpy2(&diff1, temp3);
+										diff1[end - start] = 0;
+										strlenset3(&diff1, end - start);
+
+										temp3 = param1 + start;
+										strcpy2(&diff2, temp3);
+										diff2[end - start] = 0;
+										strlenset3(&diff2, end - start);
+
+										/* do random parts match? are they both numbers or random names? */
+										if (string_is_number(diff1) && string_is_number(diff2)){
+											/* replace numbers with wildcard */
+											strcpy2(&diff, "\\*");
+											/* set success */
+											flag_match = 1;
+										}
+										else{
+											/* are they random names and they match? */
+											char *p1, *p2;
+											p1 = path_wildcard_temp_name(diff1);
+											p2 = path_wildcard_temp_name(diff2);
+											if (p1 && p2){
+												/* do both diffs got wildcarded and so they match? */
+												if (!strcmp(p1, p2)){
+													/* replace numbers with wildcard */
+													strcpy2(&diff, p2);
+													/* set success */
+													flag_match = 1;
+												}
+											}
+											free2(p1); free2(p2);
+										}
+										
+										/* success? */
+										flag_match = 0;
+										/* run only once at exactly 5 matches, and then don't run until fail again
+										 * that will reset the match counter */
+										if (flag_match && match_counter == 5){
+											char *temp4;
+
+											/* store former param */
+											strcpy2(&param1_old, param1);
+
+											/* create new path with wildcard in it */
+											/* store orig param */
+											strcpy2(&new, param1);
+											/* cut result at diff position */
+											new[start] = 0;
+											strlenset3(&new, start);
+											/* add wildcard to result at diff position */
+											strcat2(&new, diff);
+											/* add rest of path to result too */
+											temp4 = param1 + end;
+											strcat2(&new, temp4);
+											/* replace param1 with wildcarded one */
+											strcpy2(&param1, new);
+											
+											/* increase counter */
+											match_counter++;
+debug(new);
+										}
+									}
+								}
+								free2(diff);
+								free2(diff1);
+								free2(diff2);
+								free2(new);
+							}
+						}
+					}
+				}
+
+				free2(param1);
+				free2(param2);
+				free2(rule_type);
+			}
+		}
+
+		/* wasn't there any match? */
+		if (flag_match){
+			/* add rule */
+			strcat2(&tdomf_new, rule_type);
+			if (param1){
+				strcat2(&tdomf_new, " ");
+				strcat2(&tdomf_new, param1);
+				if (param2){
+					strcat2(&tdomf_new, " ");
+					strcat2(&tdomf_new, param2);
+				}
+			}
+			strcat2(&tdomf_new, "\n");
+		}
+		else{
+			/* add original rule anyway */
+			strcat2(&tdomf_new, res);
+			strcat2(&tdomf_new, "\n");
+
+			/* reset match counter */
+			match_counter = 0;
+			/* store old param and positions */
+			strcpy2(&param1_old, param1);
+			start_old = -1;
+			end_old = -1;
+		}
+
+		free2(res);
+	}
+	free2(param1_old);
+
+	/* set new policy */	
+	free2(tdomf);
+	tdomf = tdomf_new;
+}
+
+
 /* rehsape rules */
 void domain_reshape_rules()
 {
@@ -7154,7 +7379,12 @@ void domain_reshape_rules()
 	sand_clock(0);
 	domain_cleanup();
 
-	domain_remove_tomld_dir();
+	domain_reshape_rules_remove_tomld_dir();
+	
+//	domain_reshape_rules_temp_dir();
+
+	sand_clock(0);
+	domain_cleanup();
 }
 
 
@@ -7188,7 +7418,7 @@ void domain_update_change_time()
 	tdomf_new = memget2(MAX_CHAR);
 	temp = tdomf;
 	while(1){
-		/* get next domain from backup */
+		/* get next domain from current policy */
 		d1 = domain_get_next(&temp);
 		if (!d1) break;
 
@@ -7202,7 +7432,7 @@ void domain_update_change_time()
 			
 			temp2 = tdomf_bak2;
 			while(1){
-				/* get next current domain */
+				/* get next domain from backup */
 				d2 = domain_get_next(&temp2);
 				if (!d2) break;
 				/* get domain name */
@@ -7246,18 +7476,7 @@ void domain_update_change_time()
 				else{
 					/* if no match, then update current domain's policy by
 					 * copying every rule except my uuid that i change before */
-					temp3 = d1;
-					/* copy headers, like domain name and use_profile */
-					res = string_get_next_line(&temp3);
-					strcat2(&tdomf_new, res);
-					strcat2(&tdomf_new, "\n");
-					free2(res);
-					res = string_get_next_line(&temp3);
-					strcat2(&tdomf_new, res);
-					strcat2(&tdomf_new, "\n");
-					free2(res);
-
-					/* copy the rest of the rules */
+					int flag_one_change_entry = 0;
 					while(1){
 						/* get next rule */
 						res = string_get_next_line(&temp3);
@@ -7265,12 +7484,16 @@ void domain_update_change_time()
 
 						/* check if rule is my unique id */
 						if (string_search_keyword_first(res, myuid_change)){
-							/* copy my unique id of change time with the new time */
-							char *t = string_ltos(time(0));
-							strcat2(&tdomf_new, myuid_change);
-							strcat2(&tdomf_new, t);
-							strcat2(&tdomf_new, "\n");
-							free2(t);
+							if (!flag_one_change_entry){
+								/* copy my unique id of change time with the new time */
+								char *t = string_ltos(time(0));
+								strcat2(&tdomf_new, myuid_change);
+								strcat2(&tdomf_new, t);
+								strcat2(&tdomf_new, "\n");
+								free2(t);
+								
+								flag_one_change_entry = 1;
+							}
 						}
 						else{
 							/* copy rule to new policy */
@@ -7347,8 +7570,10 @@ void domain_update_cpu_time_all()
 			
 			/* if match, then update my uid cpu time rule in domain 1 by 1 */
 			if (flag_list_match){
+				int flag_one_change_entry;
 
 				/* cycle through rules */
+				flag_one_change_entry = 0;
 				flag_rule_match = 0;
 				temp2 = res;
 				while(1){
@@ -7358,20 +7583,24 @@ void domain_update_cpu_time_all()
 					
 					/* is rule my uid cpu time entry? */
 					if (string_search_keyword_first(res2, myuid_cputime)){
-						flag_rule_match = 1;
-						/* if so, then update it by adding together old and new value */
-						/* read old cpu time value */
-						ptime = string_get_number_last(res2);
-						/* add them */
-						t += atoi(ptime);
-						free2(ptime);
-						/* convert new cpu time value */
-						ptime = string_itos(t);
-						/* add my new uid rule to new domain policy */
-						strcat2(&tdomf_new, myuid_cputime);
-						strcat2(&tdomf_new, ptime);
-						strcat2(&tdomf_new, "\n");
-						free2(ptime);
+						if (!flag_one_change_entry){
+							flag_rule_match = 1;
+							/* if so, then update it by adding together old and new value */
+							/* read old cpu time value */
+							ptime = string_get_number_last(res2);
+							/* add them */
+							t += atoi(ptime);
+							free2(ptime);
+							/* convert new cpu time value */
+							ptime = string_itos(t);
+							/* add my new uid rule to new domain policy */
+							strcat2(&tdomf_new, myuid_cputime);
+							strcat2(&tdomf_new, ptime);
+							strcat2(&tdomf_new, "\n");
+							free2(ptime);
+							
+							flag_one_change_entry = 1;
+						}
 					}
 					else{
 						/* add rule to new domain policy */
@@ -7994,11 +8223,11 @@ void myinit()
 	const_time_check_long2 = const_time_check_long;
 	
 	/* create my uids */
-	strcpy2(&myuid_create, myuid);
-	strcpy2(&myuid_change, myuid);
+	strcpy2(&myuid_create,  myuid);
+	strcpy2(&myuid_change,  myuid);
 	strcpy2(&myuid_cputime, myuid);
-	strcat2(&myuid_create, "/create_time/");
-	strcat2(&myuid_change, "/change_time/");
+	strcat2(&myuid_create,  "/create_time/");
+	strcat2(&myuid_change,  "/change_time/");
 	strcat2(&myuid_cputime, "/cpu_time/");
 	
 	/* create tomld paths from its vars */
@@ -8210,6 +8439,12 @@ int main(int argc, char **argv)
 			if (time_min_cycle > t3) time_min_cycle = t3;
 			time_avg_cycle += t3;
 			time_avg_cycle_counter++;
+			
+			/* send warning on too long time cycle */
+			if (t3 > const_time_check_warning){
+				color("* warning: running cycles take too long", red);
+				notify("warning: running cycles take too long");
+			}
 			
 			/* run only once */
 			if (flag_firstrun){
