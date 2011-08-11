@@ -1905,16 +1905,11 @@ void domain_set_profile_for_prog(const char *prog, int profile)
 		res = domain_get_next(&temp);
 		if (!res) break;
 		/* check if domain is a main or subdomain of what i'm looking for */
-		res2 = domain_get_name_full(res);
+		res2 = domain_get_name(res);
 		if (res2){
 
 			/* if so, then set its profile mode */
-			if (!strcmp(prog, res2)){
-				domain_set_profile(&orig, profile);
-				free2(res2);
-				free2(res);
-				break;
-			}
+			if (!strcmp(prog, res2)) domain_set_profile(&orig, profile);
 		}
 
 		free2(res2);
