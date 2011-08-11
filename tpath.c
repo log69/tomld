@@ -67,33 +67,36 @@ char *path_get_filename(const char *path)
 	char c;
 	int i, i2, l;
 	
-	/* alloc mem for result */
-	res = memget2(max_char);
+	if (path)
+	{
+		/* alloc mem for result */
+		res = memget2(max_char);
 
-	/* search for filename part */
-	l = strlen(path);
-	if (l > 0){
-		i = l;
-		/* search for "/" char backwords and stop at it */
-		while (1){
-			c = path[i];
-			if (!i) break;
-			if (c == '/') { i++; break; }
-			i--;
-		}
-		/* rightmost string is not null? */
-		if (i < l){
-			/* copy string after "/" char */
-			i2 = 0;
-			while(i <= l){
-				res[i2++] = path[i++];
+		/* search for filename part */
+		l = strlen(path);
+		if (l > 0){
+			i = l;
+			/* search for "/" char backwords and stop at it */
+			while (1){
+				c = path[i];
+				if (!i) break;
+				if (c == '/') { i++; break; }
+				i--;
 			}
-			strlenset2(&res);
-			return res;
+			/* rightmost string is not null? */
+			if (i < l){
+				/* copy string after "/" char */
+				i2 = 0;
+				while(i <= l){
+					res[i2++] = path[i++];
+				}
+				strlenset2(&res);
+				return res;
+			}
 		}
+		
+		free2(res);
 	}
-	
-	free2(res);
 	return 0;
 }
 
@@ -102,9 +105,22 @@ char *path_get_filename(const char *path)
 /* returns true if so */
 int path_is_dir(const char *path)
 {
-	long l = strlen(path);
-	if (!l) return 0;
-	if (path[l - 1] == '/') return 1;
+	if (path){
+		long l = strlen(path);
+		if (!l) return 0;
+		if (path[l - 1] == '/') return 1;
+	}
+	return 0;
+}
+
+
+/* check if path string starts with "/" char meaning it's a path */
+/* returns true if so */
+int path_is_path(const char *path)
+{
+	if (path){
+		if (path[0] == '/') return 1;
+	}
 	return 0;
 }
 
