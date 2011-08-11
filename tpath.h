@@ -35,6 +35,8 @@ char *path_get_filename(const char *text);
 
 int path_is_dir(const char *path);
 
+int path_is_path(const char *path);
+
 int path_count_subdirs_name(const char *path);
 
 char *path_get_subdirs_name(const char *path, int num);
