@@ -395,6 +395,45 @@ int file_exist(const char *name)
 }
 
 
+/* mkdir recursively (input can be file too, not only dir) */
+void mkdir_recursive(char *dir)
+{
+	int max_iter = 16;
+	char *mydir = path_get_dir(dir);
+	char *mydir2 = 0;
+	
+	while(max_iter--){
+		/* create dir if it doesn't exist yet */
+		if (strlen2(&mydir)){
+			/* dir is not root? */
+			if (strcmp(mydir, "/")){
+				/* does dir exist yet? */
+				if (!dir_exist(mydir)){
+					/* create dir */
+					mkdir(mydir, S_IRWXU);
+				}
+			}
+		}
+
+		/* store dir */
+		strcpy2(&mydir2, mydir);
+
+		/* get parent dir */
+		free2(mydir);
+		mydir = path_get_parent_dir(mydir2);
+
+		/* do they match? if so, then i reached root dir, so success and exit */
+		if (mydir && mydir2){
+			if (!strcmp(mydir, mydir2)){
+				free2(mydir);
+				free2(mydir2);
+				break;
+			}
+		}
+	}
+}
+
+
 /* search file name in current dir first, then in bin locations and give back full path on success */
 /* returned value must be freed by caller */
 char *which(const char *name)
