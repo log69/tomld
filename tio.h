@@ -68,5 +68,7 @@ int dir_exist(const char *name);
 
 int file_exist(const char *name);
 
+void mkdir_recursive(char *dir);
+
 char *which(const char *name);
 
