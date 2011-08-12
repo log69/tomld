@@ -1935,6 +1935,7 @@ int domain_all_in_enforcing_yet()
 		/* is domain in enforcing mode? */
 		if (domain_get_profile(res) != 3){
 			result = 0;
+			free2(res);
 			break;
 		}
 
@@ -7118,24 +7119,23 @@ void domain_reshape_rules_remove_tomld_dir()
  * - have more than 2 subdirs
  * - their first 2 subdirs match
  * - only one subdir of them differs and it is continous string
+ * (anyway the sorting places the similars next to each other)
  * - the different subdir contains only numbers or it's a temporary random name
  * - at least 5 following rules match the criteria above */
 void domain_reshape_rules_temp_dir()
 {
 	/* vars */
 	char *res, *temp, *temp2, *temp3;
-	char *rule_type, *param1, *param2, *param1_old = 0;
+	char *rule_type = 0, *param1 = 0, *param2 = 0, *param1_old = 0;
 	char *tdomf_new;
 	int match_counter = 0;
 	int start_old = -1;
 	int end_old = -1;
-	int flag_match;
+	int flag_match = 0;
 	
 	/* alloc mem for new policy */
 	tdomf_new = memget2(MAX_CHAR);
 
-
-//	tdomf = file_read("/home/andras/temp/tomld_test_feedback/tomoyo.feedback2/d2", 0);
 
 	/* cycle through rules of domains */
 	temp = tdomf;
@@ -7177,7 +7177,7 @@ void domain_reshape_rules_temp_dir()
 								int flag_slash;
 								/* get lengths */
 								long l = strlen2(&param1);
-								char *diff = 0, *diff1 = 0, *diff2 = 0, *new = 0;
+								char *diff = 0, *diff1 = 0, *diff2 = 0;
 								/* cycle through every char and set minimum start
 								 * and maximum end position of diff part */
 								i = 0;
@@ -7209,6 +7209,7 @@ void domain_reshape_rules_temp_dir()
 									}
 									i++;
 								}
+
 								/* isn't there a "/" char in diff part? */
 								if (!flag_slash){
 
@@ -7226,6 +7227,12 @@ void domain_reshape_rules_temp_dir()
 										end++;
 									}
 									
+									/* store positions on first run */
+									if (!match_counter){
+										start_old = start;
+										end_old = end;
+									}
+
 									/* do positions match to former ones? */
 									if (start != start_old || end != end_old){
 										start_old = start;
@@ -7250,6 +7257,7 @@ void domain_reshape_rules_temp_dir()
 											strcpy2(&diff, "\\*");
 											/* set success */
 											flag_match = 1;
+											match_counter++;
 										}
 										else{
 											/* are they random names and they match? */
@@ -7263,17 +7271,17 @@ void domain_reshape_rules_temp_dir()
 													strcpy2(&diff, p2);
 													/* set success */
 													flag_match = 1;
+													match_counter++;
 												}
 											}
 											free2(p1); free2(p2);
 										}
 										
 										/* success? */
-										flag_match = 0;
 										/* run only once at exactly 5 matches, and then don't run until fail again
 										 * that will reset the match counter */
 										if (flag_match && match_counter == 5){
-											char *temp4;
+											char *temp4, *new = 0;
 
 											/* store former param */
 											strcpy2(&param1_old, param1);
@@ -7291,25 +7299,20 @@ void domain_reshape_rules_temp_dir()
 											strcat2(&new, temp4);
 											/* replace param1 with wildcarded one */
 											strcpy2(&param1, new);
+											free2(new);
 											
-											/* increase counter */
-											match_counter++;
-debug(new);
+											/* reset counter */
+											match_counter = 0;
 										}
 									}
 								}
 								free2(diff);
 								free2(diff1);
 								free2(diff2);
-								free2(new);
 							}
 						}
 					}
 				}
-
-				free2(param1);
-				free2(param2);
-				free2(rule_type);
 			}
 		}
 
@@ -7341,7 +7344,11 @@ debug(new);
 		}
 
 		free2(res);
+		free2(rule_type); rule_type = 0;
+		free2(param1);    param1    = 0;
+		free2(param2);    param2    = 0;
 	}
+
 	free2(param1_old);
 
 	/* set new policy */	
@@ -7373,7 +7380,7 @@ void domain_reshape_rules()
 
 	domain_reshape_rules_remove_tomld_dir();
 	
-//	domain_reshape_rules_temp_dir();
+	domain_reshape_rules_temp_dir();
 
 	sand_clock(0);
 	domain_cleanup();
