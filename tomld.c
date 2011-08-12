@@ -3920,7 +3920,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 						d_rules = d_rules * d_rules * const_domain_complexity_factor;
 						/* if a particular cpu time has grown compared to the domain complexity
 						 * since the last time of domain change, then i switch domain to enforcing mode */
-						if (d_rules < d_cputime + p_cputime) flag_enforcing = 1;
+						if (d_rules <= d_cputime + p_cputime) flag_enforcing = 1;
 
 
 						cputime_all_percent = (d_cputime + p_cputime) * 100 / d_rules;
