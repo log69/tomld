@@ -33,6 +33,7 @@ changelog:
                          - bugfix: never create or copy more than one change_time and cpu_time entry of any domain
                          - bugfix: don't add rules with myuid entries when merging domains on load()
                          - bugfix: add my exe binary to the exception list too and print it too
+                         - bugfix: try to mount security fs only if it doesn't exist in /sys/ yet
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
@@ -3477,7 +3478,8 @@ void check_tomoyo()
 
 	/* check mount state of securityfs */
 	cmd = file_read("/proc/mounts", -1);
-	if (string_search_keyword_first_all(cmd, "none /sys/kernel/security securityfs") == -1){
+	if (string_search_keyword_first_all(cmd, "none /sys/kernel/security securityfs") == -1
+	&& !file_exist("/sys/kernel/security/tomoyo/domain_policy")){
 		int flag_mount = 0;
 		/* mount tomoyo securityfs if not mounted */
 		/* shell command: mount -t securityfs none /sys/kernel/security */
