@@ -47,6 +47,7 @@ changelog:
                          - print system info on startup (/proc/version)
                          - print a warning message if running cycles take too long
                          - wildcard subdirectory names in paths containing random names or only numbers
+                         - don't add domains with executable form of /proc/$PID/exe
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -5195,37 +5196,41 @@ void domain_print_mode()
 		if (pos == -1){
 			char *t;
 			
-			color(prog, blue);
-			color(", no domain, ", clr);
-			color("create domain with learning mode", green);
+			/* don't add domains with executable form of /proc/$PID/exe */
+			if (!string_search_keyword_first(prog, "/proc/")){
+			
+				color(prog, blue);
+				color(", no domain, ", clr);
+				color("create domain with learning mode", green);
 
-			/* if the program is running already, then restart is needed for the rules to take effect */
-			if (process_get_pid(prog)) color(" (restart needed)", red);
+				/* if the program is running already, then restart is needed for the rules to take effect */
+				if (process_get_pid(prog)) color(" (restart needed)", red);
 
-			if (!flag_firstrun) newl();
-			/* create a rule for it */
-			strcat2(&tdomf, "<kernel> ");
-			strcat2(&tdomf, prog);
-			strcat2(&tdomf, "\nuse_profile 1\n");
-			/* add a rule with my unique id and the time in seconds
-			 * to know when i created this domain and when it changed last time
-			 * so i will know from the uptime of the process
-			 * if it was restarted at least once since domain creation */
-			t = string_ltos(time(0));
-			strcat2(&tdomf, myuid_create);
-			strcat2(&tdomf, t);
-			strcat2(&tdomf, "\n");
-			strcat2(&tdomf, myuid_change);
-			strcat2(&tdomf, t);
-			strcat2(&tdomf, "\n");
-			strcat2(&tdomf, myuid_cputime);
-			strcat2(&tdomf, "0\n");
-			free2(t);
+				if (!flag_firstrun) newl();
+				/* create a rule for it */
+				strcat2(&tdomf, "<kernel> ");
+				strcat2(&tdomf, prog);
+				strcat2(&tdomf, "\nuse_profile 1\n");
+				/* add a rule with my unique id and the time in seconds
+				 * to know when i created this domain and when it changed last time
+				 * so i will know from the uptime of the process
+				 * if it was restarted at least once since domain creation */
+				t = string_ltos(time(0));
+				strcat2(&tdomf, myuid_create);
+				strcat2(&tdomf, t);
+				strcat2(&tdomf, "\n");
+				strcat2(&tdomf, myuid_change);
+				strcat2(&tdomf, t);
+				strcat2(&tdomf, "\n");
+				strcat2(&tdomf, myuid_cputime);
+				strcat2(&tdomf, "0\n");
+				free2(t);
 
-			/* store prog name to know not to switch these ones to enforcing mode on exit */
-			if (string_search_line(tprogs_learn, prog) == -1){
-				strcat2(&tprogs_learn, prog);
-				strcat2(&tprogs_learn, "\n");
+				/* store prog name to know not to switch these ones to enforcing mode on exit */
+				if (string_search_line(tprogs_learn, prog) == -1){
+					strcat2(&tprogs_learn, prog);
+					strcat2(&tprogs_learn, "\n");
+				}
 			}
 		}
 		else{
