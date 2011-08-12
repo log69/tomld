@@ -8426,7 +8426,7 @@ int main(int argc, char **argv)
 
 		/* run policy check from time to time
 		 * or at once if temporary learning mode is requested,
-		 * or also at once if mod time of syslog changed and tomld is having temporary learning mode
+		 * or also at once if mod time of system log changed and tomld is having temporary learning mode
 		 * (only with temp learn mode or else a process could DoS the tomld process),
 		 * and not 30 sec later */
 		if ((mytime() - t) >= const_time_check_long2 || flag_learn3 ||
