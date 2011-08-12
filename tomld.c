@@ -32,6 +32,7 @@ changelog:
                          - bugfix: don't set --notify option if [notify] tag is in config, only tomld client needs it
                          - bugfix: never create or copy more than one change_time and cpu_time entry of any domain
                          - bugfix: don't add rules with myuid entries when merging domains on load()
+                         - bugfix: add my exe binary to the exception list too and print it too
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
@@ -2994,9 +2995,6 @@ void check_instance(){
 	
 	/* signal to write null to pid file on exit */
 	flag_pid = 1;
-
-	/* store path to my executable to a global variable for later */
-	my_exe_path = process_get_path(getpid());
 
 	/* get pid list of the same running processes */
 	pid_list = process_get_pid_list(my_exe_path);
@@ -7844,8 +7842,10 @@ void check_exceptions()
 		strcat2(&tprogs_exc, "\n");
 	}
 
-	/* add my executable too to the list */
+	/* store path to my executable to a global variable */
+	my_exe_path = process_get_path(getpid());
 	if (my_exe_path){
+		/* add my executable too to the list */
 		strcat2(&tprogs_exc, my_exe_path);
 		strcat2(&tprogs_exc, "\n");
 	}
