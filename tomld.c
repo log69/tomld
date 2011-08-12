@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-12/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+13/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -50,6 +50,7 @@ changelog:
                          - wildcard subdirectory names in paths containing random names or only numbers
                          - don't add domains with executable form of /proc/$PID/exe
                          - change target log to read from /var/log/syslog to /var/log/messages
+                         - check tomld directories on startup more efficiently
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -442,7 +443,7 @@ char *tmanf23 = ""
 	"/usr/sbin/tomoyo-ld-watch\n"
 	"/usr/sbin/tomoyo-queryd\n";
 
-char *tdir	= "/etc/tomoyo";
+char *tdir	= "/etc/tomoyo/";
 char *tverk = "/sys/kernel/security/tomoyo/version";
 char *tdom	= "/etc/tomoyo/domain_policy.conf";
 char *texc	= "/etc/tomoyo/exception_policy.conf";
@@ -3630,18 +3631,17 @@ void check_config()
 	if (mail_users)       opt_mail        = 1;
 	/*if (opt_notify2)      opt_notify      = 1;*/
 
-	/* create tomoyo dir if it doesn't exist yet */
-	if (!dir_exist(tdir)){ mkdir(tdir, S_IRWXU); }
+	/* create tomoyo dirs if they don't exist yet */
+	mkdir_recursive(tdir);
+	mkdir_recursive(tpid);
+	mkdir_recursive(tmark);
 
-	/* create tomld dirs if they don't exist yet */
+	/* chmods */
 	mydir = path_get_parent_dir(tpid);
-	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
-	/* chmod 0755 dir */
 	chmod (mydir, strtol(mode, 0, 8));
 	free2(mydir);
+
 	mydir = path_get_parent_dir(tmark);
-	if (!dir_exist(mydir)){ mkdir(mydir, S_IRWXU); }
-	/* chmod 0755 dir */
 	chmod (mydir, strtol(mode, 0, 8));
 	free2(mydir);
 }
