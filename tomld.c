@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-11/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+12/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -1534,14 +1534,14 @@ char *domain_get_next(char **text)
 
 	/* search for first keyword */
 	text2 = (*text);
-	start = string_search_keyword(text2, key);
+	start = string_search_keyword_first_all(text2, key);
 	
 	/* fail if no match */
 	if (start == -1) return 0;
 
 	/* move position to the end of keyword and search for second keyword */
 	text2 += start + keyl;
-	end = string_search_keyword(text2, key);
+	end = string_search_keyword_first_all(text2, key);
 	/* if reached the end of text, then use that as the remaining part of domain block */
 	if (end == -1){
 		end = 0;
@@ -1583,17 +1583,18 @@ char *domain_get_next(char **text)
 /* returned value must be freed by caller */
 char *domain_get_name(char *domain)
 {
-	char *res, *res2, *temp, *temp2;
+	char *res, *temp;
 	
-	/* get first line containing the name of the domain */
-	temp = domain;
-	res = string_get_next_line(&temp);
-	if (!res) return 0;
-	/* get second word for domain name */
-	temp2 = res;
-	res2 = string_get_next_wordn(&temp2, 1);
-	free2(res);
-	return res2;
+	/* search for line with kernel tag */
+	int i = string_search_keyword_first_all(domain, "<kernel>");
+	if (i > -1){
+		/* name is after kernel tag */
+		temp = domain + i;
+		/* get second word for domain name */
+		res = string_get_next_wordn(&temp, 1);
+		return res;
+	}
+	return 0;
 }
 
 
@@ -1601,18 +1602,20 @@ char *domain_get_name(char *domain)
 /* returned value must be freed by caller */
 char *domain_get_name_full(char *domain)
 {
-	char *res, *res2, *temp, *temp2;
+	char *res, *temp;
 	
-	/* get first line containing the name of the domain */
-	temp = domain;
-	res = string_get_next_line(&temp);
-	if (!res) return 0;
-	/* get everything except first word for domain name */
-	temp2 = res;
-	res2 = string_get_next_word(&temp2); free2(res2);
-	res2 = string_get_next_line(&temp2);
-	free2(res);
-	return res2;
+	/* search for line with kernel tag */
+	int i = string_search_keyword_first_all(domain, "<kernel>");
+	if (i > -1){
+		/* name is after kernel tag */
+		temp = domain + i;
+		/* get all line from second word for full domain name */
+		res = string_get_next_word(&temp);
+		free2(res);
+		res = string_get_next_line(&temp);
+		return res;
+	}
+	return 0;
 }
 
 
@@ -1620,17 +1623,18 @@ char *domain_get_name_full(char *domain)
 /* returned value must be freed by caller */
 char *domain_get_name_sub(char *domain)
 {
-	char *res, *res2, *temp, *temp2;
+	char *res, *temp;
 	
-	/* get first line containing the name of the domain */
-	temp = domain;
-	res = string_get_next_line(&temp);
-	if (!res) return 0;
-	/* get last word for main or subdomain name */
-	temp2 = res;
-	res2 = string_get_last_word(&temp2);
-	free2(res);
-	return res2;
+	/* search for line with kernel tag */
+	int i = string_search_keyword_first_all(domain, "<kernel>");
+	if (i > -1){
+		/* name is after kernel tag */
+		temp = domain + i;
+		/* get last word for subdomain name */
+		res = string_get_last_word(&temp);
+		return res;
+	}
+	return 0;
 }
 
 
@@ -1697,7 +1701,7 @@ int domain_get_creation_time(char *prog)
 	
 	char *domain = domain_get(prog);
 	if (domain){
-		int i = string_search_keyword(domain, myuid_create);
+		int i = string_search_keyword_first_all(domain, myuid_create);
 		if (i > -1){
 			char *res, *res2;
 			temp = domain + i;
@@ -1839,23 +1843,20 @@ int domain_exist(const char *text)
 
 /* return profile number of domain (0-3) from text position */
 /* return -1 on fail */
-int domain_get_profile(char *text)
+int domain_get_profile(char *domain)
 {
 	int i, p;
 	char *key = "use_profile ";
 	int keyl = 12;
 	
 	/* search for the keyword */
-	i = string_search_keyword(text, key);
+	i = string_search_keyword_first_all(domain, key);
 	
 	/* if match */
 	if (i > -1){
-		/* former char should be a newline */
-		if (i < 1) return -1;
-		if (text[i - 1] != '\n') return -1;
-		/* get numer */
+		/* get number */
 		i += keyl;
-		p = string_ctoi(text[i]);
+		p = string_ctoi(domain[i]);
 		return p;
 	}
 	
@@ -3476,7 +3477,7 @@ void check_tomoyo()
 
 	/* check mount state of securityfs */
 	cmd = file_read("/proc/mounts", -1);
-	if (string_search_keyword(cmd, "none /sys/kernel/security securityfs") == -1){
+	if (string_search_keyword_first_all(cmd, "none /sys/kernel/security securityfs") == -1){
 		int flag_mount = 0;
 		/* mount tomoyo securityfs if not mounted */
 		/* shell command: mount -t securityfs none /sys/kernel/security */
@@ -3507,7 +3508,7 @@ void check_tomoyo()
 	if (file_exist(tdom)){
 		tdomf = file_read(tdom, 0);
 		/* my unique id matches in domain policy? */
-		if (string_search_keyword(tdomf, myuid) == -1){
+		if (string_search_keyword_first_all(tdomf, myuid) == -1){
 			backup();
 			clear();
 			/* set incompatibility flag to print message later, so it gets into the log file too */
@@ -3843,7 +3844,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 		/* get process uptime of domain */
 		p_uptime = process_get_least_uptime(name);
 		/* get creation time of domain */
-		i = string_search_keyword(domain, myuid_create);
+		i = string_search_keyword_first_all(domain, myuid_create);
 		if (i > -1){
 			temp = domain + i;
 			/* get my unique id with the creation time in it */
@@ -3864,7 +3865,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 				p_cputime = process_get_cpu_time_all(name, 0);
 				/* get the formerly stored cpu time of domain */
 				d_cputime = 0;
-				i = string_search_keyword(domain, myuid_cputime);
+				i = string_search_keyword_first_all(domain, myuid_cputime);
 				if (i > -1){
 					temp = domain + i;
 					/* get my unique id with the cpu time in it */
@@ -3877,7 +3878,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 				}
 
 				/* get last change time of domain */
-				i = string_search_keyword(domain, myuid_change);
+				i = string_search_keyword_first_all(domain, myuid_change);
 				if (i > -1){
 					temp = domain + i;
 					/* get my unique id with the last change time in it */
@@ -4459,14 +4460,13 @@ void domain_set_enforce_old()
 					/* get domain name */
 					prog = domain_get_name(res);
 					prog_sub = domain_get_name_sub(res);
-					prog_full = domain_get_name_full(res);
 
 					/* check if it's not a newly created domain */
 					if (string_search_line(tprogs_learn, prog_sub) == -1){
 						int i = string_search_line(tprogs_exc, prog_sub);
 						/* check if not an exception domain */
 						/* or if an exception domain, check if it's not a main domain */
-						if ((i == -1) || (i != -1 && strcmp(prog, prog_full))){
+						if ((i == -1) || (i != -1 && !domain_main_exist(prog))){
 
 							/* print info once */
 							if (!flag_turned){
@@ -4484,7 +4484,6 @@ void domain_set_enforce_old()
 					}
 					free2(prog);
 					free2(prog_sub);
-					free2(prog_full);
 				}
 				free2(res);
 			}
@@ -4513,7 +4512,6 @@ void domain_set_enforce_old()
 				if (m == 1 || m == 2){
 					/* get domain name */
 					prog = domain_get_name(res);
-					prog_sub = domain_get_name_sub(res);
 					prog_full = domain_get_name_full(res);
 					if (prog && prog_full){
 
@@ -4549,7 +4547,6 @@ void domain_set_enforce_old()
 						}
 					}
 					free2(prog);
-					free2(prog_sub);
 					free2(prog_full);
 				}
 				free2(res);
@@ -4604,7 +4601,7 @@ void domain_get_log()
 		/* get messages only from mark, so jump to mark if it exists */
 		start = tlogf;
 		if (tmarkf){
-			i = string_search_keyword(start, tmarkf);
+			i = string_search_keyword_first_all(start, tmarkf);
 			if (i > -1){
 				start += i;
 				/* jump after the next line where i found the log mark */
@@ -7472,6 +7469,7 @@ void domain_update_change_time()
 					/* if no match, then update current domain's policy by
 					 * copying every rule except my uuid that i change before */
 					int flag_one_change_entry = 0;
+					temp3 = d1;
 					while(1){
 						/* get next rule */
 						res = string_get_next_line(&temp3);
@@ -8003,7 +8001,7 @@ void check_processes()
 							mysock = path_link_read(mydir_name2);
 							if (mysock){
 								/* does it contain a name like "socket:"? */
-								if (string_search_keyword(mysock, "socket:") > -1){
+								if (string_search_keyword_first_all(mysock, "socket:") > -1){
 									/* is the inode number in netf3's list? */
 									if (string_search_line(netf3, mysock) > -1){
 										/* is it in my progs list yet? */
