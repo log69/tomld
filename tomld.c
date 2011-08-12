@@ -32,7 +32,6 @@ changelog:
                          - bugfix: don't set --notify option if [notify] tag is in config, only tomld client needs it
                          - bugfix: never create or copy more than one change_time and cpu_time entry of any domain
                          - bugfix: don't add rules with myuid entries when merging domains on load()
-                         - bugfix: add wildcarded create rules to allow_read rule too beside allow_read/write
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
@@ -6994,7 +6993,7 @@ void domain_reshape_rules_create_double()
 	char *rule_type, *param1, *param2;
 	char *tdomf_new;
 	
-	char *cre[] = {"allow_create", "allow_read", "allow_read/write", "allow_write", "allow_unlink",
+	char *cre[] = {"allow_create", "allow_read/write", "allow_write", "allow_unlink",
 		"allow_truncate", 0};
 		
 	/* alloc mem for new policy */
