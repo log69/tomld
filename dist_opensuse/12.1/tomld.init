@@ -1,0 +1,38 @@
+#!/bin/sh
+# tomld service script
+
+### BEGIN INIT INFO
+# Provides:          tomld
+# Required-Start:    $remote_fs
+# Required-Stop:     $remote_fs
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: tomoyo learning daemon
+# Description:       fully automatic MAC configuration
+### END INIT INFO
+
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
+DAEMON=/usr/sbin/tomld
+LOGFILE=/var/log/tomld.log
+
+case $1 in
+	start)
+		startproc $DAEMON --log $LOGFILE
+		;;
+	stop)
+		killproc -t 60 $DAEMON
+		;;
+	restart)
+		$0 stop
+		$0 start
+		;;
+	force-reload)
+		;;
+	learn)
+		$DAEMON --learn
+		;;
+	*)
+		echo "Usage: $0 {start|stop|restart|learn}"
+		;;
+esac
