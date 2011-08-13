@@ -398,7 +398,7 @@ int file_exist(const char *name)
 /* mkdir recursively (input can be file too, not only dir) */
 void mkdir_recursive(char *dir)
 {
-	const int max_iter = 16;
+	const int max_iter = 32;
 	int i, l;
 	
 	if (!dir) return;
@@ -414,7 +414,7 @@ void mkdir_recursive(char *dir)
 			/* create dir */
 			mkdir(d, S_IRWXU);
 			i++;
-			if (i > l) break;
+			if (i > l || i > max_iter) break;
 		}
 	}
 }
