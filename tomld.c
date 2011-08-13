@@ -51,8 +51,8 @@ changelog:
                          - print a warning message if running cycles take too long
                          - wildcard subdirectory names in paths containing random names or only numbers
                          - don't add domains with executable form of /proc/$PID/exe
-                         - change target log to read from /var/log/syslog to /var/log/messages
                          - check tomld directories on startup more efficiently
+                         - search for target system logs to read from on startup (/var/log/syslog, kern.log, messages)
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
