@@ -466,7 +466,10 @@ char *texcf_bak3 = 0;
 char *tmarkf_bak3 = 0;
 
 /* system log */
-char *tlog	= "/var/log/messages";
+char *tsyslog1	= "/var/log/syslog";
+char *tsyslog2	= "/var/log/kern.log";
+char *tsyslog3	= "/var/log/messages";
+char *tlog	= 0;
 char *tlogf = 0;
 int tlogf_mod_time = -1;
 int tlearnf_mod_time = -1;
@@ -729,6 +732,7 @@ void myfree()
 	free2(opt_info2);
 	free2(opt_remove2);
 	free2(tmarkf);
+	free2(tlog);
 	free2(tlogf);
 	free2(tdomf_bak);
 	free2(tdomf_bak2);
@@ -8250,6 +8254,11 @@ void myinit()
 	string_add_line_uniq(&tomld_path, res); free2(res);
 	res = path_get_dir(tspec);
 	string_add_line_uniq(&tomld_path, res); free2(res);
+
+	/* choose log file */
+	if      (file_exist(tsyslog1)) strcpy2(&tlog, tsyslog1);
+	else if (file_exist(tsyslog2)) strcpy2(&tlog, tsyslog2);
+	else                           strcpy2(&tlog, tsyslog3);
 }
 
 
