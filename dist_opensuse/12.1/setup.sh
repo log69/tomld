@@ -33,7 +33,7 @@ rm -rf "$TEMP"
 # grub update
 # change linux boot parameters in grub for tomoyo and prompt for reboot
 # linux has to start with "security=tomoyo" kernel parameter to activate tomoyo
-GRUB_DEFAULT="/etc/sysconfig/bootloader"
+GRUB_DEFAULT="/boot/grub/menu.lst"
 KERNEL_CMDLINE="/proc/cmdline"
 
 # searching for grub settings
@@ -41,14 +41,9 @@ if [ -f "$GRUB_DEFAULT" ]; then
 
 	# add kernel parameter to grub config
 	echo "* checking grub config"
-	if ! grep -E "^ *DEFAULT_APPEND" "$GRUB_DEFAULT" | grep -q "security=tomoyo"
+	if ! sudo grep "kernel" "$GRUB_DEFAULT" | grep -q "security=tomoyo"
 	then
-		if grep -qE "^ *DEFAULT_APPEND *=" "$GRUB_DEFAULT"
-		then
-			sudo sed -i -r s/"^ *DEFAULT_APPEND *= *\""/"DEFAULT_APPEND=\"security=tomoyo "/ "$GRUB_DEFAULT"
-		else
-			sudo echo "DEFAULT_APPEND=\"security=tomoyo\"" >> "$GRUB_DEFAULT"
-		fi
+		sudo sed -i s/"root="/"security=tomoyo root="/ "$GRUB_DEFAULT"
 		echo "* kernel parameter added"
 
 		echo "* done"
