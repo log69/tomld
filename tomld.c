@@ -34,6 +34,7 @@ changelog:
                          - bugfix: don't add rules with myuid entries when merging domains on load()
                          - bugfix: add my exe binary to the exception list too and print it too
                          - bugfix: try to mount security fs only if it doesn't exist in /sys/ yet
+                         - bugfix: search for security=tomoyo kernel parameter without extra leading space
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
@@ -3471,7 +3472,7 @@ void check_tomoyo()
 
 	/* check kernel command line */
 	cmd = file_read("/proc/cmdline", -1);
-	if (string_search_keyword(cmd, " security=tomoyo") == -1){
+	if (string_search_keyword(cmd, "security=tomoyo") == -1){
 		free2(cmd);
 		error("error: tomoyo kernel mode is not activated\n");
 		myexit(1);
