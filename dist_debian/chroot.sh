@@ -62,7 +62,7 @@ echo
 echo "deleting files..."
 rm -f tomld_*.*
 echo "copying files back..."
-cp -f "$CHROOTDIR""$BASE"/dist_debian/tomld_*  ./
+cp -f "$CHROOTDIR""$BASE"/dist_debian/tomld_*.deb  ./
 cp -f "$CHROOTDIR""$BASE"/dist_debian/changelog  ./
 chown andras:andras tomld_* changelog
 
