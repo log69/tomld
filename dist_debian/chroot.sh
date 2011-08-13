@@ -59,8 +59,8 @@ BASE="/home/$MYUSER/development/tomld"
 
 cd "$BASE"/dist_debian/
 echo
-#echo "deleting files..."
-#rm -f tomld_*.gz tomld_*.dsc tomld_*.changes tomld_*.build tomld_*.deb
+echo "deleting files..."
+rm -f tomld_*.*
 echo "copying files back..."
 cp -f "$CHROOTDIR""$BASE"/dist_debian/tomld_*  ./
 cp -f "$CHROOTDIR""$BASE"/dist_debian/changelog  ./
