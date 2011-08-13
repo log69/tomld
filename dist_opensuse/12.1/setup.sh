@@ -3,8 +3,8 @@
 
 if whoami | grep -q root; then echo "error: no root privileges needed"; exit 1; fi
 
-if ! which gcc;  then sudo zypper in gcc;  fi
-if ! which make; then sudo zypper in make; fi
+if ! which gcc >/dev/null;  then sudo zypper in gcc;  fi
+if ! which make >/dev/null; then sudo zypper in make; fi
 if [ ! -x "/usr/sbin/tomoyo-loadpolicy" ]; then
 	sudo zypper in tomoyo-tools;
 	/usr/lib64/tomoyo/init_policy
