@@ -399,6 +399,7 @@ int file_exist(const char *name)
 void mkdir_recursive(char *dir)
 {
 	int max_iter = 16;
+	
 	char *mydir = path_get_dir(dir);
 	char *mydir2 = 0;
 	
@@ -407,6 +408,7 @@ void mkdir_recursive(char *dir)
 		if (strlen2(&mydir)){
 			/* dir is not root? */
 			if (strcmp(mydir, "/")){
+debug(mydir);
 				/* does dir exist yet? */
 				if (!dir_exist(mydir)){
 					/* create dir */

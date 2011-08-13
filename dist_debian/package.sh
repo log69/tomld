@@ -51,13 +51,13 @@ rm -f README.Debian README.source tomld.cron.d.ex menu.ex
 
 # manage postinst
 grep -E -m 1 -B 1000 "^ *configure\)" postinst.ex > postinst
-cat ../postinst.sh | tail -n+4 >> postinst
+cat ../dist_debian/postinst.sh | tail -n+4 >> postinst
 grep -E -m 1 -A 1000 "^ *configure\)" postinst.ex | tail -n+2 >> postinst
 rm postinst.ex
 
 # manage postrm
 grep -E -m 1 -B 1000 "^ *purge.remove.*\)" postrm.ex > postrm
-cat ../postrm.sh | tail -n+4 >> postrm
+cat ../dist_debian/postrm.sh | tail -n+4 >> postrm
 grep -E -m 1 -A 1000 "^ *purge.remove.*\)" postrm.ex | tail -n+2 >> postrm
 rm postrm.ex
 
@@ -89,7 +89,7 @@ echo "usr/share/applications" 	>> dirs
 echo "README"		>> docs
 echo "FAQ"			>> docs
 
-cp ../tomld.control ./control
+cp ../dist_debian/control .
 #cp ../tomld.manual ./tomld.1
 #echo "debian/tomld.1" > ./tomld.manpages
 cp ../tomld.init ./init.d
