@@ -398,39 +398,23 @@ int file_exist(const char *name)
 /* mkdir recursively (input can be file too, not only dir) */
 void mkdir_recursive(char *dir)
 {
-	int max_iter = 16;
+	const int max_iter = 16;
+	int i, l;
 	
-	char *mydir = path_get_dir(dir);
-	char *mydir2 = 0;
-	
-	while(max_iter--){
-		/* create dir if it doesn't exist yet */
-		if (strlen2(&mydir)){
-			/* dir is not root? */
-			if (strcmp(mydir, "/")){
-debug(mydir);
-				/* does dir exist yet? */
-				if (!dir_exist(mydir)){
-					/* create dir */
-					mkdir(mydir, S_IRWXU);
-				}
-			}
-		}
+	if (!dir) return;
 
-		/* store dir */
-		strcpy2(&mydir2, mydir);
-
-		/* get parent dir */
-		free2(mydir);
-		mydir = path_get_parent_dir(mydir2);
-
-		/* do they match? if so, then i reached root dir, so success and exit */
-		if (mydir && mydir2){
-			if (!strcmp(mydir, mydir2)){
-				free2(mydir);
-				free2(mydir2);
-				break;
-			}
+	/* get number of subdirs */	
+	l = path_count_subdirs_name(dir);
+	if (l > 1){
+		i = 2;
+		/* mkdir recursively */
+		while(1){
+			/* get first subdirs of path */
+			char *d = path_get_subdirs_name(dir, i);
+			/* create dir */
+			mkdir(d, S_IRWXU);
+			i++;
+			if (i > l) break;
 		}
 	}
 }
