@@ -16,6 +16,8 @@ tar xf tomld.tgz
 
 cd tomld
 
+cp -f dist_opensuse/12.1/tomld.init .
+
 make
 
 make install
