@@ -1,8 +1,5 @@
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
-
 Format: 1.8
-Date: Fri, 12 Aug 2011 22:37:20 +0000
+Date: Sat, 13 Aug 2011 10:43:28 +0000
 Source: tomld
 Binary: tomld
 Architecture: source amd64
@@ -18,25 +15,17 @@ Changes:
  .
    * New upstream release
 Checksums-Sha1: 
- 6d94781da930a6b9e9efdd93be2e335d22d4787f 967 tomld_0.40-1.dsc
- 1c06c517757ea12abd2fe408d467bff2abae97b5 97458 tomld_0.40.orig.tar.gz
- ea8b8f65cdbef52a4f9893393b72e8a1d38d983d 5599 tomld_0.40-1.debian.tar.gz
- 608c00ff4ef0417f68aa06c2efa4d1d239dafa3f 62068 tomld_0.40-1_amd64.deb
+ 9a2b5b0456d51bdf0cc476d8fcc6a2a70149eb23 724 tomld_0.40-1.dsc
+ 2517f0acdd85b4736f8e11c702e887ef2c443210 332961 tomld_0.40.orig.tar.gz
+ 15be5d3ef4e2f3cda837da32d38c88f6fab194c6 5593 tomld_0.40-1.debian.tar.gz
+ 354c175ec329c73af5cf0085554c70d424c9a1e5 61968 tomld_0.40-1_amd64.deb
 Checksums-Sha256: 
- 9e7840d08221e2034f4a098ab27397cf81d36f84ca188562a61e220cbc93e99b 967 tomld_0.40-1.dsc
- 546eb56a2e2ff483a87742ad93a6dcb2d8c5d441e010d4441e4fcc011e4e94e8 97458 tomld_0.40.orig.tar.gz
- 3a1d75c9eb99aba7c4da79be64a272705ec3e5a4c86f0a713ce0f4cd60d24106 5599 tomld_0.40-1.debian.tar.gz
- 5619a893379d8fc0422b7ee628db1aa670440bf59c71df389dae19a4ef3e6729 62068 tomld_0.40-1_amd64.deb
+ a77bf2a7a51993484d28fab069dde63e319ba912c2ca9fc06e23889839509aae 724 tomld_0.40-1.dsc
+ c1f9c7dabfbcee0d819dbbc16c38f33c2ca2452e55138aa83d73245e18e43b92 332961 tomld_0.40.orig.tar.gz
+ 998ec6d3fc8e00f1a433889fbbc9842f06dbf81de6ee8c72f2cb9b9437c6f031 5593 tomld_0.40-1.debian.tar.gz
+ 2612532f4ac8df07264745615f114d4468d81923849da7e3241e793bce9bc1ea 61968 tomld_0.40-1_amd64.deb
 Files: 
- 2f6ebf278ec097f17bb981949b87d5a8 967 admin optional tomld_0.40-1.dsc
- ec4a65ec7d99d384785216a2db008b07 97458 admin optional tomld_0.40.orig.tar.gz
- 167e73b9736adf89f864ee349bd3e29c 5599 admin optional tomld_0.40-1.debian.tar.gz
- b59212fccdd36e7eebea7b2e83e036fe 62068 admin optional tomld_0.40-1_amd64.deb
-
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1.4.11 (GNU/Linux)
-
-iEYEARECAAYFAk5FqzAACgkQAx9+mHylNBjyHgCgvh5rNkcYjWKxMuZPfT1EQaOT
-h5wAnAySNmfK5WuoKxr9d7l8Z41TwYtF
-=QjcU
------END PGP SIGNATURE-----
+ 097fc86a42ac2c28b62b01bbe1b16a27 724 admin optional tomld_0.40-1.dsc
+ 6f8ca41afc299b0d8b066338a915061c 332961 admin optional tomld_0.40.orig.tar.gz
+ cf21941e14425b4d12734d231f72ad52 5593 admin optional tomld_0.40-1.debian.tar.gz
+ c91856b8f7c53ef9e600b395222d8b52 61968 admin optional tomld_0.40-1_amd64.deb

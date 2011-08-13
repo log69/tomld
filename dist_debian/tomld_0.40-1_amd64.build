@@ -13,9 +13,9 @@ dpkg-buildpackage: host architecture amd64
 dh clean 
    dh_testdir
    dh_auto_clean
-make[1]: Entering directory `/tmp/tmp.wGgbywgwy8/tomld-0.40'
+make[1]: Entering directory `/tmp/tmp.qAAaopyZpd/tomld-0.40'
 rm -f tomld *.o
-make[1]: Leaving directory `/tmp/tmp.wGgbywgwy8/tomld-0.40'
+make[1]: Leaving directory `/tmp/tmp.qAAaopyZpd/tomld-0.40'
    dh_clean
  dpkg-source -b tomld-0.40
 dpkg-source: info: using source format `3.0 (quilt)'
@@ -27,13 +27,15 @@ dh build
    dh_testdir
    dh_auto_configure
    dh_auto_build
-make[1]: Entering directory `/tmp/tmp.wGgbywgwy8/tomld-0.40'
+make[1]: Entering directory `/tmp/tmp.qAAaopyZpd/tomld-0.40'
 cc -O2 -Wall -pedantic -Wcomment -Wextra   -c -o tomld.o tomld.c
 cc -O2 -Wall -pedantic -Wcomment -Wextra   -c -o tio.o tio.c
+tio.c: In function 'mkdir_recursive':
+tio.c:401:12: warning: unused variable 'max_iter' [-Wunused-variable]
 cc -O2 -Wall -pedantic -Wcomment -Wextra   -c -o tpath.o tpath.c
 cc -O2 -Wall -pedantic -Wcomment -Wextra   -c -o tstring.o tstring.c
 cc -O2 -Wall -pedantic -Wcomment -Wextra -o tomld  tomld.o tio.o tpath.o tstring.o
-make[1]: Leaving directory `/tmp/tmp.wGgbywgwy8/tomld-0.40'
+make[1]: Leaving directory `/tmp/tmp.qAAaopyZpd/tomld-0.40'
    dh_auto_test
  fakeroot debian/rules binary
 dh binary 
@@ -41,27 +43,27 @@ dh binary
    dh_prep
    dh_installdirs
    debian/rules override_dh_auto_install
-make[1]: Entering directory `/tmp/tmp.wGgbywgwy8/tomld-0.40'
+make[1]: Entering directory `/tmp/tmp.qAAaopyZpd/tomld-0.40'
 dh_install ./tomld_learn.desktop usr/share/applications
 dh_install ./tomld_notify.desktop usr/share/applications
 dh_install ./tomld.svg usr/share/pixmaps
 dh_auto_install
-make[2]: Entering directory `/tmp/tmp.wGgbywgwy8/tomld-0.40'
-test -d /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr                || mkdir /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr
-test -d /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/sbin           || mkdir /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/sbin
-test -d /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/share          || mkdir /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/share
-test -d /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/share/man      || mkdir /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/share/man
-test -d /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/share/man/man1 || mkdir /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/share/man/man1
-test -d /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/etc                     || mkdir /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/etc
-test -d /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/etc/init.d              || mkdir /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/etc/init.d
-test -d /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/etc/tomld               || mkdir /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/etc/tomld
-install --mode 0755 tomld /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/sbin/
-install --mode 0755 tomld.init /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/etc/init.d/tomld
-install --mode 0644 tomld.conf /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/etc/tomld/
-install --mode 0644 tomld.manual /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/usr/share/man/man1/tomld.1
-test ! -x /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/sbin/insserv || /tmp/tmp.wGgbywgwy8/tomld-0.40/debian/tomld/sbin/insserv tomld
-make[2]: Leaving directory `/tmp/tmp.wGgbywgwy8/tomld-0.40'
-make[1]: Leaving directory `/tmp/tmp.wGgbywgwy8/tomld-0.40'
+make[2]: Entering directory `/tmp/tmp.qAAaopyZpd/tomld-0.40'
+test -d /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr                || mkdir /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr
+test -d /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/sbin           || mkdir /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/sbin
+test -d /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/share          || mkdir /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/share
+test -d /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/share/man      || mkdir /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/share/man
+test -d /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/share/man/man1 || mkdir /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/share/man/man1
+test -d /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/etc                     || mkdir /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/etc
+test -d /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/etc/init.d              || mkdir /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/etc/init.d
+test -d /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/etc/tomld               || mkdir /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/etc/tomld
+install --mode 0755 tomld /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/sbin/
+install --mode 0755 tomld.init /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/etc/init.d/tomld
+install --mode 0644 tomld.conf /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/etc/tomld/
+install --mode 0644 tomld.manual /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/usr/share/man/man1/tomld.1
+test ! -x /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/sbin/insserv || /tmp/tmp.qAAaopyZpd/tomld-0.40/debian/tomld/sbin/insserv tomld
+make[2]: Leaving directory `/tmp/tmp.qAAaopyZpd/tomld-0.40'
+make[1]: Leaving directory `/tmp/tmp.qAAaopyZpd/tomld-0.40'
    dh_install
    dh_installdocs
    dh_installchangelogs
@@ -114,7 +116,3 @@ W: tomld: su-wrapper-not-su-to-root usr/share/applications/tomld_learn.desktop g
 Finished running lintian.
 Now signing changes and any dsc files...
  signfile tomld_0.40-1.dsc 7CA53418
-
- signfile tomld_0.40-1_amd64.changes 7CA53418
-
-Successfully signed dsc and changes files
