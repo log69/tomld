@@ -21,7 +21,7 @@ case $1 in
 		start-stop-daemon --oknodo --start --exec $DAEMON --background -- --log $LOGFILE
 		;;
 	stop)
-		start-stop-daemon --oknodo --stop --exec $DAEMON --retry 1
+		start-stop-daemon --oknodo --stop --exec $DAEMON --retry 60
 		;;
 	restart)
 		$0 stop

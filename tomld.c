@@ -35,6 +35,7 @@ changelog:
                          - bugfix: add my exe binary to the exception list too and print it too
                          - bugfix: try to mount security fs only if it doesn't exist in /sys/ yet
                          - bugfix: search for security=tomoyo kernel parameter without extra leading space
+                         - bugfix: wait at least 60 seconds instead of 1 in service script when running start-stop-daemon
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
