@@ -9,15 +9,15 @@ wget http://log69.com/downloads/tomld.tgz
 tar xf tomld.tgz
 if uname -m | grep -iq "x86_64"; then
 	if lsb_release -d | grep -iq "ubuntu"; then
-		sudo dpkg -i tomld/debian/tomld*amd64*.deb
+		sudo dpkg -i tomld/dist_debian/tomld*amd64*.deb
 	else
-		su -c "dpkg -i tomld/debian/tomld*amd64*.deb"
+		su -c "dpkg -i tomld/dist_debian/tomld*amd64*.deb"
 	fi
 else
 	if lsb_release -d | grep -iq "ubuntu"; then
-		sudo dpkg -i tomld/debian/tomld*i386*.deb
+		sudo dpkg -i tomld/dist_debian/tomld*i386*.deb
 	else
-		su -c "dpkg -i tomld/debian/tomld*i386*.deb"
+		su -c "dpkg -i tomld/dist_debian/tomld*i386*.deb"
 	fi
 fi
 
