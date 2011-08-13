@@ -1,10 +1,14 @@
 #!/bin/sh
+# tomld opensuse script to install from source
 
-if ! whoami | grep -q root; then echo "error: root privileges needed"; exit 1; fi
+if whoami | grep -q root; then echo "error: no root privileges needed"; exit 1; fi
 
-zypper in gcc make tomoyo-tools
-
-/usr/lib64/tomoyo/init_policy
+if ! which gcc;  then sudo zypper in gcc;  fi
+if ! which make; then sudo zypper in make; fi
+if ! which tomoyo_loadpolicy; then
+	sudo zypper in tomoyo-tools;
+	/usr/lib64/tomoyo/init_policy
+fi
 
 
 TEMP=$(mktemp -d)
@@ -20,7 +24,7 @@ cp -f dist_opensuse/12.1/tomld.init .
 
 make
 
-make install
+sudo make install
 
 cd
 rm -rf "$TEMP"
