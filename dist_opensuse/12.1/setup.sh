@@ -45,9 +45,9 @@ if [ -f "$GRUB_DEFAULT" ]; then
 	then
 		if grep -qE "^ *DEFAULT_APPEND *=" "$GRUB_DEFAULT"
 		then
-			sed -i -r s/"^ *DEFAULT_APPEND *= *\""/"DEFAULT_APPEND=\"security=tomoyo "/ "$GRUB_DEFAULT"
+			sudo sed -i -r s/"^ *DEFAULT_APPEND *= *\""/"DEFAULT_APPEND=\"security=tomoyo "/ "$GRUB_DEFAULT"
 		else
-			echo "DEFAULT_APPEND=\"security=tomoyo\"" >> "$GRUB_DEFAULT"
+			sudo echo "DEFAULT_APPEND=\"security=tomoyo\"" >> "$GRUB_DEFAULT"
 		fi
 		echo "* kernel parameter added"
 
