@@ -5,6 +5,6 @@ Name=Tomld temporary learning mode
 GenericName=Security tool
 Comment=Request temporary learning mode from running tomld service
 Icon=tomld
-Exec=gksu -- /usr/sbin/tomld --learn
+Exec=su-to-root -X -c "/usr/sbin/tomld --learn"
 Terminal=false
 Categories=System;
