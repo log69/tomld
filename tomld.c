@@ -842,6 +842,7 @@ void check_notify()
 								tlog2_mod_time3 = tlog2_mod_time2;
 
 								/* read message */
+								res2 = 0;
 								/* res2 = file_read(tlog2, 0); */
 								f = fopen(tlog2, "rb");
 								if (!f){
@@ -852,25 +853,24 @@ void check_notify()
 								/* get length */
 								fseek(f, 0, SEEK_END);
 								len = ftell(f);
-								/* remember file position, because tlog2 is always appended */
-								if (pos >= len) pos = 0;
-								/* set file pointer to position to read only the end that is changed */
-								fseek(f, pos, SEEK_SET);
-								buff = memget2(len - pos);
-								len2 = fread(buff, len - pos, 1, f);
-								if (len-pos > 0 && len2 < len-pos){
-									error("error: reading file failed: "); error(tlog2); }
-								/* write null to the end of file */
-								buff[len - pos] = 0;
-								/* set dynamic string length */
-								strlenset3(&buff, len - pos);
+								if (len > 0){
+									/* remember file position, because tlog2 is always appended */
+									if (pos >= len) pos = 0;
+									/* set file pointer to position to read only the end that is changed */
+									fseek(f, pos, SEEK_SET);
+									buff = memget2(len - pos);
+									len2 = fread(buff, len - pos, 1, f);
+									/* write null to the end of file */
+									buff[len - pos] = 0;
+									/* set dynamic string length */
+									strlenset3(&buff, len - pos);
+									/* copy text */
+									strcpy2(&res2, buff);
+									free2(buff);
+									/* store new file pointer position */
+									pos = len;
+								}
 								fclose(f);
-								/* copy text */
-								res2 = 0;
-								strcpy2(&res2, buff);
-								free2(buff);
-								/* store new file pointer position */
-								pos = len;
 
 
 								/* file didn't get modified while reading? */
@@ -881,7 +881,7 @@ void check_notify()
 									/* store command */
 									char *temp = opt_notify2;
 									char *comm = string_get_next_line(&temp);
-									color(res2, clr); newl();
+									color(res2, clr);
 									/* add message */
 									strcat2(&comm, " \"");
 									strcat2(&comm, res2);
