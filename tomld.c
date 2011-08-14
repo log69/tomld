@@ -860,6 +860,11 @@ void check_notify()
 									fseek(f, pos, SEEK_SET);
 									buff = memget2(len - pos);
 									len2 = fread(buff, len - pos, 1, f);
+									if (!len2){
+										error("error: cannot read file ");
+										error(tlog2); newl_();
+										exit(1);
+									}
 									/* write null to the end of file */
 									buff[len - pos] = 0;
 									/* set dynamic string length */
