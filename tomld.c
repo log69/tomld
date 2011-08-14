@@ -3635,7 +3635,7 @@ void check_config()
 	if (!spec_replace2)   spec_replace2   = array_copy_to_string_list(spec_replace);
 	if (dirs_recursive)   opt_recursive   = 1;
 	if (mail_users)       opt_mail        = 1;
-	/*if (opt_notify2)      opt_notify      = 1;*/
+	if (opt_notify2)      opt_notify      = 1;
 
 	/* create tomoyo dirs if they don't exist yet */
 	mkdir_recursive(tdir);
