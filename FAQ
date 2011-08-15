@@ -32,7 +32,7 @@ Tomld is a Linux only solution, so you need a Linux kernel version 2.6.30 or abo
 
 On a Debian or Ubuntu system, install tomoyo-tools package. 
 
-The tomld package itself depends on two other packages: libnotify-bin and gksu for the better desktop integration, but these are not necessary. 
+The tomld Debian package itself depends on two other packages: libnotify-bin and su-to-root for the better desktop integration, but these are not necessary. 
 
 
 What are the features?
