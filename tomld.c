@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-13/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+17/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -36,6 +36,7 @@ changelog:
                          - bugfix: try to mount security fs only if it doesn't exist in /sys/ yet
                          - bugfix: search for security=tomoyo kernel parameter without extra leading space
                          - bugfix: wait at least 60 seconds instead of 1 in service script when running start-stop-daemon
+                         - bugfix: don't load (deleted) domains
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
@@ -2531,7 +2532,8 @@ void load()
 {
 	/* vars */
 	char *tdomf_new, *res, *res2, *res3, *temp, *temp2, *temp3, *temp4;
-	char *name1, *name2;
+	char *name, *name1, *name2;
+	int i;
 
 	/* load domain config */
 	free2(tdomf);
@@ -2542,7 +2544,7 @@ void load()
 	texcf = file_read(texck, -1);
 
 
-	/* remove disabled mode entries so runtime will be faster */
+	/* remove disabled mode entries and (deleted) domains */
 	tdomf_new = memget2(MAX_CHAR);
 	temp = tdomf;
 	while(1){
@@ -2553,7 +2555,18 @@ void load()
 
 		/* add domain if not empty */
 		if (domain_get_profile(res)){
-			strcat2(&tdomf_new, res);
+			/* get domain name */
+			name = domain_get_name_full(res);
+			i = 0;
+			if (name){
+				/* is domain (deleted)? */
+				i = string_search_keyword_last(name, "(deleted)");
+				free2(name);
+			}
+			/* add domain if not (deleted) */
+			if (!i){			
+				strcat2(&tdomf_new, res);
+			}
 		}
 		free2(res);
 	}
