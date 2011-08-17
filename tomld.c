@@ -54,6 +54,8 @@ changelog:
                          - don't add domains with executable form of /proc/$PID/exe
                          - check tomld directories on startup more efficiently
                          - search for target system logs to read from on startup (/var/log/syslog, kern.log, messages)
+                         - add date of building to version info
+                         - add date to every line of deny log
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -626,6 +628,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
+	/* built on date b573e6b43a740114e9cc25d368c0262a */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4900,6 +4903,7 @@ void domain_get_log()
 				color(prog, blue);
 				color("  ", clr);
 				color(rule, purple);
+				
 				/* is manual mode on? */
 				if (opt_manual){
 					/* choose if to allow denied rule */
@@ -4919,7 +4923,8 @@ void domain_get_log()
 							/* add rules to new rules */
 							strcat2(&prog_rules_new, res);
 							strcat2(&prog_rules_new, "\n");
-							color("  add rules? (y)\n", clr);
+							color("  add rules? (y) ", clr);
+							mytime_print_date(); newl();
 						}
 						else{
 							/* yes, there is a list */
@@ -4939,11 +4944,13 @@ void domain_get_log()
 								/* add rules to new rules */
 								strcat2(&prog_rules_new, res);
 								strcat2(&prog_rules_new, "\n");
-								color("  add rules? (y)\n", clr);
+								color("  add rules? (y) ", clr);
+								mytime_print_date(); newl();
 							}
 							/* else don't add rules */
 							else{
-								color("  add rules? (n)\n", clr);
+								color("  add rules? (n) ", clr);
+								mytime_print_date(); newl();
 								/* store recent deny logs */
 								strcat2(&log_recent, res);
 								strcat2(&log_recent, "\n");
@@ -4951,7 +4958,8 @@ void domain_get_log()
 						}
 					}
 					else{
-						color("  add rules? (n)\n", clr);
+						color("  add rules? (n) ", clr);
+						mytime_print_date(); newl();
 						/* store recent deny logs */
 						strcat2(&log_recent, res);
 						strcat2(&log_recent, "\n");
