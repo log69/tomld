@@ -60,7 +60,7 @@ if [ -f "$GRUB" ]; then
 
 		sudo /usr/lib/bootloader/bootloader_entry add    $(uname -r | grep -oE "[^\-]*$") $(uname -r) vmlinuz initrd
 		
-		sudo sed -ir s/"^default *[0-9]+"/"default 0"/ "$GRUB"
+		sudo sed -ir s/"^default *[0-9]*$"/"default 0"/ "$GRUB"
 
 		echo "* done"
 		echo "* kernel parameter added"
