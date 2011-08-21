@@ -30,23 +30,39 @@ sudo make install
 cd
 rm -rf "$TEMP"
 
-# grub update
+# grub update, add tomoyo kernel parameter to boot
 # change linux boot parameters in grub for tomoyo and prompt for reboot
 # linux has to start with "security=tomoyo" kernel parameter to activate tomoyo
-GRUB_DEFAULT="/boot/grub/menu.lst"
+GRUB="/boot/grub/menu.lst"
 KERNEL_CMDLINE="/proc/cmdline"
+SETTING="/etc/sysconfig/bootloader"
+ENTRY="DEFAULT_APPEND"
+PARAM="security=tomoyo"
 
 # searching for grub settings
-if [ -f "$GRUB_DEFAULT" ]; then
+if [ -f "$GRUB" ]; then
 
 	# add kernel parameter to grub config
 	echo "* checking grub config"
-	if ! sudo grep "kernel" "$GRUB_DEFAULT" | grep -q "security=tomoyo"
+	if ! sudo grep "kernel" "$GRUB" | grep -q "$PARAM"
 	then
-		sudo sed -i s/"root="/"security=tomoyo root="/ "$GRUB_DEFAULT"
-		echo "* kernel parameter added"
+		echo "* add kernel parameter"
+
+		if sudo grep -q "$ENTRY" "$SETTING"
+		then
+			if ! sudo grep "$ENTRY" "$SETTING" | grep -q "$PARAM"
+			then
+				sudo sed -ir s/"$ENTRY *= *\""/"$ENTRY=\"$PARAM "/ "$SETTING"
+			fi
+		else
+			echo "$ENTRY=\"$PARAM\"" | sudo tee -a "$SETTING"
+		fi
+
+		sudo /usr/lib/bootloader/bootloader_entry remove $(uname -r | grep -oE "[^\-]*$") $(uname -r) vmlinuz initrd
+		sudo /usr/lib/bootloader/bootloader_entry add    $(uname -r | grep -oE "[^\-]*$") $(uname -r) vmlinuz initrd
 
 		echo "* done"
+		echo "* kernel parameter added"
 		echo
 		echo "*****************************************************"
 		echo "*** reboot is needed to activate tomoyo for tomld ***"
@@ -60,9 +76,9 @@ else
 	echo "* grub settings not found"
 
 	# kernel started with tomoyo enabled?
-	if ! grep -q "security=tomoyo" "$KERNEL_CMDLINE"
+	if ! grep -q "$PARAM" "$KERNEL_CMDLINE"
 	then
-		echo "* kernel parameter 'tomoyo=security' has to be specified on boot manually"
+		echo "* kernel parameter '$PARAM' has to be specified on boot manually"
 		echo
 		echo "*****************************************************"
 		echo "*** reboot is needed to activate tomoyo for tomld ***"
