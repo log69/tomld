@@ -58,9 +58,7 @@ if [ -f "$GRUB" ]; then
 			echo "$ENTRY=\"$PARAM\"" | sudo tee -a "$SETTING"
 		fi
 
-		sudo /usr/lib/bootloader/bootloader_entry add    $(uname -r | grep -oE "[^\-]*$") $(uname -r) vmlinuz initrd
-		
-		sudo sed -ir s/"^default *[0-9]*$"/"default 0"/ "$GRUB"
+		sudo /usr/lib/bootloader/bootloader_entry add $(uname -r | grep -oE "[^\-]*$") $(uname -r) vmlinuz initrd force-default
 
 		echo "* done"
 		echo "* kernel parameter added"
