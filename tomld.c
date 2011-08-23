@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-17/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+23/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -37,6 +37,7 @@ changelog:
                          - bugfix: search for security=tomoyo kernel parameter without extra leading space
                          - bugfix: wait at least 60 seconds instead of 1 in service script when running start-stop-daemon
                          - bugfix: don't load (deleted) domains
+                         - bugfix: compare max time (2 weeks) to domain creation time instead of last change
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
@@ -628,7 +629,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sun Aug 21 15:23:05 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sun Aug 21 15:58:57 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -3930,7 +3931,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 					 * or is the domain's last change time greater than const_time_max_change?
 					 * if so, then i switch the domain to enforcing mode */
 					flag_enforcing = 0;
-					if (d_change > const_time_max_change && d_cputime + p_cputime > const_min_cputime) flag_enforcing = 1;
+					if (d_create > const_time_max_change && d_cputime + p_cputime > const_min_cputime) flag_enforcing = 1;
 					if (!flag_enforcing){
 						/* a minimum time has to pass since last domain change to let the
 						 * completness of domain grow, or else i reset cpu time of processes
