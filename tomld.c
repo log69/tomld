@@ -636,7 +636,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 12:59:29 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 13:04:20 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -691,8 +691,8 @@ void help() {
 	printf ("    -n   --notify  [command] run the command with appended info messages\n");
 	printf ("                             (should be run on a desktop as normal user)\n");
 	printf ("         --log        [file] redirect stderr and stdout to this file\n");
+	printf ("         --no-crypt          disable lookup of mounted encrypted filesystems\n");
 	printf ("         --no-domain [files] don't create domains for these executables\n");
-	printf ("         --no-crypt          disable lookup of mounted ecryptfs\n");
 	printf ("         --clear             clear domain configurations\n");
 	printf ("                             (all previously learnt rules will be backed up)\n");
 	printf ("         --reset             reinitialize domain configurations\n");
