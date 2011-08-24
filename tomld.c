@@ -636,7 +636,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 11:41:36 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 12:59:29 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -8464,9 +8464,6 @@ int main(int argc, char **argv)
 	/* create profile.conf and manager.conf files */
 	create_prof();
 
-	/* print more info about config */
-	print_info_config();
-	
 	/* this is a single tomld process here and
 	 * on --learn, request temporary learning mode for this process */
 	if (opt_learn){
@@ -8533,6 +8530,10 @@ int main(int argc, char **argv)
 
 	/* create new empty policy files if missing or if --reset switch is on */
 	if (!file_exist(tdom) || !file_exist(texc) || opt_reset) clear();
+
+	/* print more info about config */
+	print_info_config();
+
 
 	/* store negatív reference time for check() function to make check() run at least once */	
 	t  = -const_time_check_long2;
