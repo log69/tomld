@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-23/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+24/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -57,6 +57,7 @@ changelog:
                          - search for target system logs to read from on startup (/var/log/syslog, kern.log, messages)
                          - add date of building to version info
                          - add date to every line of deny log
+                         - count special char as a low case char in path_wildcard_temp_name()
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -629,7 +630,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Tue Aug 23 18:28:37 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 08:09:47 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
