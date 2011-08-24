@@ -58,6 +58,10 @@ changelog:
                          - add date of building to version info
                          - add date to every line of deny log
                          - count special char as a low case char in path_wildcard_temp_name()
+                         - add --nocrypt switch to disable lookup of mounted ecryptfs
+                         - detect ecryptfs filesystem automatically and add crypted directory to recursive dirs by default
+                         - print more info about config on startup (if there was any encrypted fs found,
+                           and if there's any recursive directories set)
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -529,6 +533,7 @@ int opt_once		= 0;
 int opt_mail		= 0;
 int opt_log			= 0;
 int opt_nodomain	= 0;
+int opt_nocrypt		= 0;
 int opt_notify		= 0;
 
 char *opt_notify2	= 0;
@@ -548,6 +553,7 @@ int flag_firstrun	= 1;
 int flag_safe		= 0;
 int flag_new_proc	= 0;
 int flag_incomp_conf = 0;
+int flag_crypt		= 0;
 
 /* time variables for statistics of check cycle time */
 float time_max_cycle = 0;
@@ -630,7 +636,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 08:22:19 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 11:41:36 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -686,6 +692,7 @@ void help() {
 	printf ("                             (should be run on a desktop as normal user)\n");
 	printf ("         --log        [file] redirect stderr and stdout to this file\n");
 	printf ("         --no-domain [files] don't create domains for these executables\n");
+	printf ("         --no-crypt          disable lookup of mounted ecryptfs\n");
 	printf ("         --clear             clear domain configurations\n");
 	printf ("                             (all previously learnt rules will be backed up)\n");
 	printf ("         --reset             reinitialize domain configurations\n");
@@ -3354,6 +3361,7 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "--clear"))	   { opt_clear     = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--reset"))	   { opt_reset     = 1; flag_reset = 1;  flag_ok = 1; }
 			if (!strcmp(myarg, "--learn-all")) { opt_learn_all = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "--no-crypt"))  { opt_nocrypt   = 1; flag_ok = 1; }
 
 			/* after -- option everything belongs to exebutables */
 			if (flag_type == 99) flag_ok = 0;
@@ -3588,6 +3596,7 @@ void check_config()
 					if (string_search_keyword_first(res2, "[extra]")){     flag_spec = 6; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[nodomain]")){  flag_spec = 7; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[notify]")){    flag_spec = 8; flag_ok = 0; }
+					if (string_search_keyword_first(res2, "[nocrypt]")){   flag_spec = 9; flag_ok = 0; }
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
@@ -3644,6 +3653,7 @@ void check_config()
 								}
 							}
 						}
+						if (flag_spec == 9){ opt_nocrypt = 1; }
 					}
 				}
 				free2(res2);
@@ -3674,6 +3684,49 @@ void check_config()
 	mydir = path_get_parent_dir(tmark);
 	chmod (mydir, strtol(mode, 0, 8));
 	free2(mydir);
+
+	/* lookup of mounted ecryptfs and add them to recursive dirs */
+	if (!opt_nocrypt){
+		char *res, *res2, *res3, *temp, *temp2;
+		char *cmd = file_read("/proc/mounts", -1);
+		if (cmd){
+			temp = cmd;
+			while(1){
+				/* get next line of mount */
+				res = string_get_next_line(&temp);
+				if (!res) break;
+				
+				/* get fs type
+				 * mount line should look like this:
+				 * crypt_dir normal_dir ecryptfs options 0 0 */
+				temp2 = res;
+				res2 = string_get_next_wordn(&temp2, 2);
+				if (res2){
+					/* is the fs type ecryptfs? this is the 3rd word */
+					if (!strcmp(res2, "ecryptfs")){
+						free2(res2);
+						temp2 = res;
+						res2 = string_get_next_word(&temp2);
+						if (res2){
+							/* get recursive link of dir */
+							res3 = path_link_read(res2);
+							if (res3){
+								/* add dir to recursive dirs */
+								strcat2(&dirs_recursive, res3); strcat2(&dirs_recursive, "\n");
+								/* set recursive option on */
+								opt_recursive  = 1;
+								flag_crypt = 1;
+								free2(res3);
+							}
+							free2(res2);
+						}
+					}
+					else free2(res2);
+				}
+			}
+			free2(cmd);
+		}
+	}
 }
 
 /* disable all domains and delete all rules from kernel memory */
@@ -7925,6 +7978,52 @@ void check_exceptions()
 }
 
 
+void print_info_config()
+{
+	/* check if mta binary exists */
+	if (opt_mail){
+		if (file_exist(mail_mta)){
+			if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn_all){
+				color("* mail requested to following recipients: ", yellow);
+				color(mail_users, yellow);
+				newl();
+			}
+		}
+		else{
+			color("* mail requested but binary ", red);
+			color(mail_mta, red);
+			color(" missing\n", red);
+			/* clear mail option because of missing mta binary */
+			opt_mail = 0;
+		}
+	}
+
+	/* was any crypted fs found? */
+	if (flag_crypt){
+		color("* encrypted fs found\n", yellow);
+	}
+
+	/* is there any recursive dir? */
+	if (opt_recursive){
+		if (dirs_recursive){
+			char *res, *temp;
+			color("* recursive directories set:\n", yellow);
+			
+			/* print recursive dirs */
+			temp = dirs_recursive;
+			while(1){
+				/* get next dir */
+				res = string_get_next_line(&temp);
+				if (!res) break;
+				/* print it */
+				color("  ", yellow);
+				color(res, yellow); newl();
+				free2(res);
+			}
+		}
+	}
+}
+
 
 /* ------------------------------------ */
 /* ------- PROCESS SEARCH LOOP -------- */
@@ -8365,23 +8464,8 @@ int main(int argc, char **argv)
 	/* create profile.conf and manager.conf files */
 	create_prof();
 
-	/* check if mta binary exists */
-	if (opt_mail){
-		if (file_exist(mail_mta)){
-			if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn_all){
-				color("* mail requested to following recipients: ", yellow);
-				color(mail_users, yellow);
-				newl();
-			}
-		}
-		else{
-			color("* mail requested but binary ", red);
-			color(mail_mta, red);
-			color(" missing\n", red);
-			/* clear mail option because of missing mta binary */
-			opt_mail = 0;
-		}
-	}
+	/* print more info about config */
+	print_info_config();
 	
 	/* this is a single tomld process here and
 	 * on --learn, request temporary learning mode for this process */
