@@ -122,6 +122,8 @@ Every tag has values under it, one per line. Spaces and empty lines don't matter
 
 [recursive] Everything will be recursively wildcarded in these directories. It may make sense to place a directory here that tomld couldn't create a general rule for and as a result it keeps generating new rules continually (like new randomly-named directories). Direcories like '/home/user/.mozilla' or the directories of samba shares may also be inserted here. Note that this option should be used with caution as over-enthusiastic recursive wildcarding negates the usefulness of Tomoyo. 
 
+[nocrypt] Disables the automatic lookup of mounted enrcypted filesystems. 
+
 [nodomain] All the entries below this will be interpreted as extra executables _not_ to create domain for. 
 
 [extra] All the entries below this will be interpreted as extra executables to create domain for. 
