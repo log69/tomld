@@ -642,7 +642,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 19:49:22 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 20:13:19 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -3824,6 +3824,7 @@ void check_config()
 					}
 					else free2(res2);
 				}
+				free2(res);
 			}
 			free2(cmd);
 		}
@@ -8704,7 +8705,7 @@ int main(int argc, char **argv)
 			
 			/* send warning on too long time cycle */
 			if (t3 > const_time_check_warning){
-				color("* warning: running cycles take too long", red);
+				color("* warning: running cycles take too long\n", red);
 				notify("warning: running cycles take too long");
 			}
 			
