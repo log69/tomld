@@ -38,6 +38,7 @@ changelog:
                          - bugfix: wait at least 60 seconds instead of 1 in service script when running start-stop-daemon
                          - bugfix: don't load (deleted) domains
                          - bugfix: compare max time (2 weeks) to domain creation time instead of last change
+                         - bugfix: load configs before creating backup on --clear (it resulted empty backup files)
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
@@ -62,6 +63,8 @@ changelog:
                          - detect ecryptfs filesystem automatically and add crypted directory to recursive dirs by default
                          - print more info about config on startup (if there was any encrypted fs found,
                            and if there's any recursive directories set)
+                         - create backup when removing domain
+                         - add --restore switch to restore configuration from last backup
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -345,9 +348,10 @@ char *ver = "0.40";
 /* this is a remark in the policy for me to know if it's my config
  * and when the domain was created */
 /* echo $(echo "tomld" | openssl md5) "$ver" | openssl md5 */
-char *myuid = "allow_read /tomld/0f86c727e2a4b82dd40446a12db7bdee";
-char *myuid_create = 0;
-char *myuid_change = 0;
+char *myuid = "0f86c727e2a4b82dd40446a12db7bdee";
+char *myuid_base    = 0;
+char *myuid_create  = 0;
+char *myuid_change  = 0;
 char *myuid_cputime = 0;
 
 /* home dir */
@@ -526,6 +530,7 @@ int opt_clear		= 0;
 int opt_reset		= 0;
 int opt_info		= 0;
 int opt_remove		= 0;
+int opt_restore		= 0;
 int opt_yes			= 0;
 int opt_keep		= 0;
 int opt_recursive	= 0;
@@ -636,7 +641,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 14:03:04 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 16:42:12 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -698,6 +703,7 @@ void help() {
 	printf ("                             (all previously learnt rules will be backed up)\n");
 	printf ("         --reset             reinitialize domain configurations\n");
 	printf ("                             (all previously learnt rules will be backed up)\n");
+	printf ("         --restore           restore domain configuration from last backup\n");
 	printf ("    -l   --learn  [patterns] **request temporary learning mode for all domains,\n");
 	printf ("                             or for those domains that match the patterns\n");
 	printf ("                             (this is the recommended way if still necessary)\n");
@@ -754,6 +760,7 @@ void myfree()
 	free2(tdomf_bak3);
 	free2(texcf_bak3);
 	free2(tmarkf_bak3);
+	free2(myuid_base);
 	free2(myuid_create);
 	free2(myuid_change);
 	free2(myuid_cputime);
@@ -2671,7 +2678,7 @@ void load()
 												res3 = string_get_next_line(&temp4);
 												if (!res3) break;
 												/* isn't rule one of my uid entry? */
-												if (!string_search_keyword_first(res3, myuid)){
+												if (!string_search_keyword_first(res3, myuid_base)){
 													strcat2(&tdomf_new, res3);
 													strcat2(&tdomf_new, "\n");
 												}
@@ -3006,9 +3013,13 @@ void backup()
 	/* create new unique names to config files */
 	strcpy2(&tdom2, tdom);
 	strcat2(&tdom2, ".backup.");
+	strcat2(&tdom2, myuid);
+	strcat2(&tdom2, ".");
 	strcat2(&tdom2, num);
 	strcpy2(&texc2, texc);
 	strcat2(&texc2, ".backup.");
+	strcat2(&texc2, myuid);
+	strcat2(&texc2, ".");
 	strcat2(&texc2, num);
 	free2(num);
 
@@ -3018,6 +3029,82 @@ void backup()
 	
 	free2(tdom2);
 	free2(texc2);
+}
+
+
+/* restore domain configuration from last backup and reload policy */
+void restore()
+{
+	DIR *mydir;
+	struct dirent *mydir_entry;
+	char *res, *f = 0;
+	char *tdom2 = 0, *texc2 = 0;
+	char *tdom3 = 0, *texc3 = 0;
+	long t, td = 0, te = 0;
+
+	/* create unique prefix to config files */
+	strcpy2(&tdom2, tdom);
+	strcat2(&tdom2, ".backup.");
+	strcat2(&tdom2, myuid);
+	strcat2(&tdom2, ".");
+	strcpy2(&texc2, texc);
+	strcat2(&texc2, ".backup.");
+	strcat2(&texc2, myuid);
+	strcat2(&texc2, ".");
+	
+	/* open Tomoyo dir */
+	mydir = opendir(tdir);
+	if (!mydir){ error("error: cannot open "); error(tdir); error(" directory\n"); myexit(1); }
+
+	/* cycle through files in Tomoyo dir */
+	while((mydir_entry = readdir(mydir))) {
+		strcpy2(&f, tdir);
+		strcat2(&f, mydir_entry->d_name);
+
+		/* is file domain config? */
+		if (string_search_keyword_first(f, tdom2)){
+			/* get last number representing epoch time */
+			res = string_get_number_last(f);
+			/* convert string to number */
+			t = atol(res); free2(res);
+			/* store only the most recent file name and its time */
+			if (t > td){
+				td = t;
+				/* get the file name */
+				strcpy2(&tdom3, f);
+			}
+		}
+
+		/* is file exception config? */
+		if (string_search_keyword_first(f, texc2)){
+			/* get last number representing epoch time */
+			res = string_get_number_last(f);
+			/* convert string to number */
+			t = atol(res); free2(res);
+			/* store only the most recent file name and its time */
+			if (t > te){
+				te = t;
+				/* get the file name */
+				strcpy2(&texc3, f);
+			}
+		}
+	}
+	closedir(mydir);
+	free2(f);
+
+	/* was there any match? do config timestamps of domain and exception match? */
+	if (strlen2(&tdom3) && strlen2(&texc3) && td && te && (td == te)){
+		/* load configs from backup files from disk */
+		tdomf = file_read(tdom3, 0);
+		texcf = file_read(texc3, 0);
+		
+		/* reload configs to kernel and save them to disk */
+		reload();
+		save();
+	}
+
+	free2(tdom3); free2(texc3);
+	free2(tdom2); free2(texc2);
 }
 
 
@@ -3363,6 +3450,7 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "--reset"))	   { opt_reset     = 1; flag_reset = 1;  flag_ok = 1; }
 			if (!strcmp(myarg, "--learn-all")) { opt_learn_all = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--no-crypt"))  { opt_nocrypt   = 1; flag_ok = 1; }
+			if (!strcmp(myarg, "--restore"))   { opt_restore   = 1; flag_ok = 1; }
 
 			/* after -- option everything belongs to exebutables */
 			if (flag_type == 99) flag_ok = 0;
@@ -3551,7 +3639,7 @@ void check_tomoyo()
 	if (file_exist(tdom)){
 		tdomf = file_read(tdom, 0);
 		/* my unique id matches in domain policy? */
-		if (string_search_keyword_first_all(tdomf, myuid) == -1){
+		if (string_search_keyword_first_all(tdomf, myuid_base) == -1){
 			backup();
 			clear();
 			/* set incompatibility flag to print message later, so it gets into the log file too */
@@ -3892,7 +3980,7 @@ void clear()
 
 	strcpy2(&tdomf, "<kernel>\nuse_profile 0\n");
 	/* add a rule with my unique id too */
-	strcat2(&tdomf, myuid);
+	strcat2(&tdomf, myuid_base);
 	strcat2(&tdomf, "\n");
 
 	/* write config files */
@@ -4440,6 +4528,12 @@ void domain_remove(const char *pattern)
 				free2(res);
 			}
 			
+			/* create backup before removing any domain */
+			if (count2 > 0){
+				backup();
+				color("policy file backups created\n", green);
+			}
+
 			/* replace old policy with new one */
 			free2(tdomf);
 			tdomf = tdomf_new;
@@ -6735,7 +6829,7 @@ void domain_reshape_rules_recursive_dirs()
 					strcat2(&rules, "\n");
 					
 					/* do not run check on my uid entries */
-					if (!string_search_keyword_first(res2, myuid)){
+					if (!string_search_keyword_first(res2, myuid_base)){
 						/* get a modified rule by recursive dirs if any */
 						res3 = domain_get_rules_with_recursive_dirs(res2);
 						if (res3){
@@ -6813,7 +6907,7 @@ void domain_reshape_rules_wildcard_spec()
 		if (!res) break;
 		
 		/* is it a rule starting with "allow_" tag and not my uid entry? */
-		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ") && !string_search_keyword_first(res, myuid)){
+		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ") && !string_search_keyword_first(res, myuid_base)){
 
 			/* get rule type */
 			temp2 = res;
@@ -6898,7 +6992,7 @@ void domain_reshape_rules_wildcard_spec()
 		if (!res) break;
 		
 		/* is it a rule starting with "allow_" tag? */
-		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ") && !string_search_keyword_first(res, myuid)){
+		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ") && !string_search_keyword_first(res, myuid_base)){
 
 			/* get rule type */
 			temp2 = res;
@@ -7113,7 +7207,7 @@ void domain_reshape_rules_create_double()
 		param2 = string_get_next_word(&temp2);
 
 		/* is the rule any of the create rule type? */
-		if (!string_search_keyword_first(res, myuid) && array_search_keyword(cre, rule_type)){
+		if (!string_search_keyword_first(res, myuid_base) && array_search_keyword(cre, rule_type)){
 
 			/* allow_create can have second parameter from kernel 2.6.36 and above */
 			strcat2(&tdomf_new, "allow_create ");
@@ -7179,7 +7273,7 @@ void domain_reshape_rules_remove_tomld_dir()
 		if (!res) break;
 		
 		/* is it a rule? */
-		if (!string_search_keyword_first(res, myuid) && string_search_keyword_first(res, "allow_")){
+		if (!string_search_keyword_first(res, myuid_base) && string_search_keyword_first(res, "allow_")){
 			
 			/* get rule type and params */
 			temp2 = res;
@@ -7246,7 +7340,7 @@ void domain_reshape_rules_temp_dir()
 		/* is it a rule? */
 		if (string_search_keyword_first(res, "allow_")){
 			/* do not run check on my uid entries */
-			if (!string_search_keyword_first(res, myuid)){
+			if (!string_search_keyword_first(res, myuid_base)){
 				
 				/* get rule type and params */
 				temp2 = res;
@@ -8370,9 +8464,11 @@ void myinit()
 	const_time_check_long2 = const_time_check_long;
 	
 	/* create my uids */
-	strcpy2(&myuid_create,  myuid);
-	strcpy2(&myuid_change,  myuid);
-	strcpy2(&myuid_cputime, myuid);
+	strcpy2(&myuid_base,    "allow_read /tomld/");
+	strcat2(&myuid_base,    myuid);
+	strcpy2(&myuid_create,  myuid_base);
+	strcpy2(&myuid_change,  myuid_base);
+	strcpy2(&myuid_cputime, myuid_base);
 	strcat2(&myuid_create,  "/create_time/");
 	strcat2(&myuid_change,  "/change_time/");
 	strcat2(&myuid_cputime, "/cpu_time/");
@@ -8503,6 +8599,18 @@ int main(int argc, char **argv)
 	}
 
 	/* on --remove, remove domain */
+	if (opt_restore){
+		color("* restoring domain configurations from last backup\n", red);
+		if (!choice("are you sure?")){
+			color("no change\n", green);
+			myexit(0);
+		}
+		restore();
+		color("* configuration restored\n", red);
+		myexit(0);
+	}
+
+	/* on --remove, remove domain */
 	if (opt_remove){
 		domain_remove(opt_remove2);
 		myexit(0);
@@ -8515,6 +8623,9 @@ int main(int argc, char **argv)
 			color("no change\n", green);
 			myexit(0);
 		}
+		/* load configs */
+		load();
+		/* create backup */
 		backup();
 		color("policy file backups created\n", green);
 		clear();
