@@ -10,12 +10,12 @@ tomld - tomoyo learning daemon, fully automatic MAC configuration
 
 .SH DESCRIPTION
 
-Tomld (tomoyo learning daemon) is an extension to the Tomoyo security 
-framework. Tomoyo increases security by confining applications and services 
-into domains using rules. Tomld automates this process helping users harden 
-their systems more easily. To do this tomld starts in learning mode, creates 
-Tomoyo domains, collects rules, changes them and once the rules appear to be 
-complete tomld enforces the policy.
+Tomld (tomoyo learning daemon) is a 1-click dynamic MAC configuration solution.
+It is an extension to the Tomoyo security framework. Tomoyo increases security
+by confining applications and services into domains using rules. Tomld
+automates this process helping users harden their systems more easily. To do
+this tomld starts in learning mode, creates Tomoyo domains, collects rules,
+changes them and once the rules appear to be complete tomld enforces the policy.
 .br
 
 The Tomoyo framework already has a learning mode which automatically sets up 
