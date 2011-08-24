@@ -39,6 +39,7 @@ changelog:
                          - bugfix: don't load (deleted) domains
                          - bugfix: compare max time (2 weeks) to domain creation time instead of last change
                          - bugfix: load configs before creating backup on --clear (it resulted empty backup files)
+                         - bugfix: several bugfixes regarding backup
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
@@ -641,7 +642,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 19:44:50 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 19:49:22 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -3643,6 +3644,7 @@ void check_tomoyo()
 	 * and create new one if incompatible */
 	if (file_exist(tdom)){
 		tdomf = file_read(tdom, 0);
+		texcf = file_read(texc, 0);
 		/* my unique id matches in domain policy? */
 		if (string_search_keyword_first_all(tdomf, myuid_base) == -1){
 			backup();
@@ -3651,6 +3653,7 @@ void check_tomoyo()
 			flag_incomp_conf = 1;
 		}
 		free2(tdomf); tdomf = 0;
+		free2(texcf); texcf = 0;
 	}
 }
 
@@ -8596,6 +8599,9 @@ int main(int argc, char **argv)
 			color("no change\n", green);
 			myexit(0);
 		}
+		/* load configs */
+		load();
+		/* create backup */
 		backup();
 		color("policy file backups created\n", green);
 		domain_set_learn_all();
@@ -8644,6 +8650,9 @@ int main(int argc, char **argv)
 			color("no change\n", green);
 			myexit(0);
 		}
+		/* load configs */
+		load();
+		/* create backup */
 		backup();
 		color("policy file backups created\n", green);
 	}
