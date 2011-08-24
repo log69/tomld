@@ -629,7 +629,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sun Aug 21 15:58:57 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Tue Aug 23 18:28:37 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -1351,7 +1351,7 @@ char *path_wildcard_temp_name(char *name)
 	/* base64 encoding may use extra 2 chars beside a-z A-Z and 0-9
 	 * these may vary, but common ones are - + _
 	 * http://en.wikipedia.org/wiki/Base64#Variants_summary_table */
-	char *spec = "_-+";
+	char *spec = "_+";
 	
 	/* return null on null input */
 	if (!name) return 0;
@@ -1380,7 +1380,8 @@ char *path_wildcard_temp_name(char *name)
 		while(1){
 			c2 = spec[i3++];
 			if (!c2) break;
-			if (c2 == c){ flag_now = 1; break; }
+			/* count special char as a low case char */
+			if (c2 == c){ flag_now = 1; flag_lcase = 1; break; }
 		}
 
 		/* is char alfanumeric char? */
@@ -1516,7 +1517,7 @@ char *path_wildcard_temp_name(char *name)
 
 /* wildcard temporary (random type) file name in path */
 /* returned value must be freed by caller */
-char *path_wildcard_temp_dir(char *path)
+char *path_wildcard_temp(char *path)
 {
 	char *new = 0;
 	
@@ -6956,7 +6957,7 @@ void domain_reshape_rules_wildcard_spec()
 							
 							/* path is in spec_ex */
 							if (flag_ex){
-								res2 = path_wildcard_temp_dir(param);
+								res2 = path_wildcard_temp(param);
 								free2(param); param = res2;
 							}
 							
