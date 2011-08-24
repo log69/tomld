@@ -630,7 +630,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 08:09:47 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 08:22:19 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4504,10 +4504,10 @@ void domain_set_enforce_old()
 							/* print info once */
 							if (!flag_turned){
 								flag_turned = 1;
-								color("* switch old domains back to enforcing mode\n", red);
+								color("* switch old domains to enforcing mode\n", red);
 								
 								/* notification */
-								notify("switch old domains back to enforcing mode");
+								notify("switch old domains to enforcing mode");
 							}
 							/* switch domain and all its subdomains to enforcing mode */
 							color(prog, blue); newl();
