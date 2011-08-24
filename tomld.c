@@ -641,7 +641,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 16:42:12 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 19:44:50 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -3101,6 +3101,11 @@ void restore()
 		/* reload configs to kernel and save them to disk */
 		reload();
 		save();
+
+		color("* configuration restored\n", red);
+	}
+	else{
+		color("* no proper backup found\n", yellow);
 	}
 
 	free2(tdom3); free2(texc3);
@@ -8606,7 +8611,6 @@ int main(int argc, char **argv)
 			myexit(0);
 		}
 		restore();
-		color("* configuration restored\n", red);
 		myexit(0);
 	}
 
