@@ -413,6 +413,7 @@ void mkdir_recursive(char *dir)
 			char *d = path_get_subdirs_name(dir, i);
 			/* create dir */
 			mkdir(d, S_IRWXU);
+			free2(d);
 			i++;
 			if (i > l || i > max_iter) break;
 		}
