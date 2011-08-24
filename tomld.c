@@ -636,7 +636,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 13:04:20 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 13:14:37 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -3712,7 +3712,7 @@ void check_config()
 							res3 = path_link_read(res2);
 							if (res3){
 								/* add dir to recursive dirs */
-								strcat2(&dirs_recursive, res3); strcat2(&dirs_recursive, "\n");
+								strcat2(&dirs_recursive, res3); strcat2(&dirs_recursive, "/\n");
 								/* set recursive option on */
 								opt_recursive  = 1;
 								flag_crypt = 1;
