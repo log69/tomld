@@ -64,6 +64,9 @@ run the command with appended info messages
      \fB\-\-log [file]\fR
 redirect stderr and stdout to this file
 .TP
+     \fB\-\-no\-crypt\fR
+disable lookup of mounted encrypted filesystems
+.TP
      \fB\-\-no\-domain [files]\fR
 don't create domains for these executables
 .TP
