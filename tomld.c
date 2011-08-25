@@ -42,6 +42,7 @@ changelog:
                          - bugfix: several bugfixes regarding backup
                          - bugfix: several bugfixes in path_wildcard_temp_name()
                          - bugfix: create recursive wildcards for rules having 2 params too
+                         - bugfix: fixes in domain_reshape_rules_temp_dir(), check the second parameter too
                            if both params matches the same recursive directory path
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
@@ -646,7 +647,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Thu Aug 25 07:52:53 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Thu Aug 25 13:51:14 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -7416,12 +7417,17 @@ void domain_reshape_rules_temp_dir()
 {
 	/* vars */
 	char *res, *temp, *temp2, *temp3;
-	char *rule_type = 0, *param1 = 0, *param2 = 0, *param1_old = 0;
+	char *rule_type = 0, *param1 = 0, *param2 = 0, *param1_old = 0, *param2_old = 0;
 	char *tdomf_new;
-	int match_counter = 0;
-	int start_old = -1;
-	int end_old = -1;
-	int flag_match = 0;
+	int match_counter1 = 0;
+	int match_counter2 = 0;
+	int start_old1 = -1;
+	int start_old2 = -1;
+	int end_old1   = -1;
+	int end_old2   = -1;
+	int flag_match1 = 0;
+	int flag_match2 = 0;
+	int flag_first = 0;
 	
 	/* alloc mem for new policy */
 	tdomf_new = memget2(MAX_CHAR);
@@ -7442,12 +7448,11 @@ void domain_reshape_rules_temp_dir()
 				/* get rule type and params */
 				temp2 = res;
 				rule_type = string_get_next_word(&temp2);
-				/* use only param1 and not param2, domain cleanup will replace paths
-				 * with the wildcarded path later */
 				param1 = string_get_next_word(&temp2);
 				param2 = string_get_next_word(&temp2);
 
-				flag_match = 0;
+
+				flag_match1 = 0;
 
 				/* run check only on path params */
 				if (path_is_path(param1)){
@@ -7518,15 +7523,15 @@ void domain_reshape_rules_temp_dir()
 									}
 									
 									/* store positions on first run */
-									if (!match_counter){
-										start_old = start;
-										end_old = end;
+									if (!match_counter1){
+										start_old1 = start;
+										end_old1 = end;
 									}
 
 									/* do positions match to former ones? */
-									if (start != start_old || end != end_old){
-										start_old = start;
-										end_old = end;
+									if (start != start_old1 || end != end_old1){
+										start_old1 = start;
+										end_old1 = end;
 									}
 									else{
 									
@@ -7546,8 +7551,8 @@ void domain_reshape_rules_temp_dir()
 											/* replace numbers with wildcard */
 											strcpy2(&diff, "\\*");
 											/* set success */
-											flag_match = 1;
-											match_counter++;
+											flag_match1 = 1;
+											match_counter1++;
 										}
 										else{
 											/* are they random names and they match? */
@@ -7560,8 +7565,8 @@ void domain_reshape_rules_temp_dir()
 													/* replace numbers with wildcard */
 													strcpy2(&diff, p2);
 													/* set success */
-													flag_match = 1;
-													match_counter++;
+													flag_match1 = 1;
+													match_counter1++;
 												}
 											}
 											free2(p1); free2(p2);
@@ -7570,7 +7575,7 @@ void domain_reshape_rules_temp_dir()
 										/* success? */
 										/* run only once at exactly 5 matches, and then don't run until fail again
 										 * that will reset the match counter */
-										if (flag_match && match_counter == 5){
+										if (flag_match1 && match_counter1 == 5){
 											char *temp4, *new = 0;
 
 											/* store former param */
@@ -7592,7 +7597,165 @@ void domain_reshape_rules_temp_dir()
 											free2(new);
 											
 											/* reset counter */
-											match_counter = 0;
+											match_counter1 = 0;
+										}
+									}
+								}
+								free2(diff);
+								free2(diff1);
+								free2(diff2);
+							}
+						}
+					}
+				}
+
+
+				flag_match2 = 0;
+
+				/* run check only on path params */
+				if (path_is_path(param2)){
+					/* compare params' length */
+					if (strlen2(&param2) == strlen2(&param2_old)){
+						/* params differ and they're not totally the same? */
+						if (strcmp(param2, param2_old)){
+							/* do params have same number of subdirs more than 2? */
+							int s1 = path_count_subdirs_name(param2);
+							int s2 = path_count_subdirs_name(param2_old);
+							if (s1 == s2 && s1 > 2 && s2 > 2){
+								/* create a diff of the params to see their differences in their names */
+								int i;
+								int start = -1;
+								int end   = -1;
+								char c1, c2;
+								int flag_slash;
+								/* get lengths */
+								long l = strlen2(&param2);
+								char *diff = 0, *diff1 = 0, *diff2 = 0;
+								/* cycle through every char and set minimum start
+								 * and maximum end position of diff part */
+								i = 0;
+								while(1){
+									/* get next char */
+									c1 = param2[i];
+									if (!c1) break;
+									c2 = param2_old[i];
+									/* do chars differ? */
+									if (c1 != c2){
+										/* store fist start position of diff */
+										if (start == -1) start = i;
+										/* store last end position of diff */
+										end = i;
+									}
+									i++;
+								}
+								/* check if diff is within a subdir of any of the params,
+								 * so check if there is any "/" char between start and end position */
+								i = start;
+								flag_slash = 0;
+								while(1){
+									if (i > end) break;
+									c1 = param2[i];
+									c2 = param2_old[i];
+									if (c1 == '/' || c2 == '/'){
+										flag_slash = 1;
+										break;
+									}
+									i++;
+								}
+
+								/* isn't there a "/" char in diff part? */
+								if (!flag_slash){
+
+									/* get whole subdir that has differing part in it by
+									 * going backward to the first "/" char for start position,
+									 * and going forward to the next "/" char for end posotion */
+									while(1){
+										if (start < 0){ start = 0; break; }
+										if (param2[start] == '/'){ start++; break; }
+										start--;
+									}
+									while(1){
+										if (end >= l){ break; }
+										if (param2[end] == '/'){ break; }
+										end++;
+									}
+									
+									/* store positions on first run */
+									if (!match_counter2){
+										start_old2 = start;
+										end_old2 = end;
+									}
+
+									/* do positions match to former ones? */
+									if (start != start_old2 || end != end_old2){
+										start_old2 = start;
+										end_old2 = end;
+									}
+									else{
+									
+										/* copy only the differing subdirs */
+										temp3 = param2_old + start;
+										strcpy2(&diff1, temp3);
+										diff1[end - start] = 0;
+										strlenset3(&diff1, end - start);
+
+										temp3 = param2 + start;
+										strcpy2(&diff2, temp3);
+										diff2[end - start] = 0;
+										strlenset3(&diff2, end - start);
+
+										/* do random parts match? are they both numbers or random names? */
+										if (string_is_number(diff1) && string_is_number(diff2)){
+											/* replace numbers with wildcard */
+											strcpy2(&diff, "\\*");
+											/* set success */
+											flag_match2 = 1;
+											match_counter2++;
+										}
+										else{
+											/* are they random names and they match? */
+											char *p1, *p2;
+											p1 = path_wildcard_temp_name(diff1);
+											p2 = path_wildcard_temp_name(diff2);
+											if (p1 && p2){
+												/* do both diffs got wildcarded and so they match? */
+												if (!strcmp(p1, p2)){
+													/* replace numbers with wildcard */
+													strcpy2(&diff, p2);
+													/* set success */
+													flag_match2 = 1;
+													match_counter2++;
+												}
+											}
+											free2(p1); free2(p2);
+										}
+										
+										/* success? */
+										/* run only once at exactly 5 matches, and then don't run until fail again
+										 * that will reset the match counter */
+										if (flag_match2 && match_counter2 == 5){
+											char *temp4, *new = 0;
+
+											/* store former param */
+											strcpy2(&param2_old, param2);
+
+											/* create new path with wildcard in it */
+											/* store orig param */
+											strcpy2(&new, param2);
+											/* cut result at diff position */
+											new[start] = 0;
+											strlenset3(&new, start);
+											/* add wildcard to result at diff position */
+											strcat2(&new, diff);
+											/* add rest of path to result too */
+											temp4 = param2 + end;
+											strcat2(&new, temp4);
+											/* replace param2 with wildcarded one */
+											strcpy2(&param2, new);
+											free2(new);
+											
+											/* reset counter */
+											match_counter2 = 0;
 										}
 									}
 								}
@@ -7607,7 +7770,7 @@ void domain_reshape_rules_temp_dir()
 		}
 
 		/* wasn't there any match? */
-		if (flag_match){
+		if (flag_match1 || flag_match2){
 			/* add rule */
 			strcat2(&tdomf_new, rule_type);
 			if (param1){
@@ -7624,14 +7787,33 @@ void domain_reshape_rules_temp_dir()
 			/* add original rule anyway */
 			strcat2(&tdomf_new, res);
 			strcat2(&tdomf_new, "\n");
+		}
 
-			/* reset match counter */
-			match_counter = 0;
+		/* reset match counters */
+		if (!flag_match2){
+			/* is it the first run? */
+			if (!flag_first) flag_first = 1;
+			else{
+				/* check if 1 param rules are coming after 2 param rules or opposite */
+				if ((param2 && !param2_old) || (!param2 && param2_old)){
+					/* reset param1's match counter too because of the change of the number of parameters */
+					flag_match1 = 0;
+				}
+			}
+			match_counter2 = 0;
+			/* store old param and positions */
+			strcpy2(&param2_old, param2);
+			start_old2 = -1;
+			end_old2   = -1;
+		}
+		if (!flag_match1){
+			match_counter1 = 0;
 			/* store old param and positions */
 			strcpy2(&param1_old, param1);
-			start_old = -1;
-			end_old = -1;
+			start_old1 = -1;
+			end_old1   = -1;
 		}
+
 
 		free2(res);
 		free2(rule_type); rule_type = 0;
@@ -7640,6 +7822,7 @@ void domain_reshape_rules_temp_dir()
 	}
 
 	free2(param1_old);
+	free2(param2_old);
 
 	/* set new policy */	
 	free2(tdomf);
