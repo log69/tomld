@@ -40,6 +40,9 @@ changelog:
                          - bugfix: compare max time (2 weeks) to domain creation time instead of last change
                          - bugfix: load configs before creating backup on --clear (it resulted empty backup files)
                          - bugfix: several bugfixes regarding backup
+                         - bugfix: several bugfixes in path_wildcard_temp_name()
+                         - bugfix: create recursive wildcards for rules having 2 params too
+                           if both params matches the same recursive directory path
                          - add feature to --info to show completeness of domain's learning mode in percentage
                          - improve --info option and make domain list more readable
                          - add special chars to look for in temporary names in path_wildcard_temp_name()
@@ -66,6 +69,7 @@ changelog:
                            and if there's any recursive directories set)
                          - create backup when removing domain
                          - add --restore switch to restore configuration from last backup
+                         - improve path_wildcard_temp_name() to wildcard hexadecimal numbers too
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -642,7 +646,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 20:31:31 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Thu Aug 25 07:52:53 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -1351,6 +1355,7 @@ char *path_wildcard_home(char *path)
 /* wildcard random part of file name */
 /* i consider random part in a file name if it contains only lower and upper case, numbers
  * and some extra characters, and upper case also from 2nd char - or only numbers */
+/* or if it's a hexadecimal number (also minimum 6 chars, at least 3 nums and 3 alphanums) */
 /* the point is a special char - if the left and right side of the point are random names too
  * (together longer than 6 chars), then i consider the point char to be a part of the random names,
  * this is because apps divide random names from normal ones by a point in file names */
@@ -1365,6 +1370,11 @@ char *path_wildcard_temp_name(char *name)
 	long l;
 	int i, i2, i3;
 	int flag_now, flag_lcase, flag_ucase, flag_num;
+	/* count the different type of chars */
+	int count_lcase, count_ucase, count_num;
+	/* flag to signal if random part is a hex number */
+	int flag_hex, flag_hex_not_ok;
+	
 	/* base64 encoding may use extra 2 chars beside a-z A-Z and 0-9
 	 * these may vary, but common ones are - + _
 	 * http://en.wikipedia.org/wiki/Base64#Variants_summary_table */
@@ -1382,9 +1392,14 @@ char *path_wildcard_temp_name(char *name)
 	temp2 = memget2(l * 2);
 	
 	/* search for random part in name */
-	flag_lcase = 0;
-	flag_ucase = 0;
-	flag_num   = 0;
+	flag_lcase  = 0;
+	flag_ucase  = 0;
+	flag_num    = 0;
+	count_lcase = 0;
+	count_ucase = 0;
+	count_num   = 0;
+	flag_hex    = 0;
+	flag_hex_not_ok = 0;
 	i = 0;
 	i2 = 0;
 	while(1){
@@ -1402,36 +1417,56 @@ char *path_wildcard_temp_name(char *name)
 		}
 
 		/* is char alfanumeric char? */
-		if (c >= '0' && c <= '9'){ flag_now = 1; flag_num   = 1; }
-		if (c >= 'a' && c <= 'z'){ flag_now = 1; flag_lcase = 1; }
-		if (c >= 'A' && c <= 'Z'){ flag_now = 1;
+		if (c >= '0' && c <= '9'){ flag_now = 1; flag_num   = 1; count_num++;   }
+		if (c >= 'a' && c <= 'z'){ flag_now = 1; flag_lcase = 1; count_lcase++; }
+		if (c >= 'A' && c <= 'Z'){ flag_now = 1;                 count_ucase++;
 			/* upper case must be exist from the 2nd char */
 			if (i2 >= 1) flag_ucase = 1;
 		}
 
+
+		/* **********************************************************************
+		 * does part seem to be a hex number?
+		 * were numeric and alphanumeric chars continous to be a hex number?
+		 * ******************************************************************** */
+		if ((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')){
+			/* mixed lower and upper case means it cannot be a hex number */
+			if (!count_lcase || !count_ucase){
+				/* there must be at least 3 num and 3 chars */
+				if (count_num >= 3 && (count_lcase >= 3 || count_ucase >= 3)){
+					/* was it good since new part? */
+					if (!flag_hex_not_ok){
+						flag_hex = 1;
+					}
+				}
+			}
+			else{ flag_hex_not_ok = 1; if (c != '.') flag_hex = 0; }
+		}
+		else{     flag_hex_not_ok = 1; if (c != '.') flag_hex = 0; }
+		/* ******************************************************************** */
+
+
 		/* was last char a random char? */
 		if (flag_now){
-			/* a new part starts to build? */
-			if (!i2){
-				/* store former part */
-				strcat2(&new, temp);
-				/* reset count */
-				i2 = 0;
-			}
 			/* increase random char count, must be at least 6 or more to success
-			 * and add char to result */
+			 * and add char to temp part */
 			temp[i2++] = c; temp[i2] = 0;
 		}
 		else{
+
 			/* **************** */
 			/* is char a point? */
 			/* **************** */
 			if (c == '.'){
+
+				/* add char to temp part */
+				temp[i2++] = c; temp[i2] = 0;
+
 				/* this part seemed random independently from the counter?
 				 * saying it otherwise:
 				 * was there a number and lower case alpha somewhere
 				 * and upper case alpha from the 2nd char? */
-				if (flag_lcase && flag_ucase && flag_num){
+				if ((flag_lcase && flag_ucase && flag_num) || flag_hex){
 					/* store and collect these parts before "." char for later */
 					strcat2(&temp2, temp);
 				}
@@ -1447,27 +1482,40 @@ char *path_wildcard_temp_name(char *name)
 					strnull2(&temp2);
 				}
 				/* reset */
+				strnull2(&temp);
 				flag_lcase = 0;
 				flag_ucase = 0;
 				flag_num   = 0;
+				count_lcase = 0;
+				count_ucase = 0;
+				count_num   = 0;
+				flag_hex    = 0;
+				flag_hex_not_ok = 0;
 				i2 = 0;
-				
-				/* add char to result */
-				temp[i2++] = c; temp[i2] = 0;
+
 			}
 			else{
 
+				/* add char to temp part */
+				temp[i2++] = c; temp[i2] = 0;
+
 				/* make a wildcard if random part was more or equal than 6 chars */
 				if (strlen2(&temp2) + i2 >= 6){
-					if (flag_lcase && flag_ucase && flag_num){
+					if ((flag_lcase && flag_ucase && flag_num) || flag_hex){
 						strcat2(&new, "\\*");
+						/* add only this one char to result */
+						i2 = 0;
+						temp[i2++] = c; temp[i2] = 0;
+						strcat2(&new, temp);
 					}
 					else{
 						if (strlen2(&temp2) >= 6){
+							/* add temp part to result */
 							strcat2(&new, "\\*");
 							strcat2(&new, temp);
 						}
 						else{
+							/* add whole temp part to result */
 							strcat2(&new, temp2);
 							strcat2(&new, temp);
 						}
@@ -1475,19 +1523,22 @@ char *path_wildcard_temp_name(char *name)
 				}
 				/* store original sample if less than 6 chars */
 				else{
+					/* add whole temp part to result */
 					strcat2(&new, temp2);
 					strcat2(&new, temp);
 				}
 				/* reset counts and temps */
 				strnull2(&temp2);
+				strnull2(&temp);
 				flag_lcase = 0;
 				flag_ucase = 0;
 				flag_num   = 0;
+				count_lcase = 0;
+				count_ucase = 0;
+				count_num   = 0;
+				flag_hex    = 0;
+				flag_hex_not_ok = 0;
 				i2 = 0;
-
-				/* add char to result */
-				temp[i2++] = c; temp[i2] = 0;
-
 			}
 		}
 	}
@@ -1498,15 +1549,21 @@ char *path_wildcard_temp_name(char *name)
 	
 	/* make a wildcard if random part was more or equal than 6 chars */
 	if (strlen2(&temp2) + i2 >= 6){
-		if (flag_lcase && flag_ucase && flag_num){
+		if ((flag_lcase && flag_ucase && flag_num) || flag_hex){
 			strcat2(&new, "\\*");
+			/* add only this one char to result */
+			i2 = 0;
+			temp[i2++] = c; temp[i2] = 0;
+			strcat2(&new, temp);
 		}
 		else{
 			if (strlen2(&temp2) >= 6){
+				/* add temp part to result */
 				strcat2(&new, "\\*");
 				strcat2(&new, temp);
 			}
 			else{
+				/* add whole temp part to result */
 				strcat2(&new, temp2);
 				strcat2(&new, temp);
 			}
@@ -1514,16 +1571,10 @@ char *path_wildcard_temp_name(char *name)
 	}
 	/* store original sample if less than 6 chars */
 	else{
+		/* add whole temp part to result */
 		strcat2(&new, temp2);
 		strcat2(&new, temp);
 	}
-	/* reset counts and temps */
-	strnull2(&temp2);
-	flag_lcase = 0;
-	flag_ucase = 0;
-	flag_num   = 0;
-	i2 = 0;
-
 	
 	free2(temp);
 	free2(temp2);
@@ -6156,7 +6207,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 		}
 		/* get beginning of path to compare it to recursive dir */
 		res2 = path_get_subdirs_name(path1, c);
-		
+
 		/* compare them */
 		if (compare_paths(res, res2)){
 			/* success, store it on match and exit */
@@ -6318,6 +6369,43 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 					/* add "/" char if path is a dir */
 					if (path_is_dir(path2)) strcat2(&rules_new, "/");
 					strcat2(&rules_new, "\n");
+				}
+			}
+			if (count1 && count2 && count1 == count2 && path_new1 && path_new2){
+				if (!strcmp(path_new1, path_new2)){
+					while(count1--){
+						int flag  = 0;
+						int flag2 = 0;
+						/* add rule type */
+						strcat2(&rules_new, type);
+						strcat2(&rules_new, " ");
+
+						/* add new first param */
+						strcat2(&rules_new, path_new1);
+						/* add wildcards */
+						c = count1 + 1;
+						while(c--){
+							if (!flag){ strcat2(&rules_new, "\\*"); flag = 1; }
+							else        strcat2(&rules_new, "/\\*");
+						}
+						/* add "/" char if path is a dir */
+						if (path_is_dir(path1)) strcat2(&rules_new, "/");
+
+						strcat2(&rules_new, " ");
+
+						/* add new second param */
+						strcat2(&rules_new, path_new2);
+						/* add wildcards */
+						c = count1 + 1;
+						while(c--){
+							if (!flag2){ strcat2(&rules_new, "\\*"); flag2 = 1; }
+							else        strcat2(&rules_new, "/\\*");
+						}
+						/* add "/" char if path is a dir */
+						if (path_is_dir(path2)) strcat2(&rules_new, "/");
+
+						strcat2(&rules_new, "\n");
+					}
 				}
 			}
 		}
