@@ -159,8 +159,8 @@ cd ..
 
 
 # create 64 bit build .deb package
-#debuild -k7CA53418 -us -uc
-debuild -k7CA53418
+debuild -k7CA53418 -us -uc
+#debuild -k7CA53418
 cp -f ../tomld_*  "$DEB"/
 
 
