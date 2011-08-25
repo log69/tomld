@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-24/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+25/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -642,7 +642,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 24 20:13:19 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 24 20:31:31 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -664,7 +664,7 @@ void version() {
 /* print help info */
 void help() {
 	printf ("DESCRIPTION:\n");
-	printf ("Tomld (tomoyo learning daemon) is a 1-click dynamic MAC configuration solution. ");
+	printf ("Tomld (tomoyo learning daemon) is a 1-click dynamic Mandatory Access Control (MAC) configuration solution. ");
 	printf ("It is an extension to the Tomoyo security framework. ");
 	printf ("Tomoyo increases security by confining applications and services into domains using rules. ");
 	printf ("Tomld automates this process helping users harden their systems more easily. ");
