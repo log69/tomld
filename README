@@ -2,7 +2,7 @@ tomld (tomoyo learning daemon) 0.40
 Copyright (C) 2011 Andras Horvath
 E-mail: mail@log69.com - suggestions & feedback are welcome
 URL: http://log69.com - the official site
-(last update Wed Aug 24 20:31:31 CEST 2011)
+(last update Thu Aug 25 07:52:53 CEST 2011)
 
 LICENSE:
 This program is free software; you can redistribute it and/or modify it under 
@@ -18,12 +18,13 @@ You should have received a copy of the GNU General Public License along with
 this program.  If not, see <http://www.gnu.org/licenses/>.
 
 DESCRIPTION:
-Tomld (tomoyo learning daemon) is a 1-click dynamic MAC configuration solution. 
-It is an extension to the Tomoyo security framework. Tomoyo increases security 
-by confining applications and services into domains using rules. Tomld 
-automates this process helping users harden their systems more easily. To do 
-this tomld starts in learning mode, creates Tomoyo domains, collects rules, 
-changes them and once the rules appear to be complete tomld enforces the policy.
+Tomld (tomoyo learning daemon) is a 1-click dynamic Mandatory Access Control 
+(MAC) configuration solution. It is an extension to the Tomoyo security 
+framework. Tomoyo increases security by confining applications and services 
+into domains using rules. Tomld automates this process helping users harden 
+their systems more easily. To do this tomld starts in learning mode, creates 
+Tomoyo domains, collects rules, changes them and once the rules appear to be 
+complete tomld enforces the policy.
 
 The Tomoyo framework already has a learning mode which automatically sets up 
 rules while processes are running. The problem for the user is that these 
