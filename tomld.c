@@ -22,7 +22,7 @@
 
 changelog:
 -----------
-25/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
+26/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
                          - bugfix: print lines under each other and not after each other on console with --notify option
@@ -56,7 +56,6 @@ changelog:
                          - change myuid, so configuration needs to be regenerated entirely
                          - print message about incompatible config file in the log too
                          - print system info on startup (/proc/version)
-                         - print a warning message if running cycles take too long
                          - wildcard subdirectory names in paths containing random names or only numbers
                          - don't add domains with executable form of /proc/$PID/exe
                          - check tomld directories on startup more efficiently
@@ -71,6 +70,8 @@ changelog:
                          - create backup when removing domain
                          - add --restore switch to restore configuration from last backup
                          - improve path_wildcard_temp_name() to wildcard hexadecimal numbers too
+                         - print a warning message if running cycles take too long
+                           and also print the name of the directory containing the most files in it
 31/07/2011 - tomld v0.39 - bugfix: name of domain was missing when printing domains without rules
                          - bugfix: don't print "restart needed" message to domains whose process is not running
                          - bugfix in domain_get()
@@ -640,6 +641,8 @@ void domain_cleanup();
 
 void domain_update_cpu_time_all();
 
+int compare_paths(char *path1, char *path2);
+
 
 /* print version info */
 void version() {
@@ -647,7 +650,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Thu Aug 25 13:51:14 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Thu Aug 25 17:01:11 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -1604,6 +1607,109 @@ char *path_wildcard_temp(char *path)
 		free2(myname2);
 	}
 	else strcpy2(&new, path);
+	
+	return new;
+}
+
+
+/* takes a Tomoyo domain config as an input and check all rules in it
+ * to find the subdir with the most files and return this path as a result */
+/* returned value must be freed by caller */
+char *path_find_subdir_with_most_files()
+{
+	char *res, *res2, *temp, *temp2;
+	char *type, *param1, *param2;
+	char *list = 0, *new = 0;
+	int count = 0, count2 = 0;
+
+	/* cycle through all the rules and collect all paths to a string */
+	temp = tdomf;
+	while(1){
+		/* get next line */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		/* is it a rule? */
+		if (string_search_keyword_first(res, "allow_")){
+			/* is it not an execute rule? */
+			if (!string_search_keyword_first(res, "allow_execute")){
+				/* get params */
+				temp2 = res;
+				type   = string_get_next_word(&temp2);
+				param1 = string_get_next_word(&temp2);
+				param2 = string_get_next_word(&temp2);
+				
+				/* add paths to list that contain at least 2 subdirs */
+				if (path_is_path(param1)){
+					if (path_count_subdirs_name(param1) > 2){
+						strcat2(&list, param1); strcat2(&list, "\n"); } }
+				if (path_is_path(param2)){
+					if (path_count_subdirs_name(param2) > 2){
+						strcat2(&list, param2); strcat2(&list, "\n"); } }
+				
+				free2(type);
+				free2(param1);
+				free2(param2);
+			}
+		}
+		free2(res);
+	}
+	
+	/* sort list */
+	res = string_sort_uniq_lines(list);
+	free2(list); list = res;
+	
+	/* cycle through the list */
+	temp = list;
+	res2 = 0;
+	while(1){
+		/* get next line */
+		res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		/* is it not the first run? */
+		if (res2){
+			int flag = 0;
+			
+			/* get prent dirs */
+			char *p1 = path_get_parent_dir(res);
+			char *p2 = path_get_parent_dir(res2);
+			
+			/* count their subdirs */
+			int s1 = path_count_subdirs_name(p1);
+			int s2 = path_count_subdirs_name(p2);
+			
+			/* do number of subdirs match? */
+			if (s1 == s2){
+				/* paths match? */
+				if (compare_paths(p1, p2)){
+					flag = 1;
+				}
+			}
+			
+			/* was there a match? */
+			if (flag){
+				count ++;
+				if (count > count2){
+					strcpy2(&new, p1);
+					count2 = count;
+				}
+			}
+			else{
+				count = 0;
+			}
+			
+			free2(p1); free2(p2);
+		}
+		
+		/* store this path for next cycle */
+		strcpy2(&res2, res);
+		
+		free2(res);
+	}
+
+	free2(res2);
+	free2(list);
 	
 	return new;
 }
@@ -8976,8 +9082,29 @@ int main(int argc, char **argv)
 			
 			/* send warning on too long time cycle */
 			if (t3 > const_time_check_warning){
+				char *warning_dir;
+
 				color("* warning: running cycles take too long\n", red);
 				notify("warning: running cycles take too long");
+				
+				/* run a search to find the subdir containing the most files
+				 * and add this dir to the recursive directories
+				 * to avoid DoS */
+				warning_dir = path_find_subdir_with_most_files();
+				if (warning_dir){
+					char *res = 0;
+					
+					/* print info about the directory with most files */
+					strcpy2(&res, "* directory with most files is: ");
+					strcpy2(&res, warning_dir);
+					strcpy2(&res, "\n");
+
+					color(res, red);
+					notify(res);
+					
+					free2(res);
+					free2(warning_dir);
+				}
 			}
 			
 			/* run only once */
