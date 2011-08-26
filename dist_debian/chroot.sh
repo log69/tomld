@@ -4,11 +4,11 @@
 
 if ! whoami | grep -q root; then echo Run it as root.; echo; exit 1; fi
 
-CHROOTDIR="/chroot-sid"
+CHROOTDIR="/chroot-debian-sid"
 MYUSER="andras"
 DEBIANVER="sid"
 ARCH="amd64"
-PKGS="dh-make devscripts lintian autotools-dev libjasper-dev libjpeg62-dev libpng12-dev autoconf2.13 ia32-libs libc6-dev-i386 tree ne"
+PKGS="dh-make devscripts lintian autotools-dev autoconf ia32-libs libc6-dev-i386 tree ne rsync"
 
 
 if ! [ -x "$CHROOTDIR" ]
@@ -22,6 +22,8 @@ then
 
 	debootstrap --arch "$ARCH" "$DEBIANVER" "$CHROOTDIR" http://ftp.de.debian.org/debian
 
+	mount --bind /proc "$CHROOTDIR"/proc
+	chroot "$CHROOTDIR" apt-get update
 	chroot "$CHROOTDIR" apt-get -y --force-yes install $PKGS
 else
 	echo chroot directory already exists.
