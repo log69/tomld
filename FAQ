@@ -43,13 +43,19 @@ What are the features?
 
 - full automation including deciding which files get wildcarded and which domains can be switched to enforcing mode and when 
 
-- secure design by not listening on any socket or to any external input 
-
-- coded in clean C without any external dependencies apart from Tomoyo 
-
 - remembers creation time, last change time and the amount of cpu usage of the domain even after a reboot 
 
 - saves policy on reboot or on application closure 
+
+- creates backup automatically on particular operations 
+
+- restore function to restore datas from last backup 
+
+- helps to avoid denial of service caused by too many rules if one running cycle takes too long by printing a warning message with the name of the directory containing the most files (this directory can be put then to recursive tag by user) 
+
+- secure design by not listening on any socket or to any external input 
+
+- coded in clean C without any external dependencies apart from Tomoyo 
 
 - relatively small memory footprint on a modern desktop or server 
 
