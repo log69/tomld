@@ -650,7 +650,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Thu Aug 25 17:01:11 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Fri Aug 26 11:35:57 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -835,6 +835,7 @@ void check_notify()
 			while(1){
 				/* print my welcome message on first run */
 				if (!flag_firstrun_notify){
+					int ignore = 0;
 					char *comm, *temp;
 					flag_firstrun_notify = 1;
 					
@@ -843,8 +844,8 @@ void check_notify()
 					comm = string_get_next_line(&temp);
 					/* add message */
 					strcat2(&comm, " \"Tomld notification service started\"");
-					/* run command */
-					system(comm);
+					/* run command (also ignore return value) */
+					if (system(comm)) ignore++;
 					free2(comm);
 
 					/* store modification date to not read the current value, but only from now on */
@@ -913,6 +914,7 @@ void check_notify()
 
 								/* ok if not null and not modified since read */
 								if (strlen2(&res2) && tlog2_mod_time3 == tlog2_mod_time2){
+									int ignore = 0;
 									/* store command */
 									char *temp = opt_notify2;
 									char *comm = string_get_next_line(&temp);
@@ -923,8 +925,8 @@ void check_notify()
 									strcat2(&comm, "\"");
 									free2(res2);
 
-									/* run command */
-									system(comm);
+									/* run command (also ignore return value) */
+									if (system(comm)) ignore++;
 									free2(comm);
 									
 									free2(res);
