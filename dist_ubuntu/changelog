@@ -1,0 +1,11 @@
+tomld (0.40-1) natty; urgency=low
+
+  * New upstream release
+
+ -- Andras Horvath <mail@log69.com>  Sun, 07 Aug 2011 06:26:04 +0000
+
+tomld (0.39-1) natty; urgency=low
+
+  * Initial release (Closes: #635049)
+
+ -- Andras Horvath <mail@log69.com>  Mon, 01 Aug 2011 10:53:18 +0000
