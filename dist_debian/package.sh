@@ -17,9 +17,11 @@ echo
 echo "* creating tomld.tgz..."
 (make clean) &>/dev/null
 mkdir "$TEMP"/tomld-"$VER"
-rsync -a --exclude ".git" ./* "$TEMP"/tomld-"$VER"/
+#rsync -a --exclude ".git" ./* "$TEMP"/tomld-"$VER"/
+cp --preserve=all ./* "$TEMP"/tomld-"$VER"/
 cd "$TEMP"
-tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER" --exclude ".git"
+#tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER" --exclude ".git"
+tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER"
 
 cd tomld-"$VER"
 
