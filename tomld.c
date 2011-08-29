@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+29/08/2011 - tomld v0.42 - bugfix: print name of directory with most file in it properly when running time takes too long
 29/08/2011 - tomld v0.41 - bugfix: let a temporary learning mode be rerequested by user while the former one hasn't ended yet
                          - bugfix: don't check if the domain's last change time is greater than const_time_max_change
                            during temporary learning mode
@@ -352,7 +353,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.41";
+char *ver = "0.42";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -653,7 +654,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sun Aug 28 12:21:41 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Mon Aug 29 09:37:04 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -9100,7 +9101,7 @@ int main(int argc, char **argv)
 			
 			/* send warning on too long time cycle */
 			if (t3 > const_time_check_warning){
-				char *warning_dir;
+				char *warning_dir = 0;
 
 				color("* warning: running cycles take too long\n", red);
 				notify("warning: running cycles take too long");
@@ -9114,8 +9115,8 @@ int main(int argc, char **argv)
 					
 					/* print info about the directory with most files */
 					strcpy2(&res, "* directory with most files is: ");
-					strcpy2(&res, warning_dir);
-					strcpy2(&res, "\n");
+					strcat2(&res, warning_dir);
+					strcat2(&res, "\n");
 
 					color(res, red);
 					notify(res);
