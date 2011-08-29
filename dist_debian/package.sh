@@ -117,8 +117,8 @@ echo "and is licensed under the GPL, see above." >> copyright.new
 mv copyright.new copyright
 
 
-echo -n "New release? [y/N] "; read -n1 KEY; echo
-if [ "$KEY" != "y" ]
+echo -n "New release? [Y/n] "; read -n1 KEY; echo
+if [ "$KEY" == "n" ]
 then
 
 	cp -f "$DEB"/changelog .
