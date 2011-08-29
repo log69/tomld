@@ -22,6 +22,9 @@
 
 changelog:
 -----------
+29/08/2011 - tomld v0.41 - bugfix: let a temporary learning mode be rerequested by user while the former one hasn't ended yet
+                         - bugfix: don't check if the domain's last change time is greater than const_time_max_change
+                           during temporary learning mode
 26/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
                          - bugfix: fix some mem leaks
@@ -349,7 +352,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.40";
+char *ver = "0.41";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -650,7 +653,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sat Aug 27 09:10:14 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sun Aug 28 12:21:41 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4246,9 +4249,10 @@ int domain_check_enforcing(char *domain, int flag_info)
 					/* have the processes' cpu time reached a value compared to the complexity
 					 * of the domain? (i measure it by the number of its rules)
 					 * or is the domain's last change time greater than const_time_max_change?
-					 * if so, then i switch the domain to enforcing mode */
+					 * if so, then i switch the domain to enforcing mode,
+					 * but only, if there is no temporary learning mode on currently */
 					flag_enforcing = 0;
-					if (d_create > const_time_max_change && d_cputime + p_cputime > const_min_cputime) flag_enforcing = 1;
+					if ((!flag_learn2) && (d_create > const_time_max_change && d_cputime + p_cputime > const_min_cputime)) flag_enforcing = 1;
 					if (!flag_enforcing){
 						/* a minimum time has to pass since last domain change to let the
 						 * completness of domain grow, or else i reset cpu time of processes
@@ -5238,7 +5242,7 @@ void domain_get_log()
 					}
 				}
 				else{
-					/* check if there was a user requested for temporary learning mode,
+					/* check if there was a user request for temporary learning mode,
 					 * and if so, then allow rules from deny logs */
 					if (flag_learn){
 
@@ -5330,7 +5334,7 @@ void domain_get_log()
 
 			/* clear learn flag, because i want to allow temporary learning mode only for those domains,
 			 * that had access deny logs just now,
-			 * the rest of the enforcing mode domains should stay as the are for security reasons */
+			 * the rest of the enforcing mode domains should stay as they are for security reasons */
 			flag_learn = 0;
 
 			/* are there any new rules after confirmation? */
@@ -8249,65 +8253,77 @@ void check_learn()
 	/* only in automatic mode */
 	if (!opt_manual){
 
-		if (!flag_learn2){
-			/* check global var for temporary learning mode request */
-			if (file_exist(tlearn)){
-				
-				int tlearnf_mod_time2;
-				/* check modification time of learn file and read its content only if modified */
-				tlearnf_mod_time2 = file_get_mod_time(tlearn);
-				if (tlearnf_mod_time != tlearnf_mod_time2){
-					char *f;
-					/* store new time */
-					tlearnf_mod_time = tlearnf_mod_time2;
+		/* check global var for temporary learning mode request */
+		if (file_exist(tlearn)){
+			
+			int tlearnf_mod_time2;
+			/* check modification time of learn file and read its content only if modified */
+			tlearnf_mod_time2 = file_get_mod_time(tlearn);
+			if (tlearnf_mod_time != tlearnf_mod_time2){
+				char *f;
+				/* store new time */
+				tlearnf_mod_time = tlearnf_mod_time2;
 
-					/* read 1 char from signal file */
-					f = file_read(tlearn, 1);
-					/* check if length is not null */
-					if (strlen2(&f)){
-						/* clear list */
-						free2(opt_learn2); opt_learn2 = 0;
-						/* is there a list for learn with domain pattern? */
-						if (!strcmp(f, "2")){
-							/* load list with domain pattern */
-							opt_learn2 = file_read(tlearn_list, 0);
-						}
-						/* set starting time */
-						t = mytime();
-						color("* user request for temporary learning mode (max 1 hour) ", yellow);
+				/* read 1 char from signal file */
+				f = file_read(tlearn, 1);
+				/* check if length is not null */
+				if (strlen2(&f)){
+
+					/* end former temporary learning mode if new one is requested */
+					if (flag_learn2){
+						/* clear flag */
+						flag_learn  = 0;
+						flag_learn2 = 0;
+						color("* end temporary learning mode because of new request ", yellow);
 						mytime_print_date(); newl();
-						
-						/* notification */
-						notify("temporary learning mode (max 1 hour)");
-						
-						if (opt_learn2){
-							char *temp6;
-							color("  for domains matching patterns:", yellow);
-							temp6 = opt_learn2;
-							while(1){
-								char *res6 = string_get_next_line(&temp6);
-								if (!res6) break;
-								color(" ", red);
-								color(res6, red);
-								free2(res6);
-							}
-							newl();
-						}
-						/* clear temporary learning mode flag file */
-						file_write(tlearn, 0);
-						/* set flag for temporary learning mode */
-						flag_learn  = 1;
-						flag_learn2 = 1;
-						flag_learn3 = 1;
-
-						/* sleep less and run cycles faster if in temporary learning mode */				
-						check_time_set_short();
+						/* switch back to enforcing mode */
+						domain_set_enforce_old();
 					}
-					free2(f);
+
+					/* clear list */
+					free2(opt_learn2); opt_learn2 = 0;
+					/* is there a list for learn with domain pattern? */
+					if (!strcmp(f, "2")){
+						/* load list with domain pattern */
+						opt_learn2 = file_read(tlearn_list, 0);
+					}
+					/* set starting time */
+					t = mytime();
+					color("* user request for temporary learning mode (max 1 hour) ", yellow);
+					mytime_print_date(); newl();
+					
+					/* notification */
+					notify("temporary learning mode (max 1 hour)");
+					
+					if (opt_learn2){
+						char *temp6;
+						color("  for domains matching patterns:", yellow);
+						temp6 = opt_learn2;
+						while(1){
+							char *res6 = string_get_next_line(&temp6);
+							if (!res6) break;
+							color(" ", red);
+							color(res6, red);
+							free2(res6);
+						}
+						newl();
+					}
+					/* clear temporary learning mode flag file */
+					file_write(tlearn, 0);
+					/* set flag for temporary learning mode */
+					flag_learn  = 1;
+					flag_learn2 = 1;
+					flag_learn3 = 1;
+
+					/* sleep less and run cycles faster if in temporary learning mode */				
+					check_time_set_short();
 				}
+				free2(f);
 			}
 		}
-		else{
+
+		/* check if max time for temporary learning mode has passed yet? */
+		if (flag_learn2){
 			/* check if 1 hour passed yet */
 			if ((mytime() - t) >= const_time_max_learn){
 				/* clear flag */
