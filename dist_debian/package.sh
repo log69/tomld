@@ -12,18 +12,12 @@ TEMP=$(mktemp -d)
 # determine latest upstream version
 VER=$(grep -E "^char *\*ver *= *" ./tomld.c | grep -Eo "[0-9]+[0-9\.]*[0-9]+")
 
-# create tomld.tgz
+# copy original tomld source tar balls
 echo
-echo "* creating tomld.tgz..."
-(make clean) &>/dev/null
-mkdir "$TEMP"/tomld-"$VER"
-#rsync -a --exclude ".git" ./* "$TEMP"/tomld-"$VER"/
-cp -a ./* "$TEMP"/tomld-"$VER"/
-rm -f "$TEMP"/tomld-"$VER"/dist_debian/tomld_*
-rm -f "$TEMP"/tomld-"$VER"/dist_ubuntu/tomld_*
+echo "* copy original tomld source tar balls..."
+cp ../tomld_"$VER".tar.gz "$TEMP"/tomld_"$VER".orig.tar.gz
 cd "$TEMP"
-tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER" --exclude ".git"
-
+tar xf tomld_"$VER".orig.tar.gz
 cd tomld-"$VER"
 
 dh_make -f ../tomld_"$VER".orig.tar.gz --single -e mail@log69.com -p tomld -c gpl
