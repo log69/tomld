@@ -138,6 +138,10 @@ else
 	cat changelog >> changelog.new
 	
 	mv changelog.new changelog
+
+	# change unstable to natty
+	sed -i s/"unstable"/$(lsb_release -c | cut -f2)/g changelog
+	
 #	nano changelog
 
 	cp changelog "$DEB"
