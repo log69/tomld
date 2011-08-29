@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+29/08/2011 - tomld v0.43 - bugfix: do not repack sources and make all packages from the same original one
 29/08/2011 - tomld v0.42 - bugfix: print name of directory with most file in it properly when running time takes too long
 29/08/2011 - tomld v0.41 - bugfix: let a temporary learning mode be rerequested by user while the former one hasn't ended yet
                          - bugfix: don't check if the domain's last change time is greater than const_time_max_change
@@ -353,7 +354,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.42";
+char *ver = "0.43";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -654,7 +655,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Mon Aug 29 09:37:04 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Mon Aug 29 10:59:16 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
