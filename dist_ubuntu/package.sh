@@ -126,9 +126,9 @@ then
 else
 # changelog file
 
+	head -n1 changelog > changelog.new
 	cp -f "$DEB"/changelog .
 
-	head -n1 changelog > changelog.new
 	echo >> changelog.new
 	echo "  * New upstream release" >> changelog.new
 	echo >> changelog.new
@@ -138,7 +138,7 @@ else
 	cat changelog >> changelog.new
 	
 	mv changelog.new changelog
-	nano changelog
+#	nano changelog
 
 	cp changelog "$DEB"
 
