@@ -18,10 +18,11 @@ echo "* creating tomld.tgz..."
 (make clean) &>/dev/null
 mkdir "$TEMP"/tomld-"$VER"
 #rsync -a --exclude ".git" ./* "$TEMP"/tomld-"$VER"/
-cp --preserve=all ./* "$TEMP"/tomld-"$VER"/
+cp -a ./* "$TEMP"/tomld-"$VER"/
+rm -f "$TEMP"/tomld-"$VER"/dist_debian/tomld_*
+rm -f "$TEMP"/tomld-"$VER"/dist_ubuntu/tomld_*
 cd "$TEMP"
-#tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER" --exclude ".git"
-tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER"
+tar cfz tomld_"$VER".orig.tar.gz tomld-"$VER" --exclude ".git"
 
 cd tomld-"$VER"
 
