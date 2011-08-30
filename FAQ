@@ -161,6 +161,7 @@ Other remarks
 
 - tomld files:
 /var/local/tomld.logmark (this contains a mark to identify the end of the recently read message logs)
+/var/local/tomld.logmark.learn (this is the same, but used for temporary learning mode)
 /var/run/tomld.pid (pid file to avoid multiple instances of the program running at the same time)
 /var/run/tomld/tomld.learn (file to signal a request for temporary learning mode to the running daemon)
 /var/run/tomld/tomld.learn.list (pattern list for the temporary learning mode for those domains that match these patterns)
@@ -179,4 +180,9 @@ Other remarks
 - the flow chart can be found in the beginning of the source code 
 
 - tested with over 6000 inactive domains and over 60 active domains with over 3000 rules in kernel memory, tomld still runs at an acceptable speed 
+
+
+Errata
+
+- tomld cannot handle processes properly yet that were started from chroot 
 
