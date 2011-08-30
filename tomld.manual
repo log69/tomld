@@ -133,8 +133,9 @@ auto confirm everything with yes
 
 .SH FILES
 .br
-/var/local/tomld.logmark (this contains a mark to identify the end of the
-recently read message logs)
+/var/local/tomld.logmark (this contains a mark to identify the end of the recently read message logs)
+.br
+/var/local/tomld.logmark.learn (this is the same, but used for temporary learning mode)
 .br
 /var/run/tomld.pid (pid file to avoid multiple instances of the program running at the same time)
 .br
