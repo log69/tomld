@@ -44,6 +44,7 @@ cp -a /home/"$MYUSER"/.gnupg "$CHROOTDIR"/home/"$MYUSER"/
 ln -sf /home/"$MYUSER"/.gnupg "$CHROOTDIR"/root/
 echo "copying development/tomld..."
 cp -a /home/"$MYUSER"/development/tomld "$CHROOTDIR"/home/"$MYUSER"/development/
+rm -f "$CHROOTDIR"/home/"$MYUSER"/development/tomld/dist_ubuntu/tomld_*
 echo "copying original source tar balls..."
 cp /home/"$MYUSER"/development/Dhtml/log69_3/www/downloads/tomld_*.tar.gz "$CHROOTDIR"/home/"$MYUSER"/development/
 
@@ -63,7 +64,7 @@ BASE="/home/$MYUSER/development/tomld"
 cd "$BASE"/dist_ubuntu/
 echo
 echo "deleting files..."
-rm -f tomld_*.*
+rm -f tomld_*
 echo "copying files back..."
 cp -f "$CHROOTDIR""$BASE"/dist_ubuntu/tomld_*  ./
 #cp -f "$CHROOTDIR""$BASE"/dist_ubuntu/tomld_*.deb  ./
