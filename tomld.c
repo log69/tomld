@@ -22,6 +22,11 @@
 
 changelog:
 -----------
+30/08/2011 - tomld v0.44 - create backup on every user request for temporary learning mode too
+                         - change concept of temporary learning mode: from now when the user request a temporary learning mode,
+                           only those domains will get switched back to learning mode that produced deny logs previously,
+                           this is for simplicity, reliability and security.
+                         - bugfix: load configs before backup if they aren't loaded yet
 29/08/2011 - tomld v0.43 - bugfix: do not repack sources and make all packages from the same original one
 29/08/2011 - tomld v0.42 - bugfix: print name of directory with most file in it properly when running time takes too long
 29/08/2011 - tomld v0.41 - bugfix: let a temporary learning mode be rerequested by user while the former one hasn't ended yet
@@ -354,7 +359,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.43";
+char *ver = "0.44";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -490,6 +495,7 @@ char *tdomf_bak2 = 0;
 char *tdomf_bak3 = 0;
 char *texcf_bak3 = 0;
 char *tmarkf_bak3 = 0;
+char *tmarkf_bak4 = 0;
 
 /* system log */
 char *tsyslog1	= "/var/log/syslog";
@@ -497,15 +503,18 @@ char *tsyslog2	= "/var/log/kern.log";
 char *tsyslog3	= "/var/log/messages";
 char *tlog	= 0;
 char *tlogf = 0;
-int tlogf_mod_time = -1;
+int tlogf_mod_time  = -1;
+int tlogf_mod_time2 = -1;
 int tlearnf_mod_time = -1;
 
 /* tomld paths */
 char *tomld_path = 0;
 /* kernel time of the last line of system log to identify the end of tomoyo logs
  * and make sure not to read it twice */
-char *tmark	= "/var/local/tomld/tomld.logmark";
-char *tmarkf = 0;
+char *tmark	 = "/var/local/tomld/tomld.logmark";
+char *tmark2 = "/var/local/tomld/tomld.logmark.learn";
+char *tmarkf  = 0;
+char *tmarkf2 = 0;
 /* tomld pid file */
 char *tpid	= "/var/run/tomld/tomld.pid";
 int flag_pid = 0;
@@ -655,7 +664,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Mon Aug 29 11:10:24 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Mon Aug 29 11:30:31 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -767,6 +776,7 @@ void myfree()
 	free2(opt_info2);
 	free2(opt_remove2);
 	free2(tmarkf);
+	free2(tmarkf2);
 	free2(tlog);
 	free2(tlogf);
 	free2(tdomf_bak);
@@ -774,6 +784,7 @@ void myfree()
 	free2(tdomf_bak3);
 	free2(texcf_bak3);
 	free2(tmarkf_bak3);
+	free2(tmarkf_bak4);
 	free2(myuid_base);
 	free2(myuid_create);
 	free2(myuid_change);
@@ -3162,6 +3173,25 @@ void save()
 			}
 		}
 	}
+
+	/* store log mark2 backup if missig yet */
+	if (!tmarkf_bak4){
+		/* store backup */
+		strcpy2(&tmarkf_bak4, tmarkf2);
+		/* save config to disk */
+		if (tmarkf2) file_write(tmark2, tmarkf2);
+	}
+	else{
+		if (tmarkf2){
+			/* compare config to backup and save only if changed */
+			if (strcmp(tmarkf2, tmarkf_bak4)){
+				/* store backup */
+				strcpy2(&tmarkf_bak4, tmarkf2);
+				/* save config to disk */
+				file_write(tmark2, tmarkf2);
+			}
+		}
+	}
 }
 
 
@@ -3170,6 +3200,9 @@ void backup()
 {
 	char *tdom2 = 0, *texc2 = 0, *num;
 	struct timeval t;
+	
+	/* load configs if not loaded yet */
+	if (!tdomf || !texcf) load();
 	
 	/* get elapsed seconds since 1970 */
 	gettimeofday(&t, 0);
@@ -3808,8 +3841,8 @@ void check_tomoyo()
 	/* load domain config file and search for my unique id in domain policy
 	 * and create new one if incompatible */
 	if (file_exist(tdom)){
-		tdomf = file_read(tdom, 0);
-		texcf = file_read(texc, 0);
+		/* load configs */
+		load();
 		/* my unique id matches in domain policy? */
 		if (string_search_keyword_first_all(tdomf, myuid_base) == -1){
 			backup();
@@ -3817,8 +3850,6 @@ void check_tomoyo()
 			/* set incompatibility flag to print message later, so it gets into the log file too */
 			flag_incomp_conf = 1;
 		}
-		free2(tdomf); tdomf = 0;
-		free2(texcf); texcf = 0;
 	}
 }
 
@@ -4922,8 +4953,9 @@ void domain_set_enforce_old()
 }
 
 
-/* get recent access deny logs */
-void domain_get_log()
+/* get rules from system log */
+/* returned value must be freed by caller */
+char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_timex)
 {
 	/* vars */
 	char *res, *res2, *res3, *temp, *temp2, *temp3, *orig, *dlist = 0;
@@ -4933,23 +4965,22 @@ void domain_get_log()
 	char key2[] = "denied for ";
 	int i, i2, l;
 	int key2_len = 11;
-	int tlogf_mod_time2;
-
+	int tlogf_mod_time3;
 
 	/* ------------------- */
 	/* ----- get log ----- */
 	/* ------------------- */
 
 	/* check modification time of log file and read its content only if modified */
-	tlogf_mod_time2 = file_get_mod_time(tlog);
-	if (tlogf_mod_time != tlogf_mod_time2){
+	tlogf_mod_time3 = file_get_mod_time(tlog);
+	if (*tlogf_mod_timex != tlogf_mod_time3){
 		/* store new time */
-		tlogf_mod_time = tlogf_mod_time2;
+		*tlogf_mod_timex = tlogf_mod_time3;
 
 		/* load log mark from file if not loaded yet */
-		if (!tmarkf){
-			if (file_exist(tmark)){
-				tmarkf = file_read(tmark, 0);
+		if (!(*tmarkfx)){
+			if (file_exist(tmarkx)){
+				*tmarkfx = file_read(tmarkx, 0);
 			}
 		}
 
@@ -4960,8 +4991,8 @@ void domain_get_log()
 
 		/* get messages only from mark, so jump to mark if it exists */
 		start = tlogf;
-		if (tmarkf){
-			i = string_search_keyword_first_all(start, tmarkf);
+		if (*tmarkfx){
+			i = string_search_keyword_first_all(start, *tmarkfx);
 			if (i > -1){
 				start += i;
 				/* jump after the next line where i found the log mark */
@@ -4970,7 +5001,7 @@ void domain_get_log()
 			/* clear tmarkf if no previous log mark found */
 			/* it might mean the log has been rotated already */
 			else{
-				if (tmarkf) strnull2(&tmarkf);
+				if (*tmarkfx) strnull2(tmarkfx);
 				start = tlogf;
 			}
 		}
@@ -5048,17 +5079,17 @@ void domain_get_log()
 				if (i > -1 && i2 > -1){
 					/* set tmarkf to the last kernel messages' time stamp */
 					/* copy line */
-					strcpy2(&tmarkf, res);
+					strcpy2(tmarkfx, res);
 					i = i + i2 + 1;
-					tmarkf[i] = 0;
-					strlenset3(&tmarkf, i);
+					(*tmarkfx)[i] = 0;
+					strlenset3(tmarkfx, i);
 				}
 				free2(res);
 			}
 		}
 		/* clear tmarkf if no kernel messages */
 		else{
-			if (tmarkf) strnull2(&tmarkf);
+			if (*tmarkfx) strnull2(tmarkfx);
 		}
 
 
@@ -5188,258 +5219,301 @@ void domain_get_log()
 			free2(res);
 		}
 		free2(rules);
+	}
+
+	return prog_rules;
+}
 
 
-		/* ------------------------------- */
-		/* ----- add rules to policy ----- */
-		/* ------------------------------- */
+/* get recent access deny logs */
+void domain_get_log()
+{
+	/* vars */
+	char *res, *res2, *res3, *temp, *temp2, *temp3, *orig;
+	char *tlogf2 = 0, *tlogf3 = 0;
+	char *prog_rules = 0;
+	char *prog_rules2 = 0;
 
-		if (prog_rules){
-			char *tdomf_new, *prog, *prog_main, *rule, *rules_new = 0, *prog_rules_new = 0;
-			char *log_recent = 0;
 
-			/* sort and unique rules */
-			res = string_sort_uniq_lines(prog_rules);
-			free2(prog_rules);
-			prog_rules = res;
+	/* ------------------------------ */
+	/* ----- get rules from log ----- */
+	/* ------------------------------ */
 
-			if (strlen2(&prog_rules)){
-				color("* access deny log messages ", yellow);
-				mytime_print_date(); newl();
+	prog_rules = domain_get_rules_from_syslog(tmark, &tmarkf, &tlogf_mod_time);
+
+	/* get all deny logs before if temporary learning mode is on */
+	if (flag_learn){
+		prog_rules2 = domain_get_rules_from_syslog(tmark2, &tmarkf2, &tlogf_mod_time2); }
+
+
+	/* ------------------------------- */
+	/* ----- add rules to policy ----- */
+	/* ------------------------------- */
+
+	if ((prog_rules) || (flag_learn && prog_rules2)){
+		char *tdomf_new, *prog, *prog_main, *rule, *rules_new = 0, *prog_rules_new = 0;
+		char *log_recent = 0;
+
+		/* sort and unique rules */
+		res = string_sort_uniq_lines(prog_rules);
+		free2(prog_rules);
+		prog_rules = res;
+
+		if (strlen2(&prog_rules)){
+			color("* access deny log messages ", yellow);
+			mytime_print_date(); newl();
+		}
+
+		/* cycle through new rules and ask for confirmation to add it to domain policy */
+		if (!flag_learn) temp = prog_rules;
+		else             temp = prog_rules2;
+
+		while(1){
+			int i3;
+			/* get next rule */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+
+			/* get prog name and its rules */
+			/* the format is:
+			 * /bin/main_domain /bin/subdomain allow_rule /path/to/param1 /path/to/param2 */
+			i3 = string_search_keyword(res, "allow_");
+			prog = 0;
+			strcpy2(&prog, res);
+			prog[i3 - 1] = 0;
+			strlenset3(&prog, i3 - 1);
+			temp2 = prog;
+			prog_main = string_get_next_word(&temp2);
+			temp2 = res + i3;
+			rule = string_get_next_line(&temp2);
+
+			/* print and confirm */
+			color(prog, blue);
+			color("  ", clr);
+			color(rule, purple);
+			
+			/* is manual mode on? */
+			if (opt_manual){
+				/* choose if to allow denied rule */
+				if (choice("  add rules?")){
+					/* add rules to new rules */
+					strcat2(&prog_rules_new, res);
+					strcat2(&prog_rules_new, "\n");
+				}
 			}
+			else{
+				/* check if there was a user request for temporary learning mode,
+				 * and if so, then allow rules from deny logs */
+				if (flag_learn){
 
-			/* cycle through new rules and ask for confirmation to add it to domain policy */
-			temp = prog_rules;
-			while(1){
-				int i3;
-				/* get next rule */
-				res = string_get_next_line(&temp);
-				if (!res) break;
-
-				/* get prog name and its rules */
-				/* the format is:
-				 * /bin/main_domain /bin/subdomain allow_rule /path/to/param1 /path/to/param2 */
-				i3 = string_search_keyword(res, "allow_");
-				prog = 0;
-				strcpy2(&prog, res);
-				prog[i3 - 1] = 0;
-				strlenset3(&prog, i3 - 1);
-				temp2 = prog;
-				prog_main = string_get_next_word(&temp2);
-				temp2 = res + i3;
-				rule = string_get_next_line(&temp2);
-
-				/* print and confirm */
-				color(prog, blue);
-				color("  ", clr);
-				color(rule, purple);
-				
-				/* is manual mode on? */
-				if (opt_manual){
-					/* choose if to allow denied rule */
-					if (choice("  add rules?")){
+					/* if there a list with domain pattern? */
+					if (!opt_learn2){
 						/* add rules to new rules */
 						strcat2(&prog_rules_new, res);
 						strcat2(&prog_rules_new, "\n");
+						color("  add rules? (y) ", clr);
+						mytime_print_date(); newl();
 					}
-				}
-				else{
-					/* check if there was a user request for temporary learning mode,
-					 * and if so, then allow rules from deny logs */
-					if (flag_learn){
-
-						/* if there a list with domain pattern? */
-						if (!opt_learn2){
+					else{
+						/* yes, there is a list */
+						int flag = 0;
+						char *res6, *temp6;
+						temp6 = opt_learn2;
+						while(1){
+							/* get next pattern */
+							res6 = string_get_next_line(&temp6);
+							if (!res6) break;
+							/* does any pattern match the prog name? */
+							if (string_search_keyword(prog_main, res6) > -1){ flag = 1; break; }
+							free2(res6);
+						}
+						/* was there a match? if so, then add rules */
+						if (flag){
 							/* add rules to new rules */
 							strcat2(&prog_rules_new, res);
 							strcat2(&prog_rules_new, "\n");
 							color("  add rules? (y) ", clr);
 							mytime_print_date(); newl();
 						}
+						/* else don't add rules */
 						else{
-							/* yes, there is a list */
-							int flag = 0;
-							char *res6, *temp6;
-							temp6 = opt_learn2;
-							while(1){
-								/* get next pattern */
-								res6 = string_get_next_line(&temp6);
-								if (!res6) break;
-								/* does any pattern match the prog name? */
-								if (string_search_keyword(prog_main, res6) > -1){ flag = 1; break; }
-								free2(res6);
-							}
-							/* was there a match? if so, then add rules */
-							if (flag){
-								/* add rules to new rules */
-								strcat2(&prog_rules_new, res);
-								strcat2(&prog_rules_new, "\n");
-								color("  add rules? (y) ", clr);
-								mytime_print_date(); newl();
-							}
-							/* else don't add rules */
-							else{
-								color("  add rules? (n) ", clr);
-								mytime_print_date(); newl();
-								/* store recent deny logs */
-								strcat2(&log_recent, res);
-								strcat2(&log_recent, "\n");
-							}
+							color("  add rules? (n) ", clr);
+							mytime_print_date(); newl();
+							/* store recent deny logs */
+							strcat2(&log_recent, res);
+							strcat2(&log_recent, "\n");
 						}
 					}
-					else{
-						color("  add rules? (n) ", clr);
-						mytime_print_date(); newl();
-						/* store recent deny logs */
-						strcat2(&log_recent, res);
-						strcat2(&log_recent, "\n");
-					}
 				}
-
-				free2(prog);
-				free2(prog_main);
-				free2(rule);
-				free2(res);
-			}
-			free2(prog_rules);
-			prog_rules = prog_rules_new;
-
-			
-			if (log_recent){
-
-				/* notification */
-				notify(log_recent);
-
-				/* on --mail, send mail about recent deny logs to user too */
-				if (opt_mail){
-					char *comm = 0;
-					char *text = 0;
-
-					/* create message */
-					strcat2(&text, "Subject: deny logs from tomld\n");
-					strcat2(&text, log_recent);
-
-					/* create command */
-					strcat2(&comm, mail_mta);
-					strcat2(&comm, " ");
-					strcat2(&comm, mail_users);
-					
-					/* mail binary exists? */
-					pipe_write(comm, text);
-					free2(comm);
-					free2(text);
+				else{
+					color("  add rules? (n) ", clr);
+					mytime_print_date(); newl();
+					/* store recent deny logs */
+					strcat2(&log_recent, res);
+					strcat2(&log_recent, "\n");
 				}
 			}
-			free2(log_recent);
-			
-			
 
-			/* clear learn flag, because i want to allow temporary learning mode only for those domains,
-			 * that had access deny logs just now,
-			 * the rest of the enforcing mode domains should stay as they are for security reasons */
-			flag_learn = 0;
+			free2(prog);
+			free2(prog_main);
+			free2(rule);
+			free2(res);
+		}
+		free2(prog_rules);
+		prog_rules = prog_rules_new;
 
-			/* are there any new rules after confirmation? */
-			if (strlen2(&prog_rules)){
+		
+		if (log_recent){
 
-				/* alloc mem for new domain policy */
-				tdomf_new = memget2(MAX_CHAR);
+			/* notification */
+			notify(log_recent);
 
-				/* cycle through domains to add new rules */
-				temp = tdomf;
-				while(1){
-					/* get next domain policy */
-					orig = temp;
-					res = domain_get_next(&temp);
-					if (!res) break;
-					/* get subdomain name */
-					res2 = domain_get_name_sub(res);
-					if (res2){
-						int flag_once = 0;
-						temp2 = prog_rules;
-						strnull2(&rules_new);
+			/* on --mail, send mail about recent deny logs to user too */
+			if (opt_mail){
+				char *comm = 0;
+				char *text = 0;
 
-						while(1){
-							int i3;
-							/* get next line */
-							res3 = string_get_next_line(&temp2);
-							if (!res3) break;
+				/* create message */
+				strcat2(&text, "Subject: deny logs from tomld\n");
+				strcat2(&text, log_recent);
 
-							/* get prog name and its rules */
-							i3 = string_search_keyword(res3, "allow_");
-							prog = 0;
-							strcpy2(&prog, res3);
-							prog[i3 - 1] = 0;
-							strlenset3(&prog, i3 - 1);
-							temp3 = prog;
-							prog_main = string_get_next_word(&temp3);
-							temp3 = res3 + i3;
-							rule = string_get_next_line(&temp3);
-
-							/* subdomains match? (compare prog's subdomain name to other subdomain name) */
-							if (!strcmp(prog_main, res2)){
-								/* if match, add rule to domain policy */
-								strcat2(&rules_new, rule);
-								strcat2(&rules_new, "\n");
-								if (!flag_once){
-									/* switch domain to learning mode */
-									domain_set_profile_for_prog(prog_main, 1);
-									/* reread domain because it changed when i changed its profile just now
-									 * in 'tdomf', and the old one was in 'res' */
-									free2(res);
-									temp = orig;
-									res = domain_get_next(&temp);
-									/* reset cpu time counter for prog because of switching it to learning mode,
-									 * or else it would switch back to enforcing mode immediately */
-									process_get_cpu_time_all(prog_main, 1);
-									/* add domain to temporary list */
-									if (string_search_line(tprogs_learn_auto, prog_main) == -1){
-										char *nn = 0;
-										
-										strcat2(&tprogs_learn_auto, prog_main);
-										strcat2(&tprogs_learn_auto, "\n");
-
-										/* print info */
-										color(prog_main, blue); color(", ", clr);
-										color("switch to learning mode\n", clr);
-
-										/* notification */
-										strcpy2(&nn, prog_main); strcat2(&nn, ", switch to learning mode");
-										notify(nn); free2(nn);
-									}
-									/* do it only once per domain for speed */
-									flag_once = 1;
-								}
-							}
-
-							free2(prog_main);
-							free2(prog);
-							free2(rule);
-							free2(res3);
-						}
-						free2(res2);
-					}
-					/* add domain policy to new policy */
-					strcat2(&tdomf_new, res);
-					strcat2(&tdomf_new, "\n");
-					strcat2(&tdomf_new, rules_new);
-					strcat2(&tdomf_new, "\n");
-					free2(res);
-				}
-				free2(rules_new);
+				/* create command */
+				strcat2(&comm, mail_mta);
+				strcat2(&comm, " ");
+				strcat2(&comm, mail_users);
 				
-				color("* switch domains with new rules to learning mode\n", red);
-
-				/* replace old policy with new one */
-				free2(tdomf);
-				tdomf = tdomf_new;
+				/* mail binary exists? */
+				pipe_write(comm, text);
+				free2(comm);
+				free2(text);
 			}
 		}
+		free2(log_recent);
+		
+		
 
-		free2(prog_rules);
-		free2(tlogf2);
-		free2(tlogf3);
+		/* clear learn flag, because i want to allow temporary learning mode only for those domains,
+		 * that had access deny logs just now,
+		 * the rest of the enforcing mode domains should stay as they are for security reasons */
+		flag_learn = 0;
+
+		/* are there any new rules after confirmation? */
+		if (strlen2(&prog_rules)){
+
+			/* alloc mem for new domain policy */
+			tdomf_new = memget2(MAX_CHAR);
+
+			/* cycle through domains to add new rules */
+			temp = tdomf;
+			while(1){
+				/* get next domain policy */
+				orig = temp;
+				res = domain_get_next(&temp);
+				if (!res) break;
+				/* get subdomain name */
+				res2 = domain_get_name_sub(res);
+				if (res2){
+					int flag_once = 0;
+					temp2 = prog_rules;
+					strnull2(&rules_new);
+
+					while(1){
+						int i3;
+						/* get next line */
+						res3 = string_get_next_line(&temp2);
+						if (!res3) break;
+
+						/* get prog name and its rules */
+						i3 = string_search_keyword(res3, "allow_");
+						prog = 0;
+						strcpy2(&prog, res3);
+						prog[i3 - 1] = 0;
+						strlenset3(&prog, i3 - 1);
+						temp3 = prog;
+						prog_main = string_get_next_word(&temp3);
+						temp3 = res3 + i3;
+						rule = string_get_next_line(&temp3);
+
+						/* subdomains match? (compare prog's subdomain name to other subdomain name) */
+						if (!strcmp(prog_main, res2)){
+							/* if match, add rule to domain policy */
+							strcat2(&rules_new, rule);
+							strcat2(&rules_new, "\n");
+							if (!flag_once){
+								/* switch domain to learning mode */
+								domain_set_profile_for_prog(prog_main, 1);
+								/* reread domain because it changed when i changed its profile just now
+								 * in 'tdomf', and the old one was in 'res' */
+								free2(res);
+								temp = orig;
+								res = domain_get_next(&temp);
+								/* reset cpu time counter for prog because of switching it to learning mode,
+								 * or else it would switch back to enforcing mode immediately */
+								process_get_cpu_time_all(prog_main, 1);
+								/* add domain to temporary list */
+								if (string_search_line(tprogs_learn_auto, prog_main) == -1){
+									char *nn = 0;
+									
+									strcat2(&tprogs_learn_auto, prog_main);
+									strcat2(&tprogs_learn_auto, "\n");
+
+									/* print info */
+									color(prog_main, blue); color(", ", clr);
+									color("switch to learning mode\n", clr);
+
+									/* notification */
+									strcpy2(&nn, prog_main); strcat2(&nn, ", switch to learning mode");
+									notify(nn); free2(nn);
+								}
+								/* do it only once per domain for speed */
+								flag_once = 1;
+							}
+						}
+
+						free2(prog_main);
+						free2(prog);
+						free2(rule);
+						free2(res3);
+					}
+					free2(res2);
+				}
+				/* add domain policy to new policy */
+				strcat2(&tdomf_new, res);
+				strcat2(&tdomf_new, "\n");
+				strcat2(&tdomf_new, rules_new);
+				strcat2(&tdomf_new, "\n");
+				free2(res);
+			}
+			free2(rules_new);
+			
+			color("* switch domains with new rules to learning mode\n", red);
+
+			/* replace old policy with new one */
+			free2(tdomf);
+			tdomf = tdomf_new;
+		}
 	}
+	/* no rules to add */
+	else{
+		/* if there was a request for temporary learning mode
+		 * and no rules available to add,
+		 * then print log message about ending temporary learning mode */
+		if (flag_learn){
+			/* clear flag */
+			flag_learn  = 0;
+			flag_learn2 = 0;
+			color("* end temporary learning mode because of no deny logs ", yellow);
+			mytime_print_date(); newl();
+
+			/* notification */
+			notify("end temporary learning mode because of no deny logs");
+		}
+	}
+
+	free2(prog_rules);
+	free2(prog_rules2);
+	free2(tlogf2);
+	free2(tlogf3);
 }
 
 
@@ -8270,6 +8344,9 @@ void check_learn()
 				f = file_read(tlearn, 1);
 				/* check if length is not null */
 				if (strlen2(&f)){
+					
+					/* create backup on every user request for temporary learning mode too */
+					backup();
 
 					/* end former temporary learning mode if new one is requested */
 					if (flag_learn2){
@@ -8997,8 +9074,6 @@ int main(int argc, char **argv)
 			color("no change\n", green);
 			myexit(0);
 		}
-		/* load configs */
-		load();
 		/* create backup */
 		backup();
 		color("policy file backups created\n", green);
@@ -9031,8 +9106,6 @@ int main(int argc, char **argv)
 			color("no change\n", green);
 			myexit(0);
 		}
-		/* load configs */
-		load();
 		/* create backup */
 		backup();
 		color("policy file backups created\n", green);
@@ -9048,8 +9121,6 @@ int main(int argc, char **argv)
 			color("no change\n", green);
 			myexit(0);
 		}
-		/* load configs */
-		load();
 		/* create backup */
 		backup();
 		color("policy file backups created\n", green);
@@ -9067,14 +9138,14 @@ int main(int argc, char **argv)
 	t2 = 0;
 
 	while(1){
-		int tlogf_mod_time2;
+		int tlogf_mod_time3;
 
 		/* check running processes */
 		check_processes();
 		/* check signal of user request for learning mode */
 		check_learn();
 		/* check modification time of log file and read its content only if modified */
-		tlogf_mod_time2 = file_get_mod_time(tlog);
+		tlogf_mod_time3 = file_get_mod_time(tlog);
 
 		/* run policy check from time to time
 		 * or at once if temporary learning mode is requested,
@@ -9082,7 +9153,7 @@ int main(int argc, char **argv)
 		 * (only with temp learn mode or else a process could DoS the tomld process),
 		 * and not 30 sec later */
 		if ((mytime() - t) >= const_time_check_long2 || flag_learn3 ||
-			(flag_learn && tlogf_mod_time != tlogf_mod_time2)){
+			(flag_learn && tlogf_mod_time != tlogf_mod_time3)){
 
 			flag_safe = 0;
 			flag_learn3 = 0;
