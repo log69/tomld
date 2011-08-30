@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+30/08/2011 - tomld v0.45 - make notification messages more readable by prefixing an "*" char to every new message
 30/08/2011 - tomld v0.44 - create backup on every user request for temporary learning mode too
                          - change concept of temporary learning mode: from now when the user request a temporary learning mode,
                            only those domains will get switched back to learning mode that produced deny logs previously,
@@ -359,7 +360,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.44";
+char *ver = "0.45";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -664,7 +665,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Mon Aug 29 11:30:31 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Tue Aug 30 21:02:04 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -974,7 +975,8 @@ void notify(char *text)
 		file_write(tlog2_lock, "1");
 
 		/* write message */
-		strcpy2(&text2, text);
+		strcpy2(&text2, "* ");
+		strcat2(&text2, text);
 		strcat2(&text2, "\n");
 		file_writea(tlog2, text2);
 		free2(text2);
