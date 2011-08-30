@@ -152,8 +152,6 @@ auto confirm everything with yes
 
 .SH AUTHORS
 .br
-tomoyo learning daemon
-.br
 Copyright (C) 2011 Andras Horvath
 .br
 E\-mail: mail@log69.com \- suggestions & feedback are welcome
