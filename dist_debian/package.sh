@@ -69,7 +69,7 @@ echo "	dh_install ./tomld.svg usr/share/pixmaps" >> rules
 
 # manage logrotate
 cp ../tomld.logrotate .
-echo "	dh_install ./tomld.logrotate etc/logrotate.d/tomld" >> rules
+echo "	dh_install ./tomld etc/logrotate.d/" >> rules
 
 echo "	dh_auto_install" >> rules
 
