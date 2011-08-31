@@ -1,0 +1,6 @@
+/var/log/tomld.log {
+  monthly
+  rotate 6
+  compress
+  missingok
+}
