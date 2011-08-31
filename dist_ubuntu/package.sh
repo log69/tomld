@@ -66,8 +66,12 @@ echo "override_dh_auto_install:" >> rules
 echo "	dh_install ./tomld_learn.desktop usr/share/applications" >> rules
 echo "	dh_install ./tomld_notify.desktop usr/share/applications" >> rules
 echo "	dh_install ./tomld.svg usr/share/pixmaps" >> rules
-echo "	dh_auto_install" >> rules
 
+# manage logrotate
+cp ../tomld.logrotate .
+echo "	dh_install ./tomld.logrotate etc/logrotate.d/tomld" >> rules
+
+echo "	dh_auto_install" >> rules
 
 
 > dirs
