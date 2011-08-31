@@ -152,7 +152,7 @@ sed -i "0,/Andras Horvath <mail@log69.com>.*/s/Andras Horvath <mail@log69.com>.*
 
 
 grep -i "^version=" watch.ex > watch
-echo "http://log69.com/tomld.html downloads/tomld_v(.*)\.tar\.gz" >> watch
+echo "http://log69.com/tomld.html downloads/tomld_(.*)\.tar\.gz" >> watch
 rm -f watch.ex
 
 
