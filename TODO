@@ -1,10 +1,6 @@
 - run security checks on the final code
 - lots of tests
-- create more functions to make the code more readable
-- no regex
+- no use of regex while manipulating rules
 - make it fast
 - make it a boot service
 - entirely automatize all setup regarding Tomoyo
-- create an easily readable flow chart
-- create debian package
-- create manual and expand docs
