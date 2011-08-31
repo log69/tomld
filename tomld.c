@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+31/08/2011 - tomld v0.47 - fix logrotate in package
 31/08/2011 - tomld v0.46 - add logrotate to package
 30/08/2011 - tomld v0.45 - make notification messages more readable by prefixing an "*" char to every new message
 30/08/2011 - tomld v0.44 - create backup on every user request for temporary learning mode too
@@ -361,7 +362,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.46";
+char *ver = "0.47";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -666,7 +667,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 31 07:54:57 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 31 08:47:37 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
