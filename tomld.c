@@ -22,6 +22,12 @@
 
 changelog:
 -----------
+01/09/2011 - tomld v0.48 - bugfix: don't remove tomld uid entries from rules in domain_reshape_rules_recursive_dirs()
+                         - print date at the end of other warning log too
+                         - remove dir list from warning message about running time taking too long
+                         - improve --info function by printing the overall numbers of all domains and rules
+                         - improve --info function by printing the "restart needed" warning if necessary
+                         - improve --info function by printing the top dirs containing the most entries in rules by dir depth
 31/08/2011 - tomld v0.47 - fix logrotate in package
 31/08/2011 - tomld v0.46 - add logrotate to package
 30/08/2011 - tomld v0.45 - make notification messages more readable by prefixing an "*" char to every new message
@@ -362,7 +368,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.47";
+char *ver = "0.48";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -667,7 +673,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 31 08:47:37 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Aug 31 08:53:27 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -1634,15 +1640,19 @@ char *path_wildcard_temp(char *path)
 }
 
 
-/* takes a Tomoyo domain config as an input and check all rules in it
- * to find the subdir with the most files and return this path as a result */
+/* check all rules in the domain config to find the top dirs in rules
+ * containing the most enries by dir depth and return the a result */
 /* returned value must be freed by caller */
-char *path_find_subdir_with_most_files()
+void stat_print_top_dirs_with_most_entries()
 {
 	char *res, *res2, *temp, *temp2;
 	char *type, *param1, *param2;
-	char *list = 0, *new = 0;
-	int count = 0, count2 = 0;
+	char *list = 0, *top = 0, *new = 0;
+	int count, count2;
+	int depth;
+	const int min_depth = 1;
+	const int max_depth = 20;
+	int num_of_rules = 0;
 
 	/* cycle through all the rules and collect all paths to a string */
 	temp = tdomf;
@@ -1653,8 +1663,10 @@ char *path_find_subdir_with_most_files()
 		
 		/* is it a rule? */
 		if (string_search_keyword_first(res, "allow_")){
-			/* is it not an execute rule? */
-			if (!string_search_keyword_first(res, "allow_execute")){
+			num_of_rules++;
+
+			/* is it not an execute rule or myuid path? */
+			if (!string_search_keyword_first(res, "allow_execute") && !string_search_keyword_first(res, myuid_base)){
 				/* get params */
 				temp2 = res;
 				type   = string_get_next_word(&temp2);
@@ -1678,62 +1690,102 @@ char *path_find_subdir_with_most_files()
 	}
 	
 	/* sort list */
-	res = string_sort_uniq_lines(list);
+	res = string_sort_lines(list);
 	free2(list); list = res;
 	
-	/* cycle through the list */
-	temp = list;
-	res2 = 0;
-	while(1){
-		/* get next line */
-		res = string_get_next_line(&temp);
-		if (!res) break;
-		
-		/* is it not the first run? */
-		if (res2){
-			int flag = 0;
-			
-			/* get prent dirs */
-			char *p1 = path_get_parent_dir(res);
-			char *p2 = path_get_parent_dir(res2);
-			
-			/* count their subdirs */
-			int s1 = path_count_subdirs_name(p1);
-			int s2 = path_count_subdirs_name(p2);
-			
-			/* do number of subdirs match? */
-			if (s1 == s2){
-				/* paths match? */
-				if (compare_paths(p1, p2)){
-					flag = 1;
-				}
-			}
-			
-			/* was there a match? */
-			if (flag){
-				count ++;
-				if (count > count2){
-					strcpy2(&new, p1);
-					count2 = count;
-				}
-			}
-			else{
-				count = 0;
-			}
-			
-			free2(p1); free2(p2);
-		}
-		
-		/* store this path for next cycle */
-		strcpy2(&res2, res);
-		
-		free2(res);
-	}
+	/* are there any dirs? */
+	if (strlen2(&list)){
+		color("top directories with most entries at different depths:\n", yellow);
 
-	free2(res2);
+		/* run a check at different levels of dir depths */
+		depth = min_depth - 1;
+		while(depth++ < max_depth){
+			int i, l;
+			char *d;
+
+			/* cycle through the list */
+			temp = list;
+			res2 = 0;
+			count = 0;
+			count2 = 0;
+			while(1){
+				/* get next line */
+				res = string_get_next_line(&temp);
+				if (!res) break;
+				
+				/* is it not the first run? */
+				if (res2){
+
+					/* count their subdirs */
+					int s1 = path_count_subdirs_name(res);
+					int s2 = path_count_subdirs_name(res2);
+					
+					/* do number of subdirs match? */
+					if (s1 >= depth + 1 && s2 >= depth + 1){
+						/* get parent dirs of paths at given depth */
+						char *p1 = path_get_subdirs_name(res,  depth + 1);
+						char *p2 = path_get_subdirs_name(res2, depth + 1);
+						
+						/* paths match? */
+						if (compare_paths(p1, p2)){
+							count ++;
+							if (count > count2){
+								strcpy2(&top, p1);
+								count2 = count;
+							}
+						}
+						else{
+							count = 0;
+						}
+						
+						free2(p1); free2(p2);
+					}
+				}
+				
+				/* store this path for next cycle */
+				strcpy2(&res2, res);
+				
+				free2(res);
+			}
+			free2(res2);
+
+			/* was there any match? */
+			if (count2){
+				/* count percentage */
+				d = string_itos_zeros(count2 * 100 / num_of_rules, 4);
+				strcpy2(&new, d);
+				strcat2(&new, " %) ");
+				free2(d);
+
+				/* remove leading zeros from percentage */
+				i = 0;
+				l = strlen2(&new);
+				while(1){
+					char cc;
+					if (i > l - 1) break;
+					if (new[i] != '0') break;
+					cc = new[i + 1];
+					if (cc != '0'){
+						if (cc < '0' || cc > '9'){ if (i > 0) new[i - 1] = '('; }
+						else                  new[i] = '(';
+					}
+					else                  new[i] = ' ';
+					i++;
+				}
+
+				/* print percentage */
+				color(new, blue);
+
+				/* print path */
+				strcpy2(&new, top);
+				strcat2(&new, "\n");
+				color(new, red);
+			}
+		}
+		free2(top);
+		free2(new);
+	}
 	free2(list);
-	
-	return new;
 }
 
 
@@ -4513,7 +4565,42 @@ void domain_info(const char *pattern)
 		char *tdomf2, *res, *res2, *res3, *temp, *temp2;
 		char *c1, *c2, *c3;
 		char *texcf_new = 0;
+		char *sd, *sr;
+		int d = 0, r = 0;
+
+
+		/* print info about the number of domains and rules */
+		/* count domains */
+		temp = tdomf;
+		while(1){
+			res = domain_get_next(&temp);
+			if (!res) break;
+			d++;
+			free2(res);
+		}
+		/* count rules */
+		temp = tdomf;
+		while(1){
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			if (string_search_keyword_first(res, "allow_")) r++;
+			free2(res);
+		}
 		
+		/* print stat */
+		sd = string_itos(d);
+		sr = string_itos(r);
+		color(sd, blue);
+		color(" active domains, ", yellow);
+		color(sr, blue);
+		color(" rules\n", yellow);
+		free2(sd);
+		free2(sr);
+		newl();
+
+
+		color("progress of domains (* means enforcing mode):\n", yellow);
+
 		tdomf2 = tdomf;
 		while(1){
 			/* get next domain */
@@ -4537,7 +4624,7 @@ void domain_info(const char *pattern)
 						
 						strcat2(&texcf_new, "1 ");
 						strcat2(&texcf_new, percent);
-						strcat2(&texcf_new, "%) ");
+						strcat2(&texcf_new, "_%) ");
 						strcat2(&texcf_new, res2);
 						strcat2(&texcf_new, "\n");
 						
@@ -4551,7 +4638,7 @@ void domain_info(const char *pattern)
 		}
 
 		/* sort list */		
-		res = string_sort_uniq_lines(texcf_new);
+		res = string_sort_lines(texcf_new);
 		free2(texcf_new); texcf_new = res;
 
 
@@ -4569,54 +4656,48 @@ void domain_info(const char *pattern)
 			c1 = string_get_next_word(&temp2);
 			if (c1){
 				c2 = string_get_next_word(&temp2);
-				c3 = string_get_next_word(&temp2);
+				c3 = string_get_next_line(&temp2);
 				if (c2){
-					/* color option is on? if not, then print '*' char before enforcing mode domains */
-					if (opt_color){
-						/* enforcing mode domain? */
-						if (!strcmp(c1, "2")){ color("     * ", clr); color(c2, purple); newl(); }
-						else{
-							/* remove leading zeros from percentage */
-							int i = 0;
-							int l = strlen2(&c2);
-							while(1){
-								char cc;
-								if (i > l - 1) break;
-								if (c2[i] != '0') break;
-								cc = c2[i + 1];
-								if (cc != '0'){
-									if (cc < '0' || cc > '9'){ if (i > 0) c2[i - 1] = '('; }
-									else                  c2[i] = '(';
-								}
-								else                  c2[i] = ' ';
-								i++;
-							}
-
-							color(c2, blue); color(" ", clr); color(c3, red); newl();
-						}
-					}
+					/* enforcing mode domain? */
+					if (!strcmp(c1, "2")){ color("      * ", clr); color(c2, purple); newl(); }
 					else{
-						/* enforcing mode domain? */
-						if (!strcmp(c1, "2")){ color("     * ", clr); color(c2, purple); newl(); }
-						else{
-							/* remove leading zeros from percentage */
-							int i = 0;
-							int l = strlen2(&c2);
-							while(1){
-								char cc;
-								if (i > l - 1) break;
-								if (c2[i] != '0') break;
-								cc = c2[i + 1];
-								if (cc != '0'){
-									if (cc < '0' || cc > '9'){ if (i > 0) c2[i - 1] = '('; }
-									else                  c2[i] = '(';
-								}
-								else                  c2[i] = ' ';
-								i++;
-							}
+						int p_uptime, d_create;
 
-							color(c2, blue); color(" ", clr); color(c3, red); newl();
+						/* remove leading zeros from percentage */
+						int i = 0;
+						int l = strlen2(&c2);
+						while(1){
+							char cc;
+							if (i > l - 1) break;
+							if (c2[i] == '_') c2[i] = ' ';
+							if (c2[i] != '0') break;
+							cc = c2[i + 1];
+							if (cc != '0'){
+								if (cc < '0' || cc > '9'){ if (i > 0) c2[i - 1] = '('; }
+								else                  c2[i] = '(';
+							}
+							else                  c2[i] = ' ';
+							i++;
 						}
+
+						color(c2, blue); color(" ", clr); color(c3, red);
+
+						/* **************************************
+						 * check if restart is still needed,
+						 * this happens when the uptime of process is greater than
+						 * the time passed since domain creation */
+
+						/* get process uptime of domain */
+						p_uptime = process_get_least_uptime(c3);
+						/* get creation time of domain */
+						d_create = domain_get_creation_time(c3);
+						/* are all processes' uptime greater than the time passed since domain creation time?
+						 * if so, then this means that none of the domain's processes has been restarted since then
+						 * so this one blocks switching it to enforcing mode */
+						if (p_uptime && (d_create == -1 || d_create < p_uptime + 1)) color(" (restart needed)", clr);
+						/* *************************************** */
+
+						newl();
 					}
 					free2(c2);
 				}
@@ -4628,6 +4709,10 @@ void domain_info(const char *pattern)
 		}
 
 		free2(texcf_new);
+		newl();
+				
+		/* print info about the top directory with most entries of different depths */
+		stat_print_top_dirs_with_most_entries();
 	}
 }
 
@@ -7109,39 +7194,47 @@ void domain_reshape_rules_recursive_dirs()
 				
 				/* cycle through the rules */
 				strnull2(&rules);
+				strnull2(&rules2);
 				while(1){
 					/* get next rule */
 					res2 = string_get_next_line(&temp2);
 					if (!res2) break;
 					
-					/* store old rules */
-					strcat2(&rules, res2);
-					strcat2(&rules, "\n");
-					
 					/* do not run check on my uid entries */
-					if (!string_search_keyword_first(res2, myuid_base)){
+					if (string_search_keyword_first(res2, myuid_base)){
+						strcat2(&tdomf_new, res2);
+						strcat2(&tdomf_new, "\n");
+					}
+					else{
+
+						/* store old rules */
+						strcat2(&rules, res2);
+						strcat2(&rules, "\n");
+
 						/* get a modified rule by recursive dirs if any */
 						res3 = domain_get_rules_with_recursive_dirs(res2);
 						if (res3){
 							strcat2(&rules, res3);
 							free2(res3);
 						}
+
+						/* insert rule only if the former rule was not the same */
+						/* this is to avoid massive multiplication of the rules because of the recursive check */
+						if (strcmp(rules, rules2)){
+							/* add if no match */
+							strcat2(&tdomf_new, rules);
+							strcat2(&tdomf_new, "\n");
+							/* store new rule as old for next check */
+							strcpy2(&rules2, rules);
+						}
 					}
 
 					free2(res2);
 				}
-				/* insert rule only if the former rule was not the same */
-				/* this is to avoid massive multiplication of the rules because of the recursive check */
-				if (strcmp(rules, rules2)){
-					/* add if no match */
-					strcat2(&tdomf_new, rules);
-					strcat2(&tdomf_new, "\n");
-					/* store new rule as old for next check */
-					strcpy2(&rules2, rules);
-				}
 			}
 		}
 		free2(res);
+		strcat2(&tdomf_new, "\n");
 	}
 	free2(rules);
 	free2(rules2);
@@ -9177,29 +9270,9 @@ int main(int argc, char **argv)
 			
 			/* send warning on too long time cycle */
 			if (t3 > const_time_check_warning){
-				char *warning_dir = 0;
-
-				color("* warning: running cycles take too long\n", red);
+				color("* warning: running cycles take too long ", red);
+				mytime_print_date(); newl();
 				notify("warning: running cycles take too long");
-				
-				/* run a search to find the subdir containing the most files
-				 * and add this dir to the recursive directories
-				 * to avoid DoS */
-				warning_dir = path_find_subdir_with_most_files();
-				if (warning_dir){
-					char *res = 0;
-					
-					/* print info about the directory with most files */
-					strcpy2(&res, "* directory with most files is: ");
-					strcat2(&res, warning_dir);
-					strcat2(&res, "\n");
-
-					color(res, red);
-					notify(res);
-					
-					free2(res);
-					free2(warning_dir);
-				}
 			}
 			
 			/* run only once */
