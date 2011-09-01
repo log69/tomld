@@ -121,6 +121,8 @@ char *string_remove_line_from_pos(char *text, unsigned int pos);
 
 int string_cmp(const void *a, const void *b);
 
+char *string_sort_lines(const char *text);
+
 char *string_sort_uniq_lines(const char *text);
 
 char *array_copy_to_string_list(char **array);
