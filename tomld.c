@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+01/09/2011 - tomld v0.49 - bugfix: remove underscore from before % char in --info output
 01/09/2011 - tomld v0.48 - bugfix: don't remove tomld uid entries from rules in domain_reshape_rules_recursive_dirs()
                          - print date at the end of other warning log too
                          - remove dir list from warning message about running time taking too long
@@ -673,7 +674,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Aug 31 08:53:27 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Thu Sep  1 11:10:41 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4667,9 +4668,14 @@ void domain_info(const char *pattern)
 						int i = 0;
 						int l = strlen2(&c2);
 						while(1){
-							char cc;
 							if (i > l - 1) break;
 							if (c2[i] == '_') c2[i] = ' ';
+							i++;
+						}
+						i = 0;
+						while(1){
+							char cc;
+							if (i > l - 1) break;
 							if (c2[i] != '0') break;
 							cc = c2[i + 1];
 							if (cc != '0'){
