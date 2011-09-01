@@ -1016,6 +1016,81 @@ int string_cmp(const void *a, const void *b)
 }
 
 
+/* sort lines of a string */
+/* returned value must be freed by caller */
+char *string_sort_lines(const char *text)
+{
+	char c, **ptr;
+	char *text_new, *text_sort;
+	int flag_newl = 0;
+	int i, i2, count;
+	int maxl;
+
+	if (!text) return 0;
+
+	/* return null on zero input */
+	if (!text[0]) return (memget2(1));
+
+	maxl = strlen(text) + 1;
+	text_sort = memget2(maxl);
+	/* create a copy of text for sorting */
+	strcpy2(&text_sort, text);
+
+	/* count lines */
+	i = 0;
+	count = 0;
+	while(1){
+		c = text[i++];
+		/* exit on end */
+		if (!c) break;
+		if (c == '\n') count++;
+	}
+
+	/* alloc mem for char pointers pointing to string lines */
+	ptr = memget_ptr(count);
+	
+	/* change new line chars to nulls and create pointer list to string lines */
+	i = 0;
+	i2 = 0;
+	flag_newl = 0;
+	while(1){
+		c = text_sort[i];
+		/* exit on end */
+		if (!c) break;
+		/* add pointer at first line or after every new line */
+		if (!flag_newl){
+			ptr[i2++] = text_sort + i;
+			flag_newl = 1;
+		}
+		/* make a mark at new line and change new line to zero */
+		if (c == '\n'){
+			text_sort[i] = 0;
+			flag_newl = 0;
+		}
+		i++;
+	}
+	
+	/* sort it */
+	qsort(ptr, count, sizeof(char *), string_cmp);
+
+	/* create another string holder */
+	text_new = memget2(maxl);
+
+	/* collect lines back from pointer list */
+	i = 0;
+	i2 = count;
+	while(i2--){
+		char *s = ptr[i++];
+		strcat2(&text_new, s);
+		strcat2(&text_new, "\n");
+	}
+	free2(text_sort);
+	free(ptr);
+
+	return text_new;
+}
+
+
 /* sort lines of a string and make it uniq */
 /* returned value must be freed by caller */
 char *string_sort_uniq_lines(const char *text)
