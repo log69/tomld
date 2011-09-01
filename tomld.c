@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+01/09/2011 - tomld v0.50 - bugfix: don't add binaries of network processes with (deleted) tag on startup
 01/09/2011 - tomld v0.49 - bugfix: remove underscore from before % char in --info output
 01/09/2011 - tomld v0.48 - bugfix: don't remove tomld uid entries from rules in domain_reshape_rules_recursive_dirs()
                          - print date at the end of other warning log too
@@ -369,7 +370,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.49";
+char *ver = "0.50";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -674,7 +675,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Thu Sep  1 13:22:09 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Thu Sep  1 13:35:17 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -8838,8 +8839,9 @@ void check_processes()
 								if (string_search_keyword_first_all(mysock, "socket:") > -1){
 									/* is the inode number in netf3's list? */
 									if (string_search_line(netf3, mysock) > -1){
-										/* is it in my progs list yet? */
-										if (string_search_line(tprogs, myprog) == -1 && string_search_line(tprogs_exc, myprog) == -1){
+										/* is it not in my progs list yet, or in exception domains or is it not a (deleted) domain? */
+										if (string_search_line(tprogs, myprog) == -1 && string_search_line(tprogs_exc, myprog) == -1
+											&& !string_search_keyword_last(myprog, " (deleted)")){
 											strcat2(&tprogs, myprog);
 											strcat2(&tprogs, "\n");
 											if (flag_firstrun){ color(myprog, blue); newl(); }
