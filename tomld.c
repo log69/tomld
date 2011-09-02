@@ -22,6 +22,12 @@
 
 changelog:
 -----------
+02/09/2011 - tomld v0.51 - [replace] tag can contain files beside dirs too from now
+                         - expand [replace] tag with .recently-used.xbel.\* wildcard because its random part contains
+                           only upper case chars and nums, no lower case chars in this case,
+                           trying to avoid exceptions though
+                         - fix mem leaks
+                         - some code cleanup
 01/09/2011 - tomld v0.50 - bugfix: don't add binaries of network processes with (deleted) tag on startup
 01/09/2011 - tomld v0.49 - bugfix: remove underscore from before % char in --info output
 01/09/2011 - tomld v0.48 - bugfix: don't remove tomld uid entries from rules in domain_reshape_rules_recursive_dirs()
@@ -370,7 +376,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.50";
+char *ver = "0.51";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -649,7 +655,7 @@ char *tspecf = 0;
 char *spec_exception[] = {"/", "/dev/", "/var/run/", "/etc/", "/home/\\*/", "/root/", 0};
 char *spec_wildcard[] = {"/home/\\{\\*\\}/", "/usr/share/\\{\\*\\}/", "/etc/fonts/\\{\\*\\}/",
                 "/var/cache/\\{\\*\\}/", "/dev/pts/", 0};
-char *spec_replace[] = {"/var/run/gdm/auth-for-\\*/", 0};
+char *spec_replace[] = {"/var/run/gdm/auth-for-\\*/", "/home/\\*/.recently-used.xbel.\\*", 0};
 char *spec_exception2 = 0;
 char *spec_wildcard2 = 0;
 char *spec_replace2 = 0;
@@ -675,7 +681,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Thu Sep  1 13:35:17 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Thu Sep  1 13:53:44 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -3951,17 +3957,26 @@ void check_config()
 					
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
-						/* add "/" char to the end of dirs if missing
-						 * if last tag was not [mail] */
+						/* also add "/" char to the end of some of the dirs if missing */
 						long l = strlen2(&res);
-						if ((flag_spec < 5 || flag_spec > 8) && l > 0){
-							if (res[l - 1] != '/') strcat2(&res, "/"); }
+
 						/* store line */
-						if (flag_spec == 1){ strcat2(&spec_exception2, res); strcat2(&spec_exception2, "\n"); }
-						if (flag_spec == 2){ strcat2(&spec_wildcard2,  res); strcat2(&spec_wildcard2,  "\n"); }
+						if (flag_spec == 1){
+							if (l > 0){ if (res[l - 1] != '/') strcat2(&res, "/"); }
+							strcat2(&spec_exception2, res); strcat2(&spec_exception2, "\n"); }
+
+						if (flag_spec == 2){
+							if (l > 0){ if (res[l - 1] != '/') strcat2(&res, "/"); }
+							strcat2(&spec_wildcard2,  res); strcat2(&spec_wildcard2,  "\n"); }
+
 						if (flag_spec == 3){ strcat2(&spec_replace2,   res); strcat2(&spec_replace2,   "\n"); }
-						if (flag_spec == 4){ strcat2(&dirs_recursive,  res); strcat2(&dirs_recursive,  "\n"); }
+
+						if (flag_spec == 4){
+							if (l > 0){ if (res[l - 1] != '/') strcat2(&res, "/"); }
+							strcat2(&dirs_recursive,  res); strcat2(&dirs_recursive,  "\n"); }
+
 						if (flag_spec == 5){ strcat2(&mail_users,      res); strcat2(&mail_users,       " "); }
+
 						if (flag_spec == 6){
 							/* executable exists? */
 							char *res3 = which(res);
@@ -5316,6 +5331,8 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 		}
 		free2(rules);
 	}
+	free2(tlogf2);
+	free2(tlogf3);
 
 	return prog_rules;
 }
@@ -5326,7 +5343,6 @@ void domain_get_log()
 {
 	/* vars */
 	char *res, *res2, *res3, *temp, *temp2, *temp3, *orig;
-	char *tlogf2 = 0, *tlogf3 = 0;
 	char *prog_rules = 0;
 	char *prog_rules2 = 0;
 
@@ -5608,8 +5624,6 @@ void domain_get_log()
 
 	free2(prog_rules);
 	free2(prog_rules2);
-	free2(tlogf2);
-	free2(tlogf3);
 }
 
 
@@ -6303,23 +6317,37 @@ int compare_path_search_dir_in_list(char *list, char *dir)
 }
 
 
-/* search for dir in a list of dirs comparing only the beginnings of paths
+/* search for path in a list of paths comparing only the beginnings of paths if the list has a dir,
+ * or comparing full paths if both are files,
  * and return path with all wildcards taken from both paths on match */
 /* returned value must be freed by caller */
-char *compare_path_search_dir_in_list_first_subdirs(char *list, char *dir)
+char *compare_path_search_path_in_list_first_subdirs(char *list, char *dir)
 {
 	char *res, *res2, *temp;
 	int c, c1, c2, i1, i2, in1, in2;
 	int flag1, flag2;
 	long l1, l2;
+	
+	if (!list || !dir) return 0;
+
 
 	/* search for the dir in the list by wildcarded compare */
 	temp = list;
 	while(1){
 		res = string_get_next_line(&temp);
 		if (!res) return 0;
-		c = path_count_subdirs_name(res);
-		res2 = path_get_subdirs_name(dir, c);
+		
+		/* path in list is not a dir?
+		 * if so, then compare full paths */
+		if (!path_is_dir(res)){
+			res2 = 0;
+			strcpy2(&res2, dir);
+		}
+		else{
+			c = path_count_subdirs_name(res);
+			res2 = path_get_subdirs_name(dir, c);
+		}
+
 		if (compare_paths(res, res2)){
 
 			/* merge together the 2 paths subdir by subdir
@@ -6329,7 +6357,7 @@ char *compare_path_search_dir_in_list_first_subdirs(char *list, char *dir)
 			char *path2 = dir;
 			char *new, *new1, *new2;
 			l1 = strlen2(&path1);
-			l2 = strlen2(&path2);
+			l2 = strlen(path2);
 			new  = memget2((l1 + l2) * 2);
 			/* paths not null? */
 			if (l1 && l2){
@@ -6392,8 +6420,8 @@ char *compare_path_search_dir_in_list_first_subdirs(char *list, char *dir)
 			free2(res2);
 			return new;
 		}
-		free2(res);
 		free2(res2);
+		free2(res);
 	}
 	
 	return 0;
@@ -7492,7 +7520,7 @@ void domain_reshape_rules_wildcard_spec()
 							}
 
 							/* replace dir with the one in spec_replace if any */
-							res2 = compare_path_search_dir_in_list_first_subdirs(spec_replace2, param);
+							res2 = compare_path_search_path_in_list_first_subdirs(spec_replace2, param);
 							if (res2){
 								free2(param);
 								param = res2;
