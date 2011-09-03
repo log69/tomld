@@ -23,6 +23,7 @@
 changelog:
 -----------
 03/09/2011 - tomld v0.53 - add a detailed description of the solution of a warning message regarding the slow cycles
+                         - improve colorization of --info option so it works good on chrooted directories too
 03/09/2011 - tomld v0.52 - bugfix: don't add the same rules several times to the same domain while making recursive dirs
 02/09/2011 - tomld v0.51 - [replace] tag can contain files beside dirs too from now
                          - expand [replace] tag with .recently-used.xbel.\* wildcard because its random part contains
@@ -4539,26 +4540,50 @@ void domain_info(const char *pattern)
 					res2 = string_get_next_line(&text_temp);
 					/* exit on end of domain block */
 					if (!res2) break;
-					/* print non empty lines */
+					/* print non empty lines only */
 					if (strlen2(&res2)){
-						char *h = 0;
-						strcpy2(&h, home);
-						strcat2(&h, "/");
 					
-						/* print rules with reading libs in yellow */
-						if (string_search_keyword_first(res2, "allow_read /lib/") ||
-						    string_search_keyword_first(res2, "allow_read /usr/lib/")){
-							color(res2, yellow); newl();
+						/* print uid entries in purple */
+						if (string_search_keyword_first(res2, myuid_base)){
+							color(res2, purple);
 						}
-						/* print rules with touching /home in light blue */
-						else if (string_search_keyword(res2, h) > -1){
-							color(res2, cyan); newl();
-						}
-						/* print the rest in red */
 						else{
-							color(res2, red); newl();
+							int flag_lib = 0;
+							char *h = 0;
+							strcpy2(&h, home);
+							strcat2(&h, "/");
+
+							/* print rules with reading libs in yellow */
+							if (string_search_keyword_first(res2, "allow_read ")){
+								if (string_search_keyword(res2, "/lib/") > -1){
+									/* does filename contain an .so part meaning it's a shared lib? */
+									char *temp3 = res2;
+									char *f = string_get_last_word(&temp3);
+									char *f2 = path_get_filename(f);
+									int i = string_search_keyword(f2, ".so");
+									if (i > -1){
+										char c = f2[i + 3];
+										if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))){
+											flag_lib = 1;
+										}
+									}
+									free2(f); free2(f2);
+								}
+							}
+							if (flag_lib) color(res2, yellow);
+
+							/* print rules with touching .../home/... in light blue */
+							else if (string_search_keyword(res2, h) > -1){
+								color(res2, cyan);
+							}
+
+							/* print the rest in red */
+							else{
+								color(res2, red);
+							}
+							free2(h);
 						}
-						free2(h);
+						newl();
 					}
 					free2(res2);
 				}
