@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+03/09/2011 - tomld v0.52 - bugfix: don't add the same rules several times to the same domain while making recursive dirs
 02/09/2011 - tomld v0.51 - [replace] tag can contain files beside dirs too from now
                          - expand [replace] tag with .recently-used.xbel.\* wildcard because its random part contains
                            only upper case chars and nums, no lower case chars in this case,
@@ -376,7 +377,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.51";
+char *ver = "0.52";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -681,7 +682,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Thu Sep  1 13:53:44 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Fri Sep  2 10:04:41 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -7235,32 +7236,27 @@ void domain_reshape_rules_recursive_dirs()
 					res2 = string_get_next_line(&temp2);
 					if (!res2) break;
 					
-					/* do not run check on my uid entries */
-					if (string_search_keyword_first(res2, myuid_base)){
-						strcat2(&tdomf_new, res2);
-						strcat2(&tdomf_new, "\n");
-					}
-					else{
+					strcat2(&tdomf_new, res2);
+					strcat2(&tdomf_new, "\n");
 
-						/* store old rules */
-						strcat2(&rules, res2);
-						strcat2(&rules, "\n");
+					/* do not run check on my uid entries */
+					if (!string_search_keyword_first(res2, myuid_base)){
 
 						/* get a modified rule by recursive dirs if any */
 						res3 = domain_get_rules_with_recursive_dirs(res2);
 						if (res3){
-							strcat2(&rules, res3);
+							strcpy2(&rules, res3);
 							free2(res3);
-						}
 
-						/* insert rule only if the former rule was not the same */
-						/* this is to avoid massive multiplication of the rules because of the recursive check */
-						if (strcmp(rules, rules2)){
-							/* add if no match */
-							strcat2(&tdomf_new, rules);
-							strcat2(&tdomf_new, "\n");
-							/* store new rule as old for next check */
-							strcpy2(&rules2, rules);
+							/* insert rule only if the former rule was not the same */
+							/* this is to avoid massive multiplication of the rules because of the recursive check */
+							if (strcmp(rules, rules2)){
+								/* add if no match */
+								strcat2(&tdomf_new, rules);
+								strcat2(&tdomf_new, "\n");
+								/* store new rule as old for next check */
+								strcpy2(&rules2, rules);
+							}
 						}
 					}
 
