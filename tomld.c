@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+03/09/2011 - tomld v0.53 - add a detailed description of the solution of a warning message regarding the slow cycles
 03/09/2011 - tomld v0.52 - bugfix: don't add the same rules several times to the same domain while making recursive dirs
 02/09/2011 - tomld v0.51 - [replace] tag can contain files beside dirs too from now
                          - expand [replace] tag with .recently-used.xbel.\* wildcard because its random part contains
@@ -377,7 +378,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.52";
+char *ver = "0.53";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -651,8 +652,8 @@ char *tshellf[] = {"/bin/bash", "/bin/csh", "/bin/dash", "/bin/ksh", "/bin/rbash
 "/usr/bin/screen", 0};
 char *tshellf2 = 0;
 
-char *tspec = "/etc/tomld/tomld.conf";
-char *tspecf = 0;
+char *tconf = "/etc/tomld/tomld.conf";
+char *tconff = 0;
 char *spec_exception[] = {"/", "/dev/", "/var/run/", "/etc/", "/home/\\*/", "/root/", 0};
 char *spec_wildcard[] = {"/home/\\{\\*\\}/", "/usr/share/\\{\\*\\}/", "/etc/fonts/\\{\\*\\}/",
                 "/var/cache/\\{\\*\\}/", "/dev/pts/", 0};
@@ -682,7 +683,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Fri Sep  2 10:04:41 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sat Sep  3 08:21:39 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -3926,14 +3927,14 @@ void check_config()
 	char mode[] = "0755";
 
 	/* load tomld config of special dirs */
-	if (file_exist(tspec)){
+	if (file_exist(tconf)){
 		char *res, *res2, *temp, *temp2;
 		int flag_spec = 0;
 		
 		/* read file */
-		tspecf = file_read(tspec, 0);
+		tconff = file_read(tconf, 0);
 		/* cycle through config and sort it out */
-		temp = tspecf;
+		temp = tconff;
 		while(1){
 			/* read 1 line */
 			res = string_get_next_line(&temp);
@@ -4027,7 +4028,7 @@ void check_config()
 			}
 			free2(res);
 		}
-		free2(tspecf);
+		free2(tconff);
 	}
 
 	/* initialize special dir lists with default value that have no tag in config file */
@@ -9094,7 +9095,7 @@ void myinit()
 	string_add_line_uniq(&tomld_path, res); free2(res);
 	res = path_get_dir(tlearn_list);
 	string_add_line_uniq(&tomld_path, res); free2(res);
-	res = path_get_dir(tspec);
+	res = path_get_dir(tconf);
 	string_add_line_uniq(&tomld_path, res); free2(res);
 
 	/* choose log file */
@@ -9304,6 +9305,11 @@ int main(int argc, char **argv)
 			if (t3 > const_time_check_warning){
 				color("* warning: running cycles take too long ", red);
 				mytime_print_date(); newl();
+				color("  use --info option to see which directories have the most entries\n", red);
+				color("  some of them may be put under [recursive] tag in ", red);
+				color(tconf, red); newl();
+				color("  use --info option to see which directories have the most entries\n", red);
+
 				notify("warning: running cycles take too long");
 			}
 			
