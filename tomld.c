@@ -4561,9 +4561,9 @@ void domain_info(const char *pattern)
 									char *f = string_get_last_word(&temp3);
 									char *f2 = path_get_filename(f);
 									int i = string_search_keyword(f2, ".so");
-									if (i > -1){
+									if (string_search_keyword_first(f2, "lib") && i > -1){
 										char c = f2[i + 3];
-										if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'))){
+										if (c == 0 || c == '.'){
 											flag_lib = 1;
 										}
 									}
