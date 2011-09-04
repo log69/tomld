@@ -22,6 +22,9 @@
 
 changelog:
 -----------
+04/09/2011 - tomld v0.55 - remove checking tomoyo in /proc/cmdline which is not proper method if it's set at compile time
+                         - check the existence of /proc/net/files before reading them
+                           problem was reported that if IPv6 support is disabled, then /proc/net/tcp6 and udp6 is missing
 04/09/2011 - tomld v0.54 - print info about chrooted processes on startup and in every cycles too
                          - run check on chroot only in big cycles to save resources
                          - fix mem leak
@@ -384,7 +387,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.54";
+char *ver = "0.55";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -693,7 +696,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sun Sep  4 12:12:50 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sun Sep  4 15:24:17 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -3880,15 +3883,6 @@ void check_tomoyo()
 		free2(cmd);
 	}
 
-	/* check kernel command line */
-	cmd = file_read("/proc/cmdline", -1);
-	if (string_search_keyword(cmd, "security=tomoyo") == -1){
-		free2(cmd);
-		error("error: tomoyo kernel mode is not activated\n");
-		myexit(1);
-	}
-	free2(cmd);
-
 	/* check mount state of securityfs */
 	cmd = file_read("/proc/mounts", -1);
 	if (string_search_keyword_first_all(cmd, "none /sys/kernel/security securityfs") == -1
@@ -3899,7 +3893,7 @@ void check_tomoyo()
 		flag_mount = mount("none", "/sys/kernel/security", "securityfs", MS_NOATIME, 0);
 		if (flag_mount == -1){
 			free2(cmd);
-			error("error: tomoyo securityfs cannot be mounted\n");
+			error("error: tomoyo securityfs cannot be mounted - probable reason: tomoyo is not activated\n");
 			myexit(1);
 		}
 	}
@@ -8971,28 +8965,31 @@ void check_processes()
 		while (1){
 			char *res, *res2, *res3, *temp, *temp2;
 			if (!netf[i]) break;
-			/* read file */
-			res = file_read(netf[i++], -1);
-			temp = res;
-			/* skip one line */
-			res2 = string_get_next_line(&temp);
-			free2(res2);
-			/* get all column 10 (uid) */
-			while(1){
-				/* get next line */
+			/* /proc/net/file exists? */
+			if (file_exist(netf[i])){
+				/* read file */
+				res = file_read(netf[i++], -1);
+				temp = res;
+				/* skip one line */
 				res2 = string_get_next_line(&temp);
-				if (!res2) break;
-				temp2 = res2;
-				res3 = string_get_next_wordn(&temp2, 9);
-				if (res3){
-					strcat2(&netf2, "socket:[");
-					strcat2(&netf2, res3);
-					strcat2(&netf2, "]\n");
-					free2(res3);
-				}
 				free2(res2);
+				/* get all column 10 (uid) */
+				while(1){
+					/* get next line */
+					res2 = string_get_next_line(&temp);
+					if (!res2) break;
+					temp2 = res2;
+					res3 = string_get_next_wordn(&temp2, 9);
+					if (res3){
+						strcat2(&netf2, "socket:[");
+						strcat2(&netf2, res3);
+						strcat2(&netf2, "]\n");
+						free2(res3);
+					}
+					free2(res2);
+				}
+				free2(res);
 			}
-			free2(res);
 		}
 
 		/* sort pid list */
