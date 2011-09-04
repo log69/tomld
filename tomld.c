@@ -22,6 +22,9 @@
 
 changelog:
 -----------
+04/09/2011 - tomld v0.54 - print info about chrooted processes on startup and in every cycles too
+                         - run check on chroot only in big cycles to save resources
+                         - fix mem leak
 04/09/2011 - tomld v0.53 - determine processes run from chroot automatically and use these chroot dirs as a prefix
                            to my special exception directory lists
                          - add a detailed description of the solution of a warning message regarding the slow cycles
@@ -381,7 +384,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.53";
+char *ver = "0.54";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -646,6 +649,7 @@ char *tprogs = 0;
 char *tprogs_exc = 0;
 char *tprogs_exc_manual[] = {"/sbin/init", "/usr/sbin/tomoyo-loadpolicy", "/usr/sbin/sshd", 0};
 char *tprogs_learn = 0;
+char *tprogs_chroot = 0;
 
 char *netf[] = {"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6", 0};
 
@@ -689,7 +693,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sat Sep  3 08:21:39 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sun Sep  4 12:12:50 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -791,6 +795,7 @@ void myfree()
 	free2(tprogs);
 	free2(tprogs_exc);
 	free2(tprogs_learn);
+	free2(tprogs_chroot);
 	free2(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
 	if (dirs_recursive_sub)		free(dirs_recursive_sub);
@@ -8780,6 +8785,7 @@ void check_chroot()
 	char *mypid = 0;
 	char *chroot_list = 0;
 	char *temp, *temp2;
+	int flag_firstrun = 1;
 
 	/* ****************** */
 	/* copy special first */
@@ -8821,16 +8827,32 @@ void check_chroot()
 					strcat2(&mydir_name2, "/exe");
 					res2 = path_link_read(mydir_name2);
 					if (res2){
-						/* expand dir name with "/" char */
-						char *res3 = 0;
-						strcpy2(&res3, res);
-						strcat2(&res3, "/");
-						/* does the process' path contain the same directory? */
-						if (string_search_keyword_first(res2, res3)){
-							/* add chroot dir to the chroot list */
-							string_add_line_uniq(&chroot_list, res);
+						/* is process among domains? */
+						if (string_search_line(tprogs, res2) > -1){
+							/* expand dir name with "/" char */
+							char *res3 = 0;
+							strcpy2(&res3, res);
+							strcat2(&res3, "/");
+							/* does the process' path contain the same directory? */
+							if (string_search_keyword_first(res2, res3)){
+								/* new chrooted prog? if so, then print info */
+								if(string_search_line(tprogs_chroot, res2) == -1){
+									/* add prog to chroot list */
+									strcat2(&tprogs_chroot, res2);
+									strcat2(&tprogs_chroot, "\n");
+									/* print info about chrooted progs */
+									if (flag_firstrun) color("* new processes run from chroot:\n", green);
+									flag_firstrun = 0;
+									color(res2, blue);
+									color(", ", clr); color(res, clr);
+									newl();
+								}
+
+								/* add chroot dir to the chroot list */
+								string_add_line_uniq(&chroot_list, res);
+							}
+							free2(res3);
 						}
-						free2(res3);
 						free2(res2);
 					}
 				}
@@ -8897,6 +8919,7 @@ void check_chroot()
 
 		free2(res);
 	}
+	free2(chroot_list);
 }
 
 
@@ -9434,8 +9457,6 @@ int main(int argc, char **argv)
 	while(1){
 		int tlogf_mod_time3;
 
-		/* check if there are processes run from chroot */
-		check_chroot();
 		/* check running processes */
 		check_processes();
 		/* check signal of user request for learning mode */
@@ -9456,6 +9477,9 @@ int main(int argc, char **argv)
 
 			/* store time for speed comparision */			
 			t3 = mytime();
+
+			/* check if there are processes run from chroot */
+			check_chroot();
 
 			/* manage policy and rules */
 			check();
