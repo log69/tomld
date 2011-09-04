@@ -22,7 +22,9 @@
 
 changelog:
 -----------
-03/09/2011 - tomld v0.53 - add a detailed description of the solution of a warning message regarding the slow cycles
+04/09/2011 - tomld v0.53 - determine processes run from chroot automatically and use these chroot dirs as a prefix
+                           to my special exception directory lists
+                         - add a detailed description of the solution of a warning message regarding the slow cycles
                          - improve colorization of --info option so it works good on chrooted directories too
 03/09/2011 - tomld v0.52 - bugfix: don't add the same rules several times to the same domain while making recursive dirs
 02/09/2011 - tomld v0.51 - [replace] tag can contain files beside dirs too from now
@@ -660,8 +662,11 @@ char *spec_wildcard[] = {"/home/\\{\\*\\}/", "/usr/share/\\{\\*\\}/", "/etc/font
                 "/var/cache/\\{\\*\\}/", "/dev/pts/", 0};
 char *spec_replace[] = {"/var/run/gdm/auth-for-\\*/", "/home/\\*/.recently-used.xbel.\\*", 0};
 char *spec_exception2 = 0;
+char *spec_exception3 = 0;
 char *spec_wildcard2 = 0;
+char *spec_wildcard3 = 0;
 char *spec_replace2 = 0;
+char *spec_replace3 = 0;
 
 
 /* ----------------------------------- */
@@ -813,8 +818,11 @@ void myfree()
 	free2(domain_cputime_list_plus);
 	free2(domain_cputime_list_current);
 	free2(spec_exception2);
+	free2(spec_exception3);
 	free2(spec_wildcard2);
+	free2(spec_wildcard3);
 	free2(spec_replace2);
+	free2(spec_replace3);
 	free2(mail_users);
 	free2(tomld_path);
 }
@@ -7516,11 +7524,11 @@ void domain_reshape_rules_wildcard_spec()
 						if (param[0] == '/'){
 
 							/* check dir in exception */
-							if (compare_path_search_dir_in_list(spec_exception2, pdir)) flag_ex = 1;
+							if (compare_path_search_dir_in_list(spec_exception3, pdir)) flag_ex = 1;
 							
 							/* is it in spec_wildcard? */
 							if (!flag_ex){
-								if (compare_path_search_dir_in_list(spec_wildcard2, pdir)) flag = 1;
+								if (compare_path_search_dir_in_list(spec_wildcard3, pdir)) flag = 1;
 							}
 
 							/* is it in spec2? */
@@ -7534,7 +7542,7 @@ void domain_reshape_rules_wildcard_spec()
 							if (!flag_ex){
 								/* isn't parent dir in special excluded dir? */
 								res2 = path_get_parent_dir(pdir);
-								if (!compare_path_search_dir_in_list(spec_exception2, res2)){
+								if (!compare_path_search_dir_in_list(spec_exception3, res2)){
 									/* is dir in mkdir list? */
 									if (compare_path_search_dir_in_list(spec3_mkdir, pdir)) flag3 = 1;
 								}
@@ -7542,7 +7550,7 @@ void domain_reshape_rules_wildcard_spec()
 							}
 
 							/* replace dir with the one in spec_replace if any */
-							res2 = compare_path_search_path_in_list_first_subdirs(spec_replace2, param);
+							res2 = compare_path_search_path_in_list_first_subdirs(spec_replace3, param);
 							if (res2){
 								free2(param);
 								param = res2;
@@ -8761,6 +8769,137 @@ void print_info_config()
 }
 
 
+/* search for processes run from chroot and add these chroot directories
+ * to the special lists too as a prefix */
+void check_chroot()
+{
+	DIR *mydir;
+	struct dirent *mydir_entry;
+	char *mydir_name  = 0;
+	char *mydir_name2 = 0;
+	char *mypid = 0;
+	char *chroot_list = 0;
+	char *temp, *temp2;
+
+	/* ****************** */
+	/* copy special first */
+	/* ****************** */
+	strcpy2(&spec_exception3, spec_exception2);
+	strcpy2(&spec_wildcard3,  spec_wildcard2);
+	strcpy2(&spec_replace3,   spec_replace2);
+	
+	/* ************************************ */
+	/* search for processes run from chroot */
+	/* ************************************ */
+	/* open /proc dir */
+	mydir = opendir("/proc/");
+	if (!mydir){ error("error: cannot open /proc/ directory\n"); myexit(1); }
+
+	/* cycle through dirs in /proc */
+	while((mydir_entry = readdir(mydir))) {
+		/* get the dir names inside /proc dir */
+		strcpy2(&mypid, mydir_entry->d_name);
+
+		/* does it contain only numbers meaning they are pids? */
+		if (string_is_number(mypid)) {
+			char *res;
+			/* create dirname like /proc/pid/root */
+			strcpy2(&mydir_name, "/proc/");
+			strcat2(&mydir_name, mypid);
+			strcat2(&mydir_name, "/root");
+
+			/* resolv the link pointing from the root link */
+			res = path_link_read(mydir_name);
+			if (res){
+				/* is the root dir of process only a "/" path?
+				 * or it's a different chroot dir? */
+				if (strcmp(res, "/")){
+					char *res2;
+					/* create dirname like /proc/pid/exe */
+					strcpy2(&mydir_name2, "/proc/");
+					strcat2(&mydir_name2, mypid);
+					strcat2(&mydir_name2, "/exe");
+					res2 = path_link_read(mydir_name2);
+					if (res2){
+						/* expand dir name with "/" char */
+						char *res3 = 0;
+						strcpy2(&res3, res);
+						strcat2(&res3, "/");
+						/* does the process' path contain the same directory? */
+						if (string_search_keyword_first(res2, res3)){
+							/* add chroot dir to the chroot list */
+							string_add_line_uniq(&chroot_list, res);
+						}
+						free2(res3);
+						free2(res2);
+					}
+				}
+				free2(res);
+			}
+		}
+	}
+	closedir(mydir);
+
+	free2(mydir_name);
+	free2(mydir_name2);
+	free2(mypid);
+
+	/* **************************************************** */
+	/* add chroot dir as a prefix to all paths in all lists */
+	/* **************************************************** */
+	temp = chroot_list;
+	while(1){
+		/* get next chroot dir */
+		char *res = string_get_next_line(&temp);
+		if (!res) break;
+		
+		temp2 = spec_exception2;
+		while(1){
+			/* get next special path */
+			char *res2 = string_get_next_line(&temp2);
+			if (!res2) break;
+			
+			/* add chroot dir as a prefix to new list */
+			strcat2(&spec_exception3, res);
+			strcat2(&spec_exception3, res2);
+			strcat2(&spec_exception3, "\n");
+			
+			free2(res2);
+		}
+		
+		temp2 = spec_wildcard2;
+		while(1){
+			/* get next special path */
+			char *res2 = string_get_next_line(&temp2);
+			if (!res2) break;
+			
+			/* add chroot dir as a prefix to new list */
+			strcat2(&spec_wildcard3, res);
+			strcat2(&spec_wildcard3, res2);
+			strcat2(&spec_wildcard3, "\n");
+			
+			free2(res2);
+		}
+		
+		temp2 = spec_replace2;
+		while(1){
+			/* get next special path */
+			char *res2 = string_get_next_line(&temp2);
+			if (!res2) break;
+			
+			/* add chroot dir as a prefix to new list */
+			strcat2(&spec_replace3, res);
+			strcat2(&spec_replace3, res2);
+			strcat2(&spec_replace3, "\n");
+			
+			free2(res2);
+		}
+
+		free2(res);
+	}
+}
+
+
 /* ------------------------------------ */
 /* ------- PROCESS SEARCH LOOP -------- */
 /* ------------------------------------ */
@@ -9295,6 +9434,8 @@ int main(int argc, char **argv)
 	while(1){
 		int tlogf_mod_time3;
 
+		/* check if there are processes run from chroot */
+		check_chroot();
 		/* check running processes */
 		check_processes();
 		/* check signal of user request for learning mode */
