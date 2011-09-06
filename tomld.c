@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+06/09/2011 - tomld v0.57 - fix mem leaks
 06/09/2011 - tomld v0.56 - major bugfixes in domain_get_log() and in compare_path_search_path_in_list_first_subdirs()
 04/09/2011 - tomld v0.55 - remove checking tomoyo in /proc/cmdline which is not proper method if it's set at compile time
                          - check the existence of /proc/net/files before reading them
@@ -388,7 +389,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.56";
+char *ver = "0.57";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -697,7 +698,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Mon Sep  5 18:23:07 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Tue Sep  6 10:14:34 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -799,6 +800,7 @@ void myfree()
 	free2(tprogs);
 	free2(tprogs_exc);
 	free2(tprogs_learn);
+	free2(tprogs_learn_auto);
 	free2(tprogs_chroot);
 	free2(dirs_recursive);
 	if (dirs_recursive_depth)	free(dirs_recursive_depth);
@@ -6471,8 +6473,8 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 				return new;
 			}
 			free2(res2);
-			free2(res);
 		}
+		free2(res);
 	}
 	
 	return 0;
@@ -9513,7 +9515,6 @@ int main(int argc, char **argv)
 				color("  use --info option to see which directories have the most entries\n", red);
 				color("  some of them may be put under [recursive] tag in ", red);
 				color(tconf, red); newl();
-				color("  use --info option to see which directories have the most entries\n", red);
 
 				notify("warning: running cycles take too long");
 			}
