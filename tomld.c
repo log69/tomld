@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+06/09/2011 - tomld v0.58 - don't print info about domains if there isn't any
 06/09/2011 - tomld v0.57 - fix mem leaks
 06/09/2011 - tomld v0.56 - major bugfixes in domain_get_log() and in compare_path_search_path_in_list_first_subdirs()
 04/09/2011 - tomld v0.55 - remove checking tomoyo in /proc/cmdline which is not proper method if it's set at compile time
@@ -389,7 +390,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.57";
+char *ver = "0.58";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -698,7 +699,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Tue Sep  6 10:14:34 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Tue Sep  6 12:40:59 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4652,126 +4653,128 @@ void domain_info(const char *pattern)
 		free2(sr);
 		newl();
 
+		/* are there any rules? */
+		if (sr){
+			color("progress of domains (* means enforcing mode):\n", yellow);
 
-		color("progress of domains (* means enforcing mode):\n", yellow);
+			tdomf2 = tdomf;
+			while(1){
+				/* get next domain */
+				res = domain_get_next(&tdomf2);
+				/* exit on end */
+				if (!res) break;
 
-		tdomf2 = tdomf;
-		while(1){
-			/* get next domain */
-			res = domain_get_next(&tdomf2);
-			/* exit on end */
-			if (!res) break;
-
-			/* get main domain name */
-			res2 = domain_get_name(res);
-			res3 = domain_get_name_full(res);
-			/* is domain a main domain? */
-			if (res2 && res3){
-				if (!strcmp(res2, res3)){
-					if (domain_get_profile(res) == 3){
-						strcat2(&texcf_new, "2 ");
-						strcat2(&texcf_new, res2);
-						strcat2(&texcf_new, "\n");
-					}
-					else{
-						char *percent = string_itos_zeros(domain_check_enforcing(res, 0), 4);
-						
-						strcat2(&texcf_new, "1 ");
-						strcat2(&texcf_new, percent);
-						strcat2(&texcf_new, "_%) ");
-						strcat2(&texcf_new, res2);
-						strcat2(&texcf_new, "\n");
-						
-						free2(percent);
+				/* get main domain name */
+				res2 = domain_get_name(res);
+				res3 = domain_get_name_full(res);
+				/* is domain a main domain? */
+				if (res2 && res3){
+					if (!strcmp(res2, res3)){
+						if (domain_get_profile(res) == 3){
+							strcat2(&texcf_new, "2 ");
+							strcat2(&texcf_new, res2);
+							strcat2(&texcf_new, "\n");
+						}
+						else{
+							char *percent = string_itos_zeros(domain_check_enforcing(res, 0), 4);
+							
+							strcat2(&texcf_new, "1 ");
+							strcat2(&texcf_new, percent);
+							strcat2(&texcf_new, "_%) ");
+							strcat2(&texcf_new, res2);
+							strcat2(&texcf_new, "\n");
+							
+							free2(percent);
+						}
 					}
 				}
+				free2(res);
+				free2(res2);
+				free2(res3);
 			}
-			free2(res);
-			free2(res2);
-			free2(res3);
-		}
 
-		/* sort list */		
-		res = string_sort_lines(texcf_new);
-		free2(texcf_new); texcf_new = res;
+			/* sort list */		
+			res = string_sort_lines(texcf_new);
+			free2(texcf_new); texcf_new = res;
 
 
-		/* print list
-		 * it has 2 columns, first is a number; 1 is for enforcing mode domains
-		 * and 2 is for the rest */
-		temp = texcf_new;
-		while(1){
-			/* get next line */
-			res = string_get_next_line(&temp);
-			if (!res) break;
-			
-			/* first column */
-			temp2 = res;
-			c1 = string_get_next_word(&temp2);
-			if (c1){
-				c2 = string_get_next_word(&temp2);
-				c3 = string_get_next_line(&temp2);
-				if (c2){
-					/* enforcing mode domain? */
-					if (!strcmp(c1, "2")){ color("      * ", clr); color(c2, purple); newl(); }
-					else{
-						int p_uptime, d_create;
-
-						/* remove leading zeros from percentage */
-						int i = 0;
-						int l = strlen2(&c2);
-						while(1){
-							if (i > l - 1) break;
-							if (c2[i] == '_') c2[i] = ' ';
-							i++;
-						}
-						i = 0;
-						while(1){
-							char cc;
-							if (i > l - 1) break;
-							if (c2[i] != '0') break;
-							cc = c2[i + 1];
-							if (cc != '0'){
-								if (cc < '0' || cc > '9'){ if (i > 0) c2[i - 1] = '('; }
-								else                  c2[i] = '(';
-							}
-							else                  c2[i] = ' ';
-							i++;
-						}
-
-						color(c2, blue); color(" ", clr); color(c3, red);
-
-						/* **************************************
-						 * check if restart is still needed,
-						 * this happens when the uptime of process is greater than
-						 * the time passed since domain creation */
-
-						/* get process uptime of domain */
-						p_uptime = process_get_least_uptime(c3);
-						/* get creation time of domain */
-						d_create = domain_get_creation_time(c3);
-						/* are all processes' uptime greater than the time passed since domain creation time?
-						 * if so, then this means that none of the domain's processes has been restarted since then
-						 * so this one blocks switching it to enforcing mode */
-						if (p_uptime && (d_create == -1 || d_create < p_uptime + 1)) color(" (restart needed)", clr);
-						/* *************************************** */
-
-						newl();
-					}
-					free2(c2);
-				}
-				free2(c1);
-				free2(c3);
-			}
-			
-			free2(res);
-		}
-
-		free2(texcf_new);
-		newl();
+			/* print list
+			 * it has 2 columns, first is a number; 1 is for enforcing mode domains
+			 * and 2 is for the rest */
+			temp = texcf_new;
+			while(1){
+				/* get next line */
+				res = string_get_next_line(&temp);
+				if (!res) break;
 				
-		/* print info about the top directory with most entries of different depths */
-		stat_print_top_dirs_with_most_entries();
+				/* first column */
+				temp2 = res;
+				c1 = string_get_next_word(&temp2);
+				if (c1){
+					c2 = string_get_next_word(&temp2);
+					c3 = string_get_next_line(&temp2);
+					if (c2){
+						/* enforcing mode domain? */
+						if (!strcmp(c1, "2")){ color("      * ", clr); color(c2, purple); newl(); }
+						else{
+							int p_uptime, d_create;
+
+							/* remove leading zeros from percentage */
+							int i = 0;
+							int l = strlen2(&c2);
+							while(1){
+								if (i > l - 1) break;
+								if (c2[i] == '_') c2[i] = ' ';
+								i++;
+							}
+							i = 0;
+							while(1){
+								char cc;
+								if (i > l - 1) break;
+								if (c2[i] != '0') break;
+								cc = c2[i + 1];
+								if (cc != '0'){
+									if (cc < '0' || cc > '9'){ if (i > 0) c2[i - 1] = '('; }
+									else                  c2[i] = '(';
+								}
+								else                  c2[i] = ' ';
+								i++;
+							}
+
+							color(c2, blue); color(" ", clr); color(c3, red);
+
+							/* **************************************
+							 * check if restart is still needed,
+							 * this happens when the uptime of process is greater than
+							 * the time passed since domain creation */
+
+							/* get process uptime of domain */
+							p_uptime = process_get_least_uptime(c3);
+							/* get creation time of domain */
+							d_create = domain_get_creation_time(c3);
+							/* are all processes' uptime greater than the time passed since domain creation time?
+							 * if so, then this means that none of the domain's processes has been restarted since then
+							 * so this one blocks switching it to enforcing mode */
+							if (p_uptime && (d_create == -1 || d_create < p_uptime + 1)) color(" (restart needed)", clr);
+							/* *************************************** */
+
+							newl();
+						}
+						free2(c2);
+					}
+					free2(c1);
+					free2(c3);
+				}
+				
+				free2(res);
+			}
+
+			free2(texcf_new);
+			newl();
+					
+			/* print info about the top directory with most entries of different depths */
+			stat_print_top_dirs_with_most_entries();
+		}
 	}
 }
 
