@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+06/09/2011 - tomld v0.56 - major bugfixes in domain_get_log() and in compare_path_search_path_in_list_first_subdirs()
 04/09/2011 - tomld v0.55 - remove checking tomoyo in /proc/cmdline which is not proper method if it's set at compile time
                          - check the existence of /proc/net/files before reading them
                            problem was reported that if IPv6 support is disabled, then /proc/net/tcp6 and udp6 is missing
@@ -387,7 +388,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.55";
+char *ver = "0.56";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -696,7 +697,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sun Sep  4 15:24:17 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Mon Sep  5 18:23:07 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -5557,7 +5558,7 @@ void domain_get_log()
 				res = domain_get_next(&temp);
 				if (!res) break;
 				/* get subdomain name */
-				res2 = domain_get_name_sub(res);
+				res2 = domain_get_name_full(res);
 				if (res2){
 					int flag_once = 0;
 					temp2 = prog_rules;
@@ -5571,61 +5572,62 @@ void domain_get_log()
 
 						/* get prog name and its rules */
 						i3 = string_search_keyword(res3, "allow_");
-						prog = 0;
-						strcpy2(&prog, res3);
-						prog[i3 - 1] = 0;
-						strlenset3(&prog, i3 - 1);
-						temp3 = prog;
-						prog_main = string_get_next_word(&temp3);
-						temp3 = res3 + i3;
-						rule = string_get_next_line(&temp3);
+						if (i3 >= 1){
+							prog = 0;
+							strcpy2(&prog, res3);
+							prog[i3 - 1] = 0;
+							strlenset3(&prog, i3 - 1);
+							temp3 = prog;
+							prog_main = string_get_next_word(&temp3);
+							temp3 = res3 + i3;
+							rule = string_get_next_line(&temp3);
 
-						/* subdomains match? (compare prog's subdomain name to other subdomain name) */
-						if (!strcmp(prog_main, res2)){
-							/* if match, add rule to domain policy */
-							strcat2(&rules_new, rule);
-							strcat2(&rules_new, "\n");
-							if (!flag_once){
-								/* switch domain to learning mode */
-								domain_set_profile_for_prog(prog_main, 1);
-								/* reread domain because it changed when i changed its profile just now
-								 * in 'tdomf', and the old one was in 'res' */
-								free2(res);
-								temp = orig;
-								res = domain_get_next(&temp);
-								/* reset cpu time counter for prog because of switching it to learning mode,
-								 * or else it would switch back to enforcing mode immediately */
-								process_get_cpu_time_all(prog_main, 1);
-								/* add domain to temporary list */
-								if (string_search_line(tprogs_learn_auto, prog_main) == -1){
-									char *nn = 0;
-									
-									strcat2(&tprogs_learn_auto, prog_main);
-									strcat2(&tprogs_learn_auto, "\n");
+							/* subdomains match? (compare prog's subdomain name to other subdomain name) */
+							if (!strcmp(prog, res2)){
+								/* if match, add rule to domain policy */
+								strcat2(&rules_new, rule);
+								strcat2(&rules_new, "\n");
+								if (!flag_once){
+									/* switch domain to learning mode */
+									domain_set_profile_for_prog(prog_main, 1);
+									/* reread domain because it changed when i changed its profile just now
+									 * in 'tdomf', and the old one was in 'res' */
+									free2(res);
+									temp = orig;
+									res = domain_get_next(&temp);
+									/* reset cpu time counter for prog because of switching it to learning mode,
+									 * or else it would switch back to enforcing mode immediately */
+									process_get_cpu_time_all(prog_main, 1);
+									/* add domain to temporary list */
+									if (string_search_line(tprogs_learn_auto, prog_main) == -1){
+										char *nn = 0;
+										
+										strcat2(&tprogs_learn_auto, prog_main);
+										strcat2(&tprogs_learn_auto, "\n");
 
-									/* print info */
-									color(prog_main, blue); color(", ", clr);
-									color("switch to learning mode\n", clr);
+										/* print info */
+										color(prog_main, blue); color(", ", clr);
+										color("switch to learning mode\n", clr);
 
-									/* notification */
-									strcpy2(&nn, prog_main); strcat2(&nn, ", switch to learning mode");
-									notify(nn); free2(nn);
+										/* notification */
+										strcpy2(&nn, prog_main); strcat2(&nn, ", switch to learning mode");
+										notify(nn); free2(nn);
+									}
+									/* do it only once per domain for speed */
+									flag_once = 1;
 								}
-								/* do it only once per domain for speed */
-								flag_once = 1;
 							}
-						}
 
-						free2(prog_main);
-						free2(prog);
-						free2(rule);
-						free2(res3);
+							free2(prog_main);
+							free2(prog);
+							free2(rule);
+							free2(res3);
+						}
 					}
 					free2(res2);
 				}
 				/* add domain policy to new policy */
 				strcat2(&tdomf_new, res);
-				strcat2(&tdomf_new, "\n");
 				strcat2(&tdomf_new, rules_new);
 				strcat2(&tdomf_new, "\n");
 				free2(res);
@@ -6353,19 +6355,20 @@ int compare_path_search_dir_in_list(char *list, char *dir)
 
 /* search for path in a list of paths comparing only the beginnings of paths if the list has a dir,
  * or comparing full paths if both are files,
+ * in this case only if filename part of path doesn'-t contain any wildcard,
  * and return path with all wildcards taken from both paths on match */
 /* returned value must be freed by caller */
-char *compare_path_search_path_in_list_first_subdirs(char *list, char *dir)
+char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 {
 	char *res, *res2, *temp;
 	int c, c1, c2, i1, i2, in1, in2;
 	int flag1, flag2;
 	long l1, l2;
 	
-	if (!list || !dir) return 0;
+	if (!list || !path) return 0;
 
 
-	/* search for the dir in the list by wildcarded compare */
+	/* search for the path in the list by wildcarded compare */
 	temp = list;
 	while(1){
 		res = string_get_next_line(&temp);
@@ -6373,89 +6376,103 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *dir)
 		
 		/* path in list is not a dir?
 		 * if so, then compare full paths */
+		res2 = 0;
 		if (!path_is_dir(res)){
-			res2 = 0;
-			strcpy2(&res2, dir);
+			/* get filename part of path */
+			char *res3 = path_get_filename(path);
+			/* does filename contain any wildcard?
+			 * if so, then i don't compare and don't replace the path with anything
+			 * cause it may happen, that one of the path contains a wildcard
+			 * as the first char, the other path may have it as the last char,
+			 * and they will always match */
+			if (string_search_keyword(path, "*") == -1){
+				strcpy2(&res2, path);
+			}
+			free2(res3);
 		}
 		else{
 			c = path_count_subdirs_name(res);
-			res2 = path_get_subdirs_name(dir, c);
-		}
-
-		if (compare_paths(res, res2)){
-
-			/* merge together the 2 paths subdir by subdir
-			 * prefering the one from the list
-			 * or the one with wildcard in it */
-			char *path1 = res;
-			char *path2 = dir;
-			char *new, *new1, *new2;
-			l1 = strlen2(&path1);
-			l2 = strlen(path2);
-			new  = memget2((l1 + l2) * 2);
-			/* paths not null? */
-			if (l1 && l2){
-				new1 = memget2(l1 * 2);
-				new2 = memget2(l2 * 2);
-				i1 = 0; i2 = 0;
-				c1 = 0; c2 = 0;
-
-				/* merge paths */
-				while(1){
-					/* get subdir from path1 */
-					flag1 = 0;
-					in1 = 0;
-					while(1){
-						c1 = path1[i1];
-						if (c1 == '*') flag1 = 1;
-						new1[in1] = c1;
-						if (!c1 || c1 == '/'){
-							if (c1){ in1++; i1++; }
-							break;
-						}
-						in1++;
-						i1++;
-					}
-					new1[in1] = 0;
-					strlenset3(&new1, in1);
-					
-					/* get subdir from path2 */
-					flag2 = 0;
-					in2 = 0;
-					while(1){
-						c2 = path2[i2];
-						if (c2 == '*') flag2 = 1;
-						new2[in2] = c2;
-						if (!c2 || c2 == '/'){
-							if (c2){ in2++; i2++; }
-							break;
-						}
-						in2++;
-						i2++;
-					}
-					new2[in2] = 0;
-					strlenset3(&new2, in2);
-					
-					/* compare subnames */
-					/* if both contain wildcard, then i prefer the one from list (path1)
-					 * or the one that is not null */
-					if (flag1)               strcat2(&new, new1);
-					else if (flag2)          strcat2(&new, new2);
-					else if (strlen2(&new1)) strcat2(&new, new1);
-					else                     strcat2(&new, new2);
-					
-					/* exit if both paths reached end */
-					if (!c1 && !c2) break;
-				}
-				free2(new1);
-				free2(new2);
+			if (path_count_subdirs_name(path) >= c){
+				res2 = path_get_subdirs_name(path, c);
 			}
-			free2(res);
-			free2(res2);
-			return new;
 		}
-		free2(res2);
-		free2(res);
+
+		if (res2){
+			if (compare_paths(res, res2)){
+
+				/* merge together the 2 paths subdir by subdir
+				 * prefering the one from the list
+				 * or the one with wildcard in it */
+				char *path1 = res;
+				char *path2 = path;
+				char *new, *new1, *new2;
+				l1 = strlen2(&path1);
+				l2 = strlen(path2);
+				new  = memget2((l1 + l2) * 2);
+				/* paths not null? */
+				if (l1 && l2){
+					new1 = memget2(l1 * 2);
+					new2 = memget2(l2 * 2);
+					i1 = 0; i2 = 0;
+					c1 = 0; c2 = 0;
+
+					/* merge paths */
+					while(1){
+						/* get subdir from path1 */
+						flag1 = 0;
+						in1 = 0;
+						while(1){
+							c1 = path1[i1];
+							if (c1 == '*') flag1 = 1;
+							new1[in1] = c1;
+							if (!c1 || c1 == '/'){
+								if (c1){ in1++; i1++; }
+								break;
+							}
+							in1++;
+							i1++;
+						}
+						new1[in1] = 0;
+						strlenset3(&new1, in1);
+						
+						/* get subdir from path2 */
+						flag2 = 0;
+						in2 = 0;
+						while(1){
+							c2 = path2[i2];
+							if (c2 == '*') flag2 = 1;
+							new2[in2] = c2;
+							if (!c2 || c2 == '/'){
+								if (c2){ in2++; i2++; }
+								break;
+							}
+							in2++;
+							i2++;
+						}
+						new2[in2] = 0;
+						strlenset3(&new2, in2);
+						
+						/* compare subnames */
+						/* if both contain wildcard, then i prefer the one from list (path1)
+						 * or the one that is not null */
+						if (flag1)               strcat2(&new, new1);
+						else if (flag2)          strcat2(&new, new2);
+						else if (strlen2(&new1)) strcat2(&new, new1);
+						else                     strcat2(&new, new2);
+						
+						/* exit if both paths reached end */
+						if (!c1 && !c2) break;
+					}
+					free2(new1);
+					free2(new2);
+				}
+				free2(res);
+				free2(res2);
+				return new;
+			}
+			free2(res2);
+			free2(res);
+		}
 	}
 	
 	return 0;
@@ -7548,7 +7565,8 @@ void domain_reshape_rules_wildcard_spec()
 								free2(res2);
 							}
 
-							/* replace dir with the one in spec_replace if any */
+							/* replace path with the one in spec_replace if any,
+							 * but only, if filename part of param doesn't contain any wildcard */
 							res2 = compare_path_search_path_in_list_first_subdirs(spec_replace3, param);
 							if (res2){
 								free2(param);
