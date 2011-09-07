@@ -22,6 +22,9 @@
 
 changelog:
 -----------
+07/09/2011 - tomld v0.59 - bugfix: there was a neverending cycle while reading network files from /proc/net/
+                         - show tomld icon on notification bubble (thanks to Laszlo Dvornik)
+                         - hungarian translation of desktop icons (thanks to Laszlo Dvornik)
 06/09/2011 - tomld v0.58 - don't print info about domains if there isn't any
 06/09/2011 - tomld v0.57 - fix mem leaks
 06/09/2011 - tomld v0.56 - major bugfixes in domain_get_log() and in compare_path_search_path_in_list_first_subdirs()
@@ -390,7 +393,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.58";
+char *ver = "0.59";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -8991,7 +8994,7 @@ void check_processes()
 			/* /proc/net/file exists? */
 			if (file_exist(netf[i])){
 				/* read file */
-				res = file_read(netf[i++], -1);
+				res = file_read(netf[i], -1);
 				temp = res;
 				/* skip one line */
 				res2 = string_get_next_line(&temp);
@@ -9013,6 +9016,7 @@ void check_processes()
 				}
 				free2(res);
 			}
+			i++;
 		}
 
 		/* sort pid list */
