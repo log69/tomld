@@ -2,8 +2,11 @@
 [Desktop Entry]
 Type=Application
 Name=Tomld notification
+Name[hu]=Tomld értesítés
 GenericName=Security tool
+GenericName[hu]=Biztonsági segédeszköz
 Comment=Show tomld messages in notification area
+Comment[hu]=Tomld üzenetek megjelenítése az értesítési területen
 Icon=tomld
 Exec=/usr/sbin/tomld --notify
 Terminal=false

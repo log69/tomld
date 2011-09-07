@@ -2,8 +2,11 @@
 [Desktop Entry]
 Type=Application
 Name=Tomld temporary learning mode
+Name[hu]=Tomld átmeneti tanuló mód
 GenericName=Security tool
+GenericName[hu]=Biztonsági segédeszköz
 Comment=Request temporary learning mode from running tomld service
+Comment[hu]=Átmeneti tanuló mód kérése a futó tomld szolgáltatástól
 Icon=tomld
 Exec=su-to-root -X -c "/usr/sbin/tomld --learn"
 Terminal=false
