@@ -9,7 +9,7 @@
 	This program is free software; you can redistribute it and/or
 	modify it under the terms of the GNU General Public License as
 	published by the Free Software Foundation; either version 3 of the
-	License, or	(at your option) any later version.
+	License, or (at your option) any later version.
 
 	This program is distributed in the hope that it will be useful,	but
 	WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -329,7 +329,7 @@ char *string_itos_zeros(int num, int zeros)
 			free2(res); res = res2;
 		}
 	}
-	
+
 	return res;
 }
 
@@ -354,9 +354,9 @@ char *string_get_number(const char *text)
 	int i = 0;
 	int start = 0;
 	int l;
-	
+
 	if (!text) return 0;
-	
+
 	/* go to the first number char */
 	while(1){
 		c = text[i];
@@ -372,7 +372,7 @@ char *string_get_number(const char *text)
 		if (c < '0' || c > '9') break;
 		i++;
 	}
-	
+
 	l = i - start;
 	/* fail on zero length result */
 	if (l < 1) return 0;
@@ -400,11 +400,11 @@ char *string_get_number_last(const char *text)
 	int i = 0;
 	int start, end;
 	int l;
-	
+
 	if (!text) return 0;
 
 	i = strlen(text);
-	
+
 	/* go to the first number char from the end */
 	while(1){
 		i--;
@@ -420,7 +420,7 @@ char *string_get_number_last(const char *text)
 		if (c < '0' || c > '9') break;
 		i--;
 	}
-	
+
 	start = i + 1;
 	l = end - start + 1;
 	/* fail on zero length result */
@@ -457,7 +457,7 @@ int string_is_number(const char *text)
 		/* fail if not only numbers are in text */
 		if (c < '0' || c > '9'){ res = 0; break; }
 	}
-	
+
 	return res;
 }
 
@@ -468,7 +468,7 @@ char *string_get_next_line(char **text)
 {
 	char *res = 0, c;
 	int i = 0;
-	
+
 	if (!(*text)) return 0;
 	if (!(*text)[0]) return 0;
 
@@ -499,14 +499,14 @@ char *string_get_last_line(char **text)
 	char *res = 0, c;
 	int i, l;
 
-	/* get string length */	
+	/* get string length */
 	l = strlen((*text));
 	/* return null if input string is null too */
 	if (l < 1){
 		res = memget2(1);
 		return res;
 	}
-	
+
 	/* go backwards till i find a new line */
 	i = l - 1;
 	while(1){
@@ -573,7 +573,7 @@ int string_jump_next_linen(char **text, int count)
 	int res = 0;
 	int c = count;
 	while((--c) >= 0) res = string_jump_next_line(text);
-	
+
 	return res;
 }
 
@@ -605,7 +605,7 @@ char *string_get_next_word(char **text)
 		if (!c || c == '\n' || c == ' ' || c == '\t') break;
 		i++;
 	}
-	
+
 	l = i - start;
 	/* fail on zero length result */
 	if (l < 1) return 0;
@@ -670,7 +670,7 @@ char *string_get_next_wordn(char **text, int num)
 			i++;
 		}
 	}
-	
+
 	l = i - start;
 	/* fail on zero length result */
 	if (l < 1) return 0;
@@ -724,7 +724,7 @@ char *string_get_last_word(char **text)
 		if (!c || c == '\n') break;
 		i++;
 	}
-	
+
 	/* get last word going backwards */
 	i--;
 	end = i;
@@ -734,7 +734,7 @@ char *string_get_last_word(char **text)
 		i--;
 	}
 	i++;
-	
+
 	/* allocate mem for the new string */
 	l = end - i + 1;
 	res = memget2(l + 1);
@@ -759,7 +759,7 @@ char *string_get_diff(char *new, char *old)
 {
 	char *res, *temp;
 	char *list = 0;
-	
+
 	temp = new;
 	while(1){
 		/* get next line */
@@ -805,7 +805,7 @@ int string_search_keyword_first(char *text, char *key)
 {
 	char c1, c2;
 	int i = 0;
-	
+
 	if (!text) return 0;
 
 	while(1){
@@ -823,7 +823,7 @@ int string_search_keyword_first(char *text, char *key)
 int string_search_keyword_first_all(char *text, char *key)
 {
 	char *res, *temp, *orig;
-	
+
 	if (!text) return -1;
 
 	temp = text;
@@ -850,7 +850,7 @@ int string_search_keyword_last(const char *text, const char *key)
 	char c1, c2;
 	int i1, i2;
 	long l1, l2;
-	
+
 	if (!text) return 0;
 
 	l1 = strlen(text);
@@ -897,7 +897,7 @@ int string_search_keyword(const char *text, const char *key)
 		else i2++;
 		i++;
 	}
-	
+
 	return -1;
 }
 
@@ -908,7 +908,7 @@ int string_search_line(const char *text, const char *line)
 {
 	char c1, c2;
 	int i, i2, start;
-	
+
 	/* fail on null pointer */
 	if (!text) return -1;
 
@@ -938,7 +938,7 @@ int string_search_line(const char *text, const char *line)
 		else i2++;
 		i++;
 	}
-	
+
 	return -1;
 }
 
@@ -963,7 +963,7 @@ char *string_remove_line(char *text, const char *line)
 {
 	char *res, *temp;
 	char *text_new = memget2(strlen(text));
-	
+
 	temp = text;
 	while(1){
 		/* get next line */
@@ -990,7 +990,7 @@ char *string_remove_line_from_pos(char *text, unsigned int pos)
 
 	if (!text) return 0;
 
-	/* copy original text to new */	
+	/* copy original text to new */
 	strcpy2(&new, text);
 	/* pos is within text? if not, then return whole text */
 	if (pos > strlen(new)) return new;
@@ -998,7 +998,7 @@ char *string_remove_line_from_pos(char *text, unsigned int pos)
 	/* mark an end at pos */
 	new[pos] = 0;
 	strlenset3(&new, pos);
-	
+
 	/* move end to pos */
 	temp = text + pos;
 	if (string_jump_next_line(&temp)) strcat2(&new, temp);
@@ -1007,9 +1007,9 @@ char *string_remove_line_from_pos(char *text, unsigned int pos)
 }
 
 
-/* compare strings for qsort */ 
-int string_cmp(const void *a, const void *b) 
-{ 
+/* compare strings for qsort */
+int string_cmp(const void *a, const void *b)
+{
 	const char **ia = (const char **)a;
 	const char **ib = (const char **)b;
 	return strcmp(*ia, *ib);
@@ -1048,7 +1048,7 @@ char *string_sort_lines(const char *text)
 
 	/* alloc mem for char pointers pointing to string lines */
 	ptr = memget_ptr(count);
-	
+
 	/* change new line chars to nulls and create pointer list to string lines */
 	i = 0;
 	i2 = 0;
@@ -1069,7 +1069,7 @@ char *string_sort_lines(const char *text)
 		}
 		i++;
 	}
-	
+
 	/* sort it */
 	qsort(ptr, count, sizeof(char *), string_cmp);
 
@@ -1126,7 +1126,7 @@ char *string_sort_uniq_lines(const char *text)
 
 	/* alloc mem for char pointers pointing to string lines */
 	ptr = memget_ptr(count);
-	
+
 	/* change new line chars to nulls and create pointer list to string lines */
 	i = 0;
 	i2 = 0;
@@ -1147,7 +1147,7 @@ char *string_sort_uniq_lines(const char *text)
 		}
 		i++;
 	}
-	
+
 	/* sort it */
 	qsort(ptr, count, sizeof(char *), string_cmp);
 
@@ -1179,7 +1179,7 @@ char *string_sort_uniq_lines(const char *text)
 			break;
 		}
 
-		/* first run */		
+		/* first run */
 		if (!flag_first){
 			l1 = strlen2(&res);
 			strcat2(&text_final, res);
@@ -1199,7 +1199,7 @@ char *string_sort_uniq_lines(const char *text)
 			}
 			free2(res2);
 		}
-		
+
 		res2 = res;
 		flag_first = 1;
 	}
@@ -1215,14 +1215,14 @@ char *array_copy_to_string_list(char **array)
 {
 	char *new = 0;
 	char *ptr;
-	
+
 	while(1){
 		ptr = *(array++);
 		if (!ptr) break;
 		strcat2(&new, ptr);
 		strcat2(&new, "\n");
 	}
-	
+
 	return new;
 }
 
@@ -1232,13 +1232,12 @@ char *array_copy_to_string_list(char **array)
 char *array_search_keyword(char **array, const char *key)
 {
 	char *ptr;
-	
+
 	if (!key) return 0;
-	
+
 	while(1){
 		ptr = *(array++);
 		if (!ptr) return 0;
 		if (!strcmp(ptr, key)) return ptr;
 	}
 }
-
