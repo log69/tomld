@@ -9,7 +9,7 @@
 	This program is free software; you can redistribute it and/or
 	modify it under the terms of the GNU General Public License as
 	published by the Free Software Foundation; either version 3 of the
-	License, or	(at your option) any later version.
+	License, or (at your option) any later version.
 
 	This program is distributed in the hope that it will be useful,	but
 	WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -49,7 +49,7 @@ float mytime()
 
 		t = (((seconds) * 1000 + useconds/1000.0) + 0.5) / 1000;
 	}
-	
+
 	return t;
 }
 
@@ -69,7 +69,7 @@ void mytime_print_date()
 	if (l > 0) l--;
 	res[l] = 0;
 	strlenset3(&res, l);
-	
+
 	/* print it */
 	printf("at %s", res);
 	free2(res);
@@ -82,7 +82,7 @@ char *mytime_get_sec_human(int sec)
 {
 	char *ptime, *t = 0;
 	int s;
-	
+
 	int day  = sec / 60 / 60 / 24;
 	int hour = sec / 60 / 60;
 	int min  = sec / 60;
@@ -91,10 +91,10 @@ char *mytime_get_sec_human(int sec)
 	else if (hour){ s = hour; strcpy2(&t, " hour"); }
 	else if (min) { s = min;  strcpy2(&t, " minute");  }
 	else          { s = sec;  strcpy2(&t, " second");  }
-	
+
 	/* plural */
 	if (s > 1) strcat2(&t, "s");
-	
+
 	ptime = string_itos(s);
 	strcat2(&ptime, t);
 	free2(t);
@@ -108,7 +108,7 @@ void mytime_print()
 {
 	static float t = 0;
 	t = mytime() - t;
-	
+
 	printf("-- time %.2f sec\n", t);
 }
 
@@ -119,7 +119,7 @@ int sys_get_uptime()
 	char *f = "/proc/uptime";
 	char *res, *res2;
 	int i;
-	
+
 	/* read uptime from /proc system */
 	res = file_read(f, -1);
 	/* read first number part only */
@@ -176,7 +176,7 @@ char *pipe_read(const char *comm, long length)
 {
 	char *buff;
 	int ret;
-	
+
 	/* open pipe for reading */
 	FILE *p = popen(comm, "r");
 	if (!p){
@@ -184,7 +184,7 @@ char *pipe_read(const char *comm, long length)
 		error(comm); newl_();
 		exit(1);
 	}
-	
+
 	/* alloc mem for it */
 	buff = memget2(length);
 	memset(buff, 0, length);
@@ -195,11 +195,11 @@ char *pipe_read(const char *comm, long length)
 		error(comm); newl_();
 		exit(1);
 	}
-		
+
 	pclose(p);
 	/* set dynamic string length */
 	strlenset2(&buff);
-	
+
 	return buff;
 }
 
@@ -215,7 +215,7 @@ void pipe_write(const char *comm, const char *buff)
 		error(comm); newl_();
 		exit(1);
 	}
-	
+
 	/* write pipe */
 	fprintf(p, "%s\n", buff);
 	pclose(p);
@@ -230,7 +230,7 @@ char *file_read(const char *name, long length)
 {
 	char *buff;
 	unsigned long len = 0;
-	
+
 	/* open file for reading */
 	FILE *f = fopen(name, "rb");
 	if (!f){
@@ -273,7 +273,7 @@ char *file_read(const char *name, long length)
 		f = fopen(name, "rb");
 	}
 	else len = length;
-	
+
 	/* alloc mem */
 	buff = memget2(len);
 	/* read file */
@@ -356,9 +356,9 @@ int file_get_mod_time(const char *name)
 		error(name); newl_();
 		exit(1);
 	}
-	
+
 	mod = buff.st_mtime;
-	
+
 	return mod;
 }
 
@@ -400,10 +400,10 @@ void mkdir_recursive(char *dir)
 {
 	const int max_iter = 32;
 	int i, l;
-	
+
 	if (!dir) return;
 
-	/* get number of subdirs */	
+	/* get number of subdirs */
 	l = path_count_subdirs_name(dir);
 	if (l > 1){
 		i = 2;
@@ -429,7 +429,7 @@ char *which(const char *name)
 
 	char *res, *full;
 	int i;
-	
+
 	/* name starts with "/" char? */
 	if (name[0] == '/'){
 		/* file exists? if not, then fail */
@@ -439,7 +439,7 @@ char *which(const char *name)
 		}
 		return 0;
 	}
-	
+
 	full = memget2(max_char);
 
 	/* fle exists in the current dir? */
@@ -475,4 +475,3 @@ char *which(const char *name)
 	free2(full);
 	return 0;
 }
-
