@@ -8,7 +8,7 @@
 	This program is free software; you can redistribute it and/or
 	modify it under the terms of the GNU General Public License as
 	published by the Free Software Foundation; either version 3 of the
-	License, or	(at your option) any later version.
+	License, or (at your option) any later version.
 
 	This program is distributed in the hope that it will be useful,	but
 	WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -22,6 +22,12 @@
 
 changelog:
 -----------
+08/09/2011 - tomld v0.60 - major bugfix in domain_get_log() in switching domains to learning mode
+                         - change concept of temporary learning mode: from now when the user request a temporary learning mode,
+                           the former one won't be closed if any, so it's time will simply be extended
+                           this is to resolve the situtation when other domains need temporary learning mode too
+                           while having one already (thanks to Szabolcs Gyuris for the tests and reporting the issue)
+                         - cosmetical code cleanup (thanks to Laszlo Dvornik)
 07/09/2011 - tomld v0.59 - bugfix: there was a neverending cycle while reading network files from /proc/net/
                          - show tomld icon on notification bubble (thanks to Laszlo Dvornik)
                          - hungarian translation of desktop icons (thanks to Laszlo Dvornik)
@@ -393,7 +399,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.59";
+char *ver = "0.60";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -457,7 +463,7 @@ char *wildcard_recursive_file2 = "/\\{\\*\\}/\\*";
 int   wildcard_recursive_file2_len = 10;
 
 /* tomoyo vars and files */
-char *tdomf	= 0;
+char *tdomf = 0;
 char *texcf = 0;
 
 /* default profile.conf */
@@ -565,10 +571,12 @@ int tlog2_mod_time = -1;
 /* flags to signal temporary learning mode
  * flag_learn is to signal if there was a deny log already since user requested temporary learning mode
  * flag_learn2 is to signal if the 1 hour interval of temporary learning mode is still on or ended already
- * flag_learn3 is to run check() at once, but only once */
+ * flag_learn3 is to run check() at once, but only once
+ * flag_learn4 is to signal if temporary learning mode is already on and there were deny logs too */
 int flag_learn  = 0;
 int flag_learn2 = 0;
 int flag_learn3 = 0;
+int flag_learn4 = 0;
 /* buffer to hold the names of domains temporarily switch to learning mode */
 char *tprogs_learn_auto = 0;
 
@@ -702,7 +710,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Tue Sep  6 12:40:59 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Sep  7 21:55:07 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -888,7 +896,7 @@ void check_notify()
 			if (!opt_notify2){
 				error("error: commands for notification missing\n"); myexit(1); }
 
-			color("* listening to messages from tomld daemom...\n", yellow);
+			color("* listening to messages from tomld daemon...\n", yellow);
 
 			/* infinite cycle */
 			while(1){
@@ -897,7 +905,7 @@ void check_notify()
 					int ignore = 0;
 					char *comm, *temp;
 					flag_firstrun_notify = 1;
-					
+
 					/* store command */
 					temp = opt_notify2;
 					comm = string_get_next_line(&temp);
@@ -916,7 +924,7 @@ void check_notify()
 					if (tlog2_mod_time != tlog2_mod_time2){
 						/* store new time */
 						tlog2_mod_time = tlog2_mod_time2;
-						
+
 						/* is log2 file locked? if yes, then reread it 2 sec later */
 						while(1){
 							res = 0;
@@ -926,7 +934,7 @@ void check_notify()
 								long len2;
 								char *buff;
 								FILE *f;
-									
+
 								/* store modification time */
 								tlog2_mod_time2 = file_get_mod_time(tlog2);
 								tlog2_mod_time3 = tlog2_mod_time2;
@@ -987,7 +995,7 @@ void check_notify()
 									/* run command (also ignore return value) */
 									if (system(comm)) ignore++;
 									free2(comm);
-									
+
 									free2(res);
 									break;
 								}
@@ -1011,7 +1019,7 @@ void check_notify()
 void notify(char *text)
 {
 	char *text2 = 0;
-	
+
 	if (opt_notify){
 		/* lock file */
 		file_write(tlog2_lock, "1");
@@ -1033,7 +1041,7 @@ void notify(char *text)
 int choice(const char *text)
 {
 	char c = 0, c2;
-	
+
 	/* is auto yes on? */
 	if (opt_yes){
 		printf("%s", text);
@@ -1126,7 +1134,7 @@ int tomoyo_version()
 	char n;
 	int c, c2;
 	static int ver = 0;
-	
+
 	if (ver) return ver;
 
 	/* read version string */
@@ -1146,7 +1154,7 @@ int tomoyo_version()
 		}
 	}
 	free2(buff);
-	
+
 	return ver;
 }
 
@@ -1155,7 +1163,7 @@ int tomoyo_version()
 int path_is_dir_recursive_wildcard(const char *path)
 {
 	long l1;
-	
+
 	if (!path) return 0;
 
 	/* get path length */
@@ -1190,7 +1198,7 @@ char *path_wildcard_dir(char *path)
 	new = path_get_parent_dir(path);
 	if (path_is_dir(path)) strcat2(&new, "\\*/");
 	else                   strcat2(&new, "\\*");
-	
+
 	return new;
 }
 
@@ -1200,7 +1208,7 @@ char *path_wildcard_dir(char *path)
 char *path_wildcard_dir_plus_parent(char *path)
 {
 	char *new, *new2;
-	
+
 	int flag_dir = path_is_dir(path);
 	int flag_rec = path_is_dir_recursive_wildcard(path);
 
@@ -1245,7 +1253,7 @@ char *path_wildcard_dir_plus_parent(char *path)
 			}
 		}
 	}
-	
+
 	return new;
 }
 
@@ -1257,7 +1265,7 @@ char *path_wildcard_lib(char *path)
 	char *name, *new = 0;
 	char c, c2;
 	int i;
-	
+
 	name = path_get_filename(path);
 	/* does the filename start with "lib"? */
 	if (string_search_keyword_first(name, "lib")){
@@ -1331,17 +1339,17 @@ char *path_wildcard_proc(char *path)
 	char c;
 	int i, i2, flag;
 	long l;
-	
+
 	if (!path) return 0;
-	
+
 	/* does the path start with "/proc/"? */
 	if (string_search_keyword_first(path, "/proc/")){
-		
+
 		l = strlen(path);
 		temp = memget2(l * 2);
 		new  = memget2(l * 2);
 		strcpy2(&new, "/proc/");
-		
+
 		/* replace all subdirs that consist of only numbers with numeric wildcard */
 		flag = 1;
 		i = 6;
@@ -1367,10 +1375,10 @@ char *path_wildcard_proc(char *path)
 			if (!c) break;
 			i++;
 		}
-		
+
 		free2(temp);
 	}
-	
+
 	/* give back original path if no wildcard is added */
 	if (!new) strcpy2(&new, path);
 
@@ -1385,11 +1393,11 @@ char *path_wildcard_home(char *path)
 	char *h = 0, *new = 0;
 	char c;
 	int i;
-	
+
 	/* copy home dir */
 	strcpy2(&h, home);
 	strcat2(&h, "/");
-	
+
 	/* does the path start with "/home/"? */
 	if (string_search_keyword_first(path, h)){
 		i = strlen2(&h);
@@ -1408,7 +1416,7 @@ char *path_wildcard_home(char *path)
 			strcat2(&new, path + i);
 		}
 	}
-	
+
 	/* give back original path if no wildcard is added */
 	if (!new) strcpy2(&new, path);
 
@@ -1440,23 +1448,23 @@ char *path_wildcard_temp_name(char *name)
 	int count_lcase, count_ucase, count_num;
 	/* flag to signal if random part is a hex number */
 	int flag_hex, flag_hex_not_ok;
-	
+
 	/* base64 encoding may use extra 2 chars beside a-z A-Z and 0-9
 	 * these may vary, but common ones are - + _
 	 * http://en.wikipedia.org/wiki/Base64#Variants_summary_table */
 	char *spec = "_+";
-	
+
 	/* return null on null input */
 	if (!name) return 0;
 
 	/* check length */
 	l = strlen(name);
 	if (!l) return 0;
-	
+
 	/* alloc mem for temporary name */
 	temp  = memget2(l * 2);
 	temp2 = memget2(l * 2);
-	
+
 	/* search for random part in name */
 	flag_lcase  = 0;
 	flag_ucase  = 0;
@@ -1612,7 +1620,7 @@ char *path_wildcard_temp_name(char *name)
 	/* **************************************** */
 	/* run check once more after quitting cycle */
 	/* **************************************** */
-	
+
 	/* make a wildcard if random part was more or equal than 6 chars */
 	if (strlen2(&temp2) + i2 >= 6){
 		if ((flag_lcase && flag_ucase && flag_num) || flag_hex){
@@ -1641,10 +1649,10 @@ char *path_wildcard_temp_name(char *name)
 		strcat2(&new, temp2);
 		strcat2(&new, temp);
 	}
-	
+
 	free2(temp);
 	free2(temp2);
-	
+
 	return new;
 }
 
@@ -1654,13 +1662,13 @@ char *path_wildcard_temp_name(char *name)
 char *path_wildcard_temp(char *path)
 {
 	char *new = 0;
-	
+
 	/* is path a file name? */
 	if (!path_is_dir(path)){
 		char *mydir   = path_get_parent_dir(path);
 		char *myname  = path_get_filename(path);
 		char *myname2 = path_wildcard_temp_name(myname);
-		
+
 		strcpy2(&new, mydir);
 		strcat2(&new, myname2);
 
@@ -1669,7 +1677,7 @@ char *path_wildcard_temp(char *path)
 		free2(myname2);
 	}
 	else strcpy2(&new, path);
-	
+
 	return new;
 }
 
@@ -1694,7 +1702,7 @@ void stat_print_top_dirs_with_most_entries()
 		/* get next line */
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		
+
 		/* is it a rule? */
 		if (string_search_keyword_first(res, "allow_")){
 			num_of_rules++;
@@ -1706,7 +1714,7 @@ void stat_print_top_dirs_with_most_entries()
 				type   = string_get_next_word(&temp2);
 				param1 = string_get_next_word(&temp2);
 				param2 = string_get_next_word(&temp2);
-				
+
 				/* add paths to list that contain at least 2 subdirs */
 				if (path_is_path(param1)){
 					if (path_count_subdirs_name(param1) > 2){
@@ -1714,7 +1722,7 @@ void stat_print_top_dirs_with_most_entries()
 				if (path_is_path(param2)){
 					if (path_count_subdirs_name(param2) > 2){
 						strcat2(&list, param2); strcat2(&list, "\n"); } }
-				
+
 				free2(type);
 				free2(param1);
 				free2(param2);
@@ -1722,11 +1730,11 @@ void stat_print_top_dirs_with_most_entries()
 		}
 		free2(res);
 	}
-	
+
 	/* sort list */
 	res = string_sort_lines(list);
 	free2(list); list = res;
-	
+
 	/* are there any dirs? */
 	if (strlen2(&list)){
 		color("top directories with most entries at different depths:\n", yellow);
@@ -1746,20 +1754,20 @@ void stat_print_top_dirs_with_most_entries()
 				/* get next line */
 				res = string_get_next_line(&temp);
 				if (!res) break;
-				
+
 				/* is it not the first run? */
 				if (res2){
 
 					/* count their subdirs */
 					int s1 = path_count_subdirs_name(res);
 					int s2 = path_count_subdirs_name(res2);
-					
+
 					/* do number of subdirs match? */
 					if (s1 >= depth + 1 && s2 >= depth + 1){
 						/* get parent dirs of paths at given depth */
 						char *p1 = path_get_subdirs_name(res,  depth + 1);
 						char *p2 = path_get_subdirs_name(res2, depth + 1);
-						
+
 						/* paths match? */
 						if (compare_paths(p1, p2)){
 							count ++;
@@ -1771,14 +1779,14 @@ void stat_print_top_dirs_with_most_entries()
 						else{
 							count = 0;
 						}
-						
+
 						free2(p1); free2(p2);
 					}
 				}
-				
+
 				/* store this path for next cycle */
 				strcpy2(&res2, res);
-				
+
 				free2(res);
 			}
 			free2(res2);
@@ -1840,7 +1848,7 @@ char *domain_get_next(char **text)
 	/* search for first keyword */
 	text2 = (*text);
 	start = string_search_keyword_first_all(text2, key);
-	
+
 	/* fail if no match */
 	if (start == -1) return 0;
 
@@ -1863,7 +1871,7 @@ char *domain_get_next(char **text)
 			break;
 		}
 	}
-	
+
 	/* domain block length */
 	l = keyl + end;
 
@@ -1876,7 +1884,7 @@ char *domain_get_next(char **text)
 	}
 	res[l] = 0;
 	strlenset3(&res, l);
-	
+
 	/* move pointer to the next line */
 	(*text) += start + l;
 
@@ -1889,7 +1897,7 @@ char *domain_get_next(char **text)
 char *domain_get_name(char *domain)
 {
 	char *res, *temp;
-	
+
 	/* search for line with kernel tag */
 	int i = string_search_keyword_first_all(domain, "<kernel>");
 	if (i > -1){
@@ -1908,7 +1916,7 @@ char *domain_get_name(char *domain)
 char *domain_get_name_full(char *domain)
 {
 	char *res, *temp;
-	
+
 	/* search for line with kernel tag */
 	int i = string_search_keyword_first_all(domain, "<kernel>");
 	if (i > -1){
@@ -1929,7 +1937,7 @@ char *domain_get_name_full(char *domain)
 char *domain_get_name_sub(char *domain)
 {
 	char *res, *temp;
-	
+
 	/* search for line with kernel tag */
 	int i = string_search_keyword_first_all(domain, "<kernel>");
 	if (i > -1){
@@ -1947,7 +1955,7 @@ char *domain_get_name_sub(char *domain)
 int domain_main_exist(char *prog)
 {
 	char *res, *res2, *temp;
-	
+
 	temp = tdomf;
 	while(1){
 		/* get first line containing the name of the domain */
@@ -2003,7 +2011,7 @@ int domain_get_creation_time(char *prog)
 {
 	char *temp;
 	int d_create = -1;
-	
+
 	char *domain = domain_get(prog);
 	if (domain){
 		int i = string_search_keyword_first_all(domain, myuid_create);
@@ -2020,7 +2028,7 @@ int domain_get_creation_time(char *prog)
 		}
 		free2(domain);
 	}
-	
+
 	return d_create;
 }
 
@@ -2030,7 +2038,7 @@ int domain_get_creation_time(char *prog)
 char *domain_get_list()
 {
 	char *tdomf2, *res, *res2, *list, *list2;
-	
+
 	/* alloc mem for new list */
 	list = memget2(MAX_CHAR);
 
@@ -2067,7 +2075,7 @@ char *domain_get_list()
 char *domain_get_list_full()
 {
 	char *tdomf2, *res, *res2, *list, *list2;
-	
+
 	/* alloc mem for new list */
 	list = memget2(MAX_CHAR);
 
@@ -2104,26 +2112,26 @@ char *domain_get_list_full()
 char *domain_get_subdomain_belong(const char *name)
 {
 	char *list = 0, *dlist, *res, *temp;
-	
+
 	/* get a list with all domains and subdomains with full names */
 	dlist = domain_get_list_full();
-	
+
 	temp = dlist;
 	while(1){
 		/* get next full domain name */
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		
+
 		/* domain name contains subdomain name? */
 		if (string_search_keyword_last(res, name)){
 			/* add main domain name to the list */
 			strcat2(&list, res);
 			strcat2(&list, "\n");
 		}
-		
+
 		free2(res);
 	}
-	
+
 	free2(dlist);
 	return list;
 }
@@ -2135,7 +2143,7 @@ int domain_exist(const char *text)
 {
 	int i;
 	char *temp;
-	
+
 	temp = memget2(MAX_CHAR);
 	strcpy2(&temp, "<kernel> ");
 	strcat2(&temp, text);
@@ -2153,10 +2161,10 @@ int domain_get_profile(char *domain)
 	int i, p;
 	char *key = "use_profile ";
 	int keyl = 12;
-	
+
 	/* search for the keyword */
 	i = string_search_keyword_first_all(domain, key);
-	
+
 	/* if match */
 	if (i > -1){
 		/* get number */
@@ -2164,7 +2172,7 @@ int domain_get_profile(char *domain)
 		p = string_ctoi(domain[i]);
 		return p;
 	}
-	
+
 	return -1;
 }
 
@@ -2176,7 +2184,7 @@ void domain_set_profile(char **text, int profile)
 	char *key = "use_profile ";
 	int keyl = 12;
 	char *res, *orig, *temp;
-	
+
 	temp = *text;
 	while(1){
 		orig = temp;
@@ -2202,7 +2210,7 @@ void domain_set_profile(char **text, int profile)
 void domain_set_profile_for_prog(const char *prog, int profile)
 {
 	char *res, *res2, *orig, *temp;
-	
+
 	temp = tdomf;
 	while(1){
 		orig = temp;
@@ -2215,7 +2223,9 @@ void domain_set_profile_for_prog(const char *prog, int profile)
 		if (res2){
 
 			/* if so, then set its profile mode */
-			if (!strcmp(prog, res2)) domain_set_profile(&orig, profile);
+			if (!strcmp(prog, res2)){
+				domain_set_profile(&orig, profile);
+			}
 		}
 
 		free2(res2);
@@ -2259,7 +2269,7 @@ int process_get_pid(const char *name)
 	struct dirent *mydir_entry;
 	char *mydir_name = 0, *mypid = 0;
 	int p = 0;
-	
+
 	/* open /proc dir */
 	mydir = opendir("/proc/");
 	if (!mydir){ error("error: cannot open /proc/ directory\n"); myexit(1); }
@@ -2317,14 +2327,14 @@ int *process_get_pid_list(const char *name)
 	struct dirent *mydir_entry;
 	char *mydir_name = 0, *mypid = 0;
 	int p = 0;
-	
+
 	/* open /proc dir */
 	mydir = opendir("/proc/");
 	if (!mydir){ error("error: cannot open /proc/ directory\n"); myexit(1); }
 
 	/* alloc mem for list */
 	list = memget_int(list_length);
-	
+
 	/* cycle through dirs in /proc */
 	while((mydir_entry = readdir(mydir))) {
 		/* get the dir names inside /proc dir */
@@ -2347,7 +2357,7 @@ int *process_get_pid_list(const char *name)
 					p = atoi(mypid);
 					/* store pid in my list */
 					list[list_counter++] = p;
-					
+
 					/* check array boundaries */
 					if (list_counter >= list_length){
 						error("error: list array too small in process_get_pid_list()\n"); myexit(1); }
@@ -2362,7 +2372,7 @@ int *process_get_pid_list(const char *name)
 
 	/* if no process was found, then free list and fail */
 	if (!list_counter){ free(list); return 0; }
-	
+
 	/* put an ending zero to the end of list */
 	list[list_counter] = 0;
 
@@ -2384,7 +2394,7 @@ int process_get_least_uptime(const char *name)
 	int s_uptime = sys_get_uptime();
 	/* converting jiffies to second, this is from manpage of proc */
 	int jiffies_per_second=sysconf(_SC_CLK_TCK);
-	
+
 	/* open /proc dir */
 	mydir = opendir("/proc/");
 	if (!mydir){ error("error: cannot open /proc/ directory\n"); myexit(1); }
@@ -2409,7 +2419,7 @@ int process_get_least_uptime(const char *name)
 				if (!strcmp(res, name)) {
 					char *pstat, *temp, *putime;
 					int t;
-					
+
 					/* create dirname like /proc/pid/stat */
 					strcpy2(&mydir_name, "/proc/");
 					strcat2(&mydir_name, mypid);
@@ -2487,7 +2497,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 			if (res){
 				/* compare the link to the process name */
 				if (!strcmp(res, name)) {
-					
+
 					/* create dirname like /proc/pid/stat */
 					strcpy2(&mydir_name, "/proc/");
 					strcat2(&mydir_name, mypid);
@@ -2512,14 +2522,14 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 					ptime = string_get_next_wordn(&temp, 16);
 					t += atoi(ptime);
 					free2(ptime);
-					
+
 
 					/* *************************************************
 					 * manage domain cpu time list minus / plus entries
 					 * this list grows with time as new processes appear with new pids,
 					 * but this should stay at a low level
 					 * *************************************************/
-					 
+
 					/* convert cputime integer to string */
 					ptime = string_itos(t);
 					/* create list entries for compare */
@@ -2609,7 +2619,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 							strcat2(&domain_cputime_list_plus, "\n");
 						}
 					}
-					
+
 					free2(ptime);
 
 					free2(pstat);
@@ -2619,7 +2629,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 		}
 	}
 
-	
+
 	/* reset cpu time in uid of domain too if clear flag set */
 	if (flag_clear){
 		char *dname = 0;
@@ -2681,7 +2691,7 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 			}
 			free2(res2);
 		}
-		
+
 		/* sum of times */
 		mycputime = t;
 	}
@@ -2756,7 +2766,7 @@ char *process_get_cmdline(int pid)
 	}
 	/* add a new line to it */
 	strcat2(&cmd, "\n");
-	
+
 	free2(path);
 	free2(pid2);
 	return cmd;
@@ -2860,7 +2870,7 @@ void load()
 	}
 	free2(tdomf);
 	tdomf = tdomf_new;
-		
+
 
 	/* remove quota_exceeded entries */
 	tdomf_new = memget2(MAX_CHAR);
@@ -2869,7 +2879,7 @@ void load()
 		/* get next line */
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		
+
 		/* don't add line with quota_exceeded */
 		if (!string_search_keyword_first(res, "quota_exceeded")){
 			strcat2(&tdomf_new, res);
@@ -2905,14 +2915,14 @@ void load()
 				res2 = domain_get_name(res);
 				if (string_search_line(tprogs_exc, res2) > -1) flag = 1;
 				free2(res2);
-				
+
 				/* skip cycle on a main exception domain */
 				if (!flag){
 
 					/* add domain and its rules to new policy */
 					strcat2(&tdomf_new, res);
 					strcat2(&tdomf_new, "\n");
-					
+
 					temp2 = tdomf;
 					while(1){
 						/* get next domain */
@@ -2927,7 +2937,7 @@ void load()
 							temp4 = res2;
 							name2 = string_get_next_line(&temp4);
 							if (name2){
-							
+
 								/* skip the same domain as my domain name */
 								if (strcmp(name1, name2)){
 									long l1 = strlen2(&name1);
@@ -3004,7 +3014,7 @@ void reload()
 
 	/* load old policy from kernel */
 	texcf_old = file_read(texck, -1);
-	
+
 	/* load exception policy to kernel too */
 	while(1){
 		/* zero my list */
@@ -3034,10 +3044,10 @@ void reload()
 	}
 
 	free2(texcf_old);
-	
+
 	/* load old policy from kernel */
 	tdomf_old = file_read(tdomk, -1);
-	
+
 	/* load domain policy to the kernel */
 	while(1){	
 
@@ -3048,7 +3058,7 @@ void reload()
 			/* get next line */
 			res = string_get_next_line(&temp);
 			if (!res) break;
-			
+
 			/* choose only those lines starting with "<kernel>" */
 			if (string_search_keyword_first(res, "<kernel>")){
 				/* add full domain name to my list */
@@ -3193,7 +3203,7 @@ void reload()
 			tdomf_old = tdomf_old2;
 		}
 	}
-	
+
 	free2(domain_names_active);
 	free2(rules_old);
 	free2(profile);
@@ -3290,10 +3300,10 @@ void backup()
 {
 	char *tdom2 = 0, *texc2 = 0, *num;
 	struct timeval t;
-	
+
 	/* load configs if not loaded yet */
 	if (!tdomf || !texcf) load();
-	
+
 	/* get elapsed seconds since 1970 */
 	gettimeofday(&t, 0);
 	/* convert long integer to string */
@@ -3315,7 +3325,7 @@ void backup()
 	/* save configs to backup files on disk */
 	file_write(tdom2, tdomf);
 	file_write(texc2, texcf);
-	
+
 	free2(tdom2);
 	free2(texc2);
 }
@@ -3340,7 +3350,7 @@ void restore()
 	strcat2(&texc2, ".backup.");
 	strcat2(&texc2, myuid);
 	strcat2(&texc2, ".");
-	
+
 	/* open Tomoyo dir */
 	mydir = opendir(tdir);
 	if (!mydir){ error("error: cannot open "); error(tdir); error(" directory\n"); myexit(1); }
@@ -3386,7 +3396,7 @@ void restore()
 		/* load configs from backup files from disk */
 		tdomf = file_read(tdom3, 0);
 		texcf = file_read(texc3, 0);
-		
+
 		/* reload configs to kernel and save them to disk */
 		reload();
 		save();
@@ -3415,7 +3425,7 @@ void check_instance(){
 	int  len;
 	int  flag_pid_file;
 	int  flag_manual;
-	
+
 	/* signal to write null to pid file on exit */
 	flag_pid = 1;
 
@@ -3425,7 +3435,7 @@ void check_instance(){
 		error("error: unknown problem, zero instance of tomld seem to be running\n");
 		myexit(1);
 	}
-	
+
 	/* remove all pids from list that don't belong to a tomld process running with root priv */
 	i = 0;
 	while(1){
@@ -3440,7 +3450,7 @@ void check_instance(){
 		strcat2(&path, res);
 		strcat2(&path, "/status");
 		free2(res);
-		
+
 		/* read in /proc/PID/status file */
 		res = file_read(path, -1);
 		free2(path);
@@ -3456,7 +3466,7 @@ void check_instance(){
 				int n = atoi(num);
 				free2(num);
 				free2(res2);
-				
+
 				/* remove PID from list if PID is non-zero */
 				if (n) pid_list[i] = -1;
 			}
@@ -3567,7 +3577,7 @@ void check_instance(){
 			myexit(1);
 		}
 	}
-	
+
 	/* check if first tomld process has been started in manual mode or not */
 	/* get the other tomld process' pid */
 	p = getpid();
@@ -3600,7 +3610,7 @@ void check_instance(){
 				myexit(1);
 			}
 			color("waiting for other tomld process to terminate...\n", clr);
-			
+
 			/* wait for process to terminate for maximum 10 seconds */
 			c = 101;
 			while(--c){
@@ -3622,7 +3632,7 @@ void check_instance(){
 			myexit(1);
 		}
 	}
-	
+
 	/* store my pid file */
 	file_write(tpid, mypid);
 
@@ -3635,7 +3645,7 @@ void check_instance(){
 void create_prof()
 {
 	char *tmanf_old, *tmanf, *tmanf2 = 0, *tprof_old, *tprof, *tprof2, *res;
-	
+
 	/* check tomoyo version */
 	if (tomoyo_version() <= 2299){ tmanf = tmanf22; tprof = tprof22; }
 	else                         { tmanf = tmanf23; tprof = tprof23; }
@@ -3654,7 +3664,7 @@ void create_prof()
 	free2(tmanf_old); tmanf_old = res;
 	res = string_sort_uniq_lines(tmanf2);
 	free2(tmanf2); tmanf2 = res;
-	
+
 	/* compare kernel manager config and mine */
 	/* reload it to kernel if they are not identical */
 	if (strcmp(tmanf2, tmanf_old) || !file_exist(tman)){
@@ -3675,7 +3685,7 @@ void create_prof()
 			error("error: could not load manager config to kernel\n"); myexit(1); }
 		free2(comm);
 	}
-	
+
 	/* load profile.conf from kernel and check if it's the same what i have */
 	/* if identical, then no reload is needed */
 	tprof_old = file_read(tprok, -1);
@@ -3684,7 +3694,7 @@ void create_prof()
 	res = string_sort_uniq_lines(tprof_old);
 	free2(tprof_old); tprof_old = res;
 	tprof2 = string_sort_uniq_lines(tprof);
-	
+
 	/* compare kernel profile config and mine */
 	/* reload it to kernel if they are not identical */
 	if (strcmp(tprof2, tprof_old) || !file_exist(tpro)){
@@ -3713,17 +3723,17 @@ void check_options(int argc, char **argv){
 		int c = 1;
 		char *myarg = 0;
 		int flag_type = 0;
-		
+
 		/* cycle through the arguments */
 		while (argc2--){
 			int flag_ok = 0;
 			strcpy2(&myarg, argv[c]);
-			
+
 			if (!strcmp(myarg, "--"))	{ opt_dashdash = 1;	flag_ok = 1; }
 
 			if (!strcmp(myarg, "-v") || !strcmp(myarg, "--verson"))	{ opt_version = 1;	flag_ok = 1; }
 			if (!strcmp(myarg, "-h") || !strcmp(myarg, "--help"  ))	{ opt_help    = 1;	flag_ok = 1; }
-			
+
 			if (!strcmp(myarg, "-1") || !strcmp(myarg, "--once" ))	{ opt_once    = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "-c") || !strcmp(myarg, "--color"))	{ opt_color   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "-k") || !strcmp(myarg, "--keep" ))	{ opt_keep    = 1; flag_ok = 1; }
@@ -3848,7 +3858,7 @@ void check_options(int argc, char **argv){
 			}
 			c++;
 		}
-		
+
 		free2(myarg);
 
 		/* exit after --version or --help option */
@@ -3905,7 +3915,7 @@ void check_tomoyo()
 		}
 	}
 	free2(cmd);
-	
+
 	/* check tomoyo version */
 	tver = tomoyo_version();
 	if (tver < 2200 || tver > 2399){
@@ -3945,7 +3955,7 @@ void check_config()
 	if (file_exist(tconf)){
 		char *res, *res2, *temp, *temp2;
 		int flag_spec = 0;
-		
+
 		/* read file */
 		tconff = file_read(tconf, 0);
 		/* cycle through config and sort it out */
@@ -3971,7 +3981,7 @@ void check_config()
 					if (string_search_keyword_first(res2, "[nodomain]")){  flag_spec = 7; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[notify]")){    flag_spec = 8; flag_ok = 0; }
 					if (string_search_keyword_first(res2, "[nocrypt]")){   flag_spec = 9; flag_ok = 0; }
-					
+
 					/* place line containing dirs to appropriate array */
 					if (flag_ok){
 						/* also add "/" char to the end of some of the dirs if missing */
@@ -4078,7 +4088,7 @@ void check_config()
 				/* get next line of mount */
 				res = string_get_next_line(&temp);
 				if (!res) break;
-				
+
 				/* get fs type
 				 * mount line should look like this:
 				 * crypt_dir normal_dir ecryptfs options 0 0 */
@@ -4127,7 +4137,7 @@ void domain_delete_all()
 	while(1){
 		/* load old policy from kernel memory */
 		tdomf_old = file_read(tdomk, -1);
-		
+
 		/* zero my config */
 		strnull2(&myappend);
 
@@ -4183,7 +4193,7 @@ void domain_delete_all()
 			tdomf_old = tdomf_old2;
 		}
 	}
-	
+
 	free2(tdomf_old);
 	free2(myappend);
 }
@@ -4201,7 +4211,7 @@ void domain_delete(const char *name)
 	while(1){
 		/* load old policy from kernel memory */
 		tdomf_old = file_read(tdomk, -1);
-		
+
 		/* zero my config */
 		strnull2(&myappend);
 
@@ -4281,7 +4291,7 @@ void clear()
 	/* write config files */
 	file_write(texc, texcf);
 	file_write(tdom, tdomf);
-	
+
 	/* delete all other domains from memory too */
 	domain_delete_all();
 
@@ -4308,10 +4318,10 @@ int domain_check_enforcing(char *domain, int flag_info)
 	int d_create, d_change, d_rules, d_cputime, p_uptime, p_cputime;
 	int flag_enforcing, flag_cputime_change;
 	int result = 0;
-	
+
 	/* get main domain name */
 	name = domain_get_name(domain);
-	
+
 	/* domain's process is running currently? */
 	if (process_running(process_get_pid(name)) || !flag_info){
 
@@ -4327,7 +4337,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 			res2 = string_get_number_last(res);
 			/* convert epoch string to integer */
 			d_create = time(0) - atoi(res2);
-			
+
 			free2(res); free2(res2);
 
 			/* are all processes' uptime greater than the time passed since domain creation time?
@@ -4366,7 +4376,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 					 * the change time would be huge without any sense */
 					s_uptime = sys_get_uptime();
 					if (d_change > s_uptime) d_change = s_uptime;
-					
+
 					free2(res); free2(res2);
 
 					/* have the processes' cpu time reached a value compared to the complexity
@@ -4400,7 +4410,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 
 						cputime_all_percent = (d_cputime + p_cputime) * 100 / d_rules;
 						result = cputime_all_percent;
-						
+
 						if (flag_info){
 							/* ***************************************************************
 							 * print domain status on change
@@ -4482,7 +4492,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 			}
 		}
 	}
-	
+
 	free2(name);
 	return result;
 }
@@ -4492,7 +4502,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 void domain_info(const char *pattern)
 {
 	int flag_pattern = 0;
-	
+
 	/* load config files from kernel memory */
 	load();
 
@@ -4500,13 +4510,13 @@ void domain_info(const char *pattern)
 	if (pattern){
 		if (pattern[0]) flag_pattern = 1;
 	}
-	
+
 	if (flag_pattern){
 		char *tdomf2, *res, *res2, *temp;
 		int i, prof;
 		int count = 0;
 		int flag_first = 0;
-		
+
 		tdomf2 = tdomf;
 		while(1){
 			/* get next domain */
@@ -4516,20 +4526,20 @@ void domain_info(const char *pattern)
 
 			/* get profile */
 			prof = domain_get_profile(res);
-			
+
 			/* get first line */
 			/* here res2 should be something, so i don't check data availability */
 			temp = res;
 			res2 = string_get_next_line(&temp);
-			
+
 			/* search for a keyword */
 			i = string_search_keyword(res2, pattern);
-			
+
 			/* print domain if match */
 			if (i == -1) free2(res2);
 			else{
 				char *text_new, *text_temp;
-			
+
 				/* increase counter for summary */
 				count++;
 
@@ -4544,7 +4554,7 @@ void domain_info(const char *pattern)
 				res2 = string_get_next_line(&temp);
 				color(res2, green); newl();
 				free2(res2);
-				
+
 				/* sort the rest of the policy text */
 				text_new = string_sort_uniq_lines(temp);
 				text_temp = text_new;
@@ -4556,7 +4566,7 @@ void domain_info(const char *pattern)
 					if (!res2) break;
 					/* print non empty lines only */
 					if (strlen2(&res2)){
-					
+
 						/* print uid entries in purple */
 						if (string_search_keyword_first(res2, myuid_base)){
 							color(res2, purple);
@@ -4605,7 +4615,7 @@ void domain_info(const char *pattern)
 			}
 			free2(res);
 		}
-		
+
 		/* print summary */
 		if (count){
 			char *res = string_itos(count);
@@ -4644,7 +4654,7 @@ void domain_info(const char *pattern)
 			if (string_search_keyword_first(res, "allow_")) r++;
 			free2(res);
 		}
-		
+
 		/* print stat */
 		sd = string_itos(d);
 		sr = string_itos(r);
@@ -4680,13 +4690,13 @@ void domain_info(const char *pattern)
 						}
 						else{
 							char *percent = string_itos_zeros(domain_check_enforcing(res, 0), 4);
-							
+
 							strcat2(&texcf_new, "1 ");
 							strcat2(&texcf_new, percent);
 							strcat2(&texcf_new, "_%) ");
 							strcat2(&texcf_new, res2);
 							strcat2(&texcf_new, "\n");
-							
+
 							free2(percent);
 						}
 					}
@@ -4709,7 +4719,7 @@ void domain_info(const char *pattern)
 				/* get next line */
 				res = string_get_next_line(&temp);
 				if (!res) break;
-				
+
 				/* first column */
 				temp2 = res;
 				c1 = string_get_next_word(&temp2);
@@ -4768,13 +4778,13 @@ void domain_info(const char *pattern)
 					free2(c1);
 					free2(c3);
 				}
-				
+
 				free2(res);
 			}
 
 			free2(texcf_new);
 			newl();
-					
+
 			/* print info about the top directory with most entries of different depths */
 			stat_print_top_dirs_with_most_entries();
 		}
@@ -4786,7 +4796,7 @@ void domain_info(const char *pattern)
 void domain_remove(const char *pattern)
 {
 	int flag_pattern = 0;
-	
+
 	/* load config files from kernel memory */
 	load();
 
@@ -4794,7 +4804,7 @@ void domain_remove(const char *pattern)
 	if (pattern){
 		if (pattern[0]) flag_pattern = 1;
 	}
-	
+
 	if (flag_pattern){
 		char *res, *res2, *res3, *temp, *temp2, *temp3;
 		char *tdomf_new, *texcf_new;
@@ -4822,7 +4832,7 @@ void domain_remove(const char *pattern)
 			}
 			free2(res);
 		}
-		
+
 		/* print summary */
 		if (count){
 			char *res = string_itos(count);
@@ -4831,10 +4841,10 @@ void domain_remove(const char *pattern)
 			if (count == 1) color(" domain)\n", clr);
 			else            color(" domains)\n", clr);
 			free2(res);
-			
+
 			/* alloc mem for new domain policy */
 			tdomf_new = memget2(MAX_CHAR);
-			
+
 			temp = tdomf;
 			while(1){
 				/* get next domain */
@@ -4887,7 +4897,7 @@ void domain_remove(const char *pattern)
 				}
 				free2(res);
 			}
-			
+
 			/* create backup before removing any domain */
 			if (count2 > 0){
 				backup();
@@ -4923,7 +4933,7 @@ void domain_remove(const char *pattern)
 void domain_set_learn_all()
 {
 	char *res, *name, *name_sub, *temp, *orig;
-	
+
 	/* load config files */
 	load();
 
@@ -4951,7 +4961,7 @@ void domain_set_learn_all()
 
 		free2(res);
 	}
-	
+
 	/* update cpu times in domain policy too (not only in memory) */
 	domain_update_cpu_time_all();
 
@@ -4971,11 +4981,8 @@ void domain_set_enforce_old()
 
 	/* is --keep option on? */
 	if (!opt_keep){
-		
-		if (opt_manual){
 
-			/* load config files */
-			load();
+		if (opt_manual){
 
 			/* check if there are old domains with enforcing mode */
 			temp = tdomf;
@@ -5017,7 +5024,7 @@ void domain_set_enforce_old()
 							if (!flag_turned){
 								flag_turned = 1;
 								color("* switch old domains to enforcing mode\n", red);
-								
+
 								/* notification */
 								notify("switch old domains to enforcing mode");
 							}
@@ -5035,7 +5042,7 @@ void domain_set_enforce_old()
 
 			/* reload them to kernel */		
 			reload();
-			
+
 			/* did i switch any old domain to enforcing mode? */
 			if (!flag_turned){
 				if (flag_old) color("* all old domains in enforcing mode already\n", green);
@@ -5078,11 +5085,11 @@ void domain_set_enforce_old()
 									color("switch to enforcing mode\n", purple);
 									domain_set_profile_for_prog(prog, 3);
 									notify_check_enforce_all();
-									
+
 									/* notification */
 									strcpy2(&nn, prog); strcat2(&nn, ", switch to enforcing mode");
 									notify(nn); free2(nn);
-									
+
 									/* remove domain from temporary list */
 									res2 = string_remove_line(tprogs_learn_auto, prog);
 									free2(tprogs_learn_auto);
@@ -5159,7 +5166,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 				start = tlogf;
 			}
 		}
-		
+
 		/* search for tomoyo error messages from mark */
 		/* collect access deny messages */
 		if (tomoyo_version() <= 2299) strcpy2(&key, " TOMOYO-ERROR: Access ");
@@ -5199,9 +5206,9 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 				free2(res);
 			}
 		}
-		
+
 		free2(key);
-		
+
 		/* debug part to print domain deny messages if any */
 		if (strlen2(&tlogf3)){
 			debug(tlogf3);
@@ -5283,7 +5290,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 			strcat2(&rules, res2);
 			strcat2(&rules, " ");
 			free2(res2);
-			
+
 			/* get parameters of rule */
 			/* search the position of "denied for " text,
 			 * so i know that all the text before is the parameters of the rule */
@@ -5324,7 +5331,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 			strcat2(&rules, res2);
 			free2(res2);
 
-			
+
 			/* get program name the rule belongs to */
 			/* jump behind "denied for " part */
 			i = string_search_keyword(temp2, key2);
@@ -5357,7 +5364,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 					/* get next full domain name the denied domain belong to */
 					res3 = string_get_next_line(&temp3);
 					if (!res3) break;
-					
+
 					/* create text for sorting in a format like "binary allow_ rule" */
 					strcat2(&prog_rules, res3);
 					strcat2(&prog_rules, " ");
@@ -5385,7 +5392,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 void domain_get_log()
 {
 	/* vars */
-	char *res, *res2, *res3, *temp, *temp2, *temp3, *orig;
+	char *res, *res2, *res3, *temp, *temp2, *temp3;
 	char *prog_rules = 0;
 	char *prog_rules2 = 0;
 
@@ -5409,6 +5416,9 @@ void domain_get_log()
 		char *tdomf_new, *prog, *prog_main, *rule, *rules_new = 0, *prog_rules_new = 0;
 		char *log_recent = 0;
 
+		/* signal that there was a request for temporary learning mode with deny logs too */
+		if (flag_learn && prog_rules2) flag_learn4 = 1;
+		
 		/* sort and unique rules */
 		res = string_sort_uniq_lines(prog_rules);
 		free2(prog_rules);
@@ -5446,7 +5456,7 @@ void domain_get_log()
 			color(prog, blue);
 			color("  ", clr);
 			color(rule, purple);
-			
+
 			/* is manual mode on? */
 			if (opt_manual){
 				/* choose if to allow denied rule */
@@ -5461,7 +5471,7 @@ void domain_get_log()
 				 * and if so, then allow rules from deny logs */
 				if (flag_learn){
 
-					/* if there a list with domain pattern? */
+					/* is there a list with domain pattern? */
 					if (!opt_learn2){
 						/* add rules to new rules */
 						strcat2(&prog_rules_new, res);
@@ -5517,7 +5527,7 @@ void domain_get_log()
 		free2(prog_rules);
 		prog_rules = prog_rules_new;
 
-		
+
 		if (log_recent){
 
 			/* notification */
@@ -5536,7 +5546,7 @@ void domain_get_log()
 				strcat2(&comm, mail_mta);
 				strcat2(&comm, " ");
 				strcat2(&comm, mail_users);
-				
+
 				/* mail binary exists? */
 				pipe_write(comm, text);
 				free2(comm);
@@ -5544,8 +5554,8 @@ void domain_get_log()
 			}
 		}
 		free2(log_recent);
-		
-		
+
+
 
 		/* clear learn flag, because i want to allow temporary learning mode only for those domains,
 		 * that had access deny logs just now,
@@ -5554,6 +5564,7 @@ void domain_get_log()
 
 		/* are there any new rules after confirmation? */
 		if (strlen2(&prog_rules)){
+			char *progs2 = 0;
 
 			/* alloc mem for new domain policy */
 			tdomf_new = memget2(MAX_CHAR);
@@ -5562,7 +5573,6 @@ void domain_get_log()
 			temp = tdomf;
 			while(1){
 				/* get next domain policy */
-				orig = temp;
 				res = domain_get_next(&temp);
 				if (!res) break;
 				/* get subdomain name */
@@ -5596,20 +5606,12 @@ void domain_get_log()
 								strcat2(&rules_new, rule);
 								strcat2(&rules_new, "\n");
 								if (!flag_once){
-									/* switch domain to learning mode */
-									domain_set_profile_for_prog(prog_main, 1);
-									/* reread domain because it changed when i changed its profile just now
-									 * in 'tdomf', and the old one was in 'res' */
-									free2(res);
-									temp = orig;
-									res = domain_get_next(&temp);
-									/* reset cpu time counter for prog because of switching it to learning mode,
-									 * or else it would switch back to enforcing mode immediately */
-									process_get_cpu_time_all(prog_main, 1);
+									/* collect main domain names for later to switch them to learning mode */
+									string_add_line_uniq(&progs2, prog_main);
 									/* add domain to temporary list */
 									if (string_search_line(tprogs_learn_auto, prog_main) == -1){
 										char *nn = 0;
-										
+
 										strcat2(&tprogs_learn_auto, prog_main);
 										strcat2(&tprogs_learn_auto, "\n");
 
@@ -5641,20 +5643,39 @@ void domain_get_log()
 				free2(res);
 			}
 			free2(rules_new);
-			
+
 			color("* switch domains with new rules to learning mode\n", red);
 
 			/* replace old policy with new one */
 			free2(tdomf);
 			tdomf = tdomf_new;
+			
+			
+			/* ****************************************************************************** */
+			/* switch all previous domains to learning mode and reset their cpu time counters */
+			temp = progs2;
+			while(1){
+				res = string_get_next_line(&temp);
+				if (!res) break;
+				
+				/* switch domain to learning mode */
+				domain_set_profile_for_prog(res, 1);
+				/* reset cpu time counter for prog because of switching it to learning mode,
+				 * or else it would switch back to enforcing mode immediately */
+				process_get_cpu_time_all(res, 1);
+				
+				free2(res);
+			}
+			/* ****************************************************************************** */
 		}
 	}
 	/* no rules to add */
 	else{
 		/* if there was a request for temporary learning mode
 		 * and no rules available to add,
+		 * and also there wasn't any temporary mode on already before,
 		 * then print log message about ending temporary learning mode */
-		if (flag_learn){
+		if (!flag_learn4 && flag_learn){
 			/* clear flag */
 			flag_learn  = 0;
 			flag_learn2 = 0;
@@ -5704,7 +5725,7 @@ void domain_print_list_not_progs()
 	res = string_sort_uniq_lines(tprogs);
 	free2(tprogs); tprogs = res;
 
-	
+
 	free2(list);
 	list = list2;
 
@@ -5731,12 +5752,12 @@ void domain_print_list_not_progs()
 			}
 			free2(res);
 		}
-		
+
 		/* sort filename list */
 		list3 = string_sort_uniq_lines(list2);
 		free2(list2);
 		list2 = list3;
-		
+
 		/* print list */
 		temp = list2;
 		while(1){
@@ -5747,10 +5768,10 @@ void domain_print_list_not_progs()
 			free2(res);
 		}
 		newl();
-		
+
 		free2(list2);
 	}
-	
+
 	free2(list);
 }
 
@@ -5761,17 +5782,17 @@ void domain_print_mode()
 	/*vars */
 	char *prog, *temp;
 	int pos;
-	
+
 	if (flag_firstrun) color("* checking policy and rules\n", yellow);
 
 	/* cycle thorugh progs */
 	temp = tprogs;
 	while(1){
 		char *s = 0;
-		
+
 		prog = string_get_next_line(&temp);
 		if (!prog) break;
-		
+
 
 		/* does the domain exception exist for the program?
 		 * if not, then add program entry to exception policy */
@@ -5782,16 +5803,16 @@ void domain_print_mode()
 			strcat2(&texcf, "\n");
 		}
 		free2(s); s = 0;
-		
+
 
 		/* does the domain exist for the program? */
 		pos = domain_exist(prog);
 		if (pos == -1){
 			char *t;
-			
+
 			/* don't add domains with executable form of /proc/$PID/exe */
 			if (!string_search_keyword_first(prog, "/proc/")){
-			
+
 				color(prog, blue);
 				color(", no domain, ", clr);
 				color("create domain with learning mode", green);
@@ -5899,9 +5920,9 @@ void domain_print_mode()
 			}
 
 		}
-		
+
 		if (flag_firstrun) newl();
-		
+
 		free2(prog);
 	}
 }
@@ -5927,7 +5948,7 @@ int compare_names(char *name1, char *name2)
 	if (name2) l2 = strlen(name2);
 	s1 = memget2(l1);
 	s2 = memget2(l2);
-	
+
 	/* *********************************************** */
 	/* simplify names by replacing "\\*" with "*" char */
 	/* *********************************************** */
@@ -5948,7 +5969,7 @@ int compare_names(char *name1, char *name2)
 	s1[i2] = 0;
 	strlenset3(&s1, i2);
 	l1 = i2;
-	
+
 	c = 0;
 	i1 = 0;
 	i2 = 0;
@@ -5966,12 +5987,12 @@ int compare_names(char *name1, char *name2)
 	s2[i2] = 0;
 	strlenset3(&s2, i2);
 	l2 = i2;
-	
+
 	/* ************************************************************* */
 	/* get left most and right most parts of strings beside "*" char */
 	/* ************************************************************* */
 	if (flag1){
-		
+
 		/* get left 1 */
 		left1 = memget2(l1);
 		i1 = 0;
@@ -6007,7 +6028,7 @@ int compare_names(char *name1, char *name2)
 	}
 
 	if (flag2){
-		
+
 		/* get left 1 */
 		left2 = memget2(l2);
 		i1 = 0;
@@ -6041,7 +6062,7 @@ int compare_names(char *name1, char *name2)
 		strlenset3(&right2, i2);
 		right2l = i2;
 	}
-	
+
 	/* **************************************************************** */
 	/* check the four cases by comparing left most and right most parts */
 	/* **************************************************************** */
@@ -6101,7 +6122,7 @@ int compare_names(char *name1, char *name2)
 		free2(right1);
 		free2(right2);
 	}
-	
+
 	free2(s1);
 	free2(s2);
 	return 0;
@@ -6122,31 +6143,31 @@ int compare_paths(char *path1, char *path2)
 	int w1, w2;
 	int is_dir;
 	char *s1, *s2;
-	
+
 	if (!path1 || !path2) return 0;
-	
+
 	c1 = path1[0];
 	c2 = path2[0];
-	
+
 	/* success if both are null */
 	if (!c1 && !c2) return 1;
 	if (!c1 || !c2) return 0;
-	
+
 	/* fail if they don't start with "/" char and they don't match either */
 	/* this is needed for kernel above 2.6.33 where an allow_create and allow_mkdir
 	 * rule can have a second parameter that is not a dir (like 0644) */
 	if (c1 != '/' || c2 != '/'){
 		if (strcmp(path1, path2)) return 0;
 	}
-	
+
 	/* fail if one of it is a dir and the other is a file */
 	is_dir = path_is_dir(path1);
 	if (is_dir != path_is_dir(path2)) return 0;
-	
+
 	/* alloc mem for subdir names */
 	s1 = memget2(MAX_CHAR);
 	s2 = memget2(MAX_CHAR);
-	
+
 	/* compare paths only */
 	i1 = 1;
 	i2 = 1;
@@ -6227,14 +6248,14 @@ int compare_paths(char *path1, char *path2)
 			free2(s2);
 			return 1;
 		}
-		
+
 		/* fail and exit if only one of the subdir name reached end */
 		if (!c1 || !c2) break;
 	}
-	
+
 	free2(s1);
 	free2(s2);
-	
+
 	return 0;
 }
 
@@ -6247,10 +6268,10 @@ int compare_rules(char *r1, char *r2)
 	char *rule1a = 0, *rule1b = 0, *rule2a = 0, *rule2b = 0;
 	char *temp1, *temp2;
 	int flag_double = 1;
-	
+
 	/* fail if either of the rules are null */
 	if (!r1[0] || !r2[0]) return 0;
-	
+
 	/* get rule types */
 	temp1 = r1;
 	type1 = string_get_next_word(&temp1);
@@ -6262,7 +6283,7 @@ int compare_rules(char *r1, char *r2)
 	/* compare types, fail if no match */
 	if (strcmp(type1, type2)){
 		free2(type1); free2(type2); return 0; }
-	
+
 	/* get rule paths */
 	rule1a = string_get_next_word(&temp1);
 	rule1b = string_get_next_word(&temp1);
@@ -6272,7 +6293,7 @@ int compare_rules(char *r1, char *r2)
 		free2(rule1b);
 		return 0;
 	}
-	
+
 	/* get second params if any */
 	rule2a = string_get_next_word(&temp2);
 	rule2b = string_get_next_word(&temp2);
@@ -6285,7 +6306,7 @@ int compare_rules(char *r1, char *r2)
 	}
 	/* second params exist too */
 	if (rule2b) flag_double++;
-	
+
 	/* compare rules' paths */
 
 	/* first params */
@@ -6338,7 +6359,7 @@ char *compare_path_add_dir_to_list_uniq(char *list, char *dir)
 		strcat2(&new, dir);
 		strcat2(&new, "\n");
 	}
-	
+
 	return new;
 }
 
@@ -6356,7 +6377,7 @@ int compare_path_search_dir_in_list(char *list, char *dir)
 		if (compare_paths(res, dir)){ free2(res); return 1; }
 		free2(res);
 	}
-	
+
 	return 0;
 }
 
@@ -6372,7 +6393,7 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 	int c, c1, c2, i1, i2, in1, in2;
 	int flag1, flag2;
 	long l1, l2;
-	
+
 	if (!list || !path) return 0;
 
 
@@ -6381,7 +6402,7 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 	while(1){
 		res = string_get_next_line(&temp);
 		if (!res) return 0;
-		
+
 		/* path in list is not a dir?
 		 * if so, then compare full paths */
 		res2 = 0;
@@ -6442,7 +6463,7 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 						}
 						new1[in1] = 0;
 						strlenset3(&new1, in1);
-						
+
 						/* get subdir from path2 */
 						flag2 = 0;
 						in2 = 0;
@@ -6459,7 +6480,7 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 						}
 						new2[in2] = 0;
 						strlenset3(&new2, in2);
-						
+
 						/* compare subnames */
 						/* if both contain wildcard, then i prefer the one from list (path1)
 						 * or the one that is not null */
@@ -6467,7 +6488,7 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 						else if (flag2)          strcat2(&new, new2);
 						else if (strlen2(&new1)) strcat2(&new, new1);
 						else                     strcat2(&new, new2);
-						
+
 						/* exit if both paths reached end */
 						if (!c1 && !c2) break;
 					}
@@ -6482,7 +6503,7 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 		}
 		free2(res);
 	}
-	
+
 	return 0;
 }
 
@@ -6598,7 +6619,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 				count1 = c;
 			}
 			else count1 = 1;
-			
+
 			free2(res2);
 			free2(res);
 			break;
@@ -6628,7 +6649,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 			}
 			/* get beginning of path to compare it to recursive dir */
 			res2 = path_get_subdirs_name(path2, c);
-			
+
 			/* compare them */
 			if (compare_paths(res, res2)){
 				/* success, store it on match and exit */
@@ -6647,7 +6668,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 					count2 = c;
 				}
 				else count2 = 1;
-				
+
 				free2(res2);
 				free2(res);
 				break;
@@ -6667,7 +6688,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 		free2(path_new2);
 		return 0;
 	}
-	
+
 	/* alloc mem for temp dir name */
 	rules_new = memget2(MAX_CHAR);
 
@@ -6862,7 +6883,7 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 			}
 		}
 	}
-	
+
 	free2(type);
 	free2(path1);
 	free2(path2);
@@ -6885,7 +6906,7 @@ char *domain_sort_uniq_rules(char *rules)
 	rules_new = memget2(MAX_CHAR);
 	old = memget2(MAX_CHAR);
 	new = memget2(MAX_CHAR);
-	
+
 	/* cycle through rules and compare each to themselves */
 	i1 = 0;
 	temp = rules;
@@ -6918,7 +6939,7 @@ char *domain_sort_uniq_rules(char *rules)
 			if (!res2) break;
 			/* skip comparing the same entry in the list */
 			if (i1 != i2){
-				
+
 				/* compare rules containing wildcard */
 				if (compare_rules(res, res2)){
 					/* get params of rule */
@@ -6975,7 +6996,7 @@ char *domain_sort_uniq_rules(char *rules)
 			strcat2(&rules_new, res);
 			strcat2(&rules_new, "\n");
 		}
-		
+
 		free2(res);
 		i1++;
 	}
@@ -6984,7 +7005,7 @@ char *domain_sort_uniq_rules(char *rules)
 	rules2 = string_sort_uniq_lines(rules_new);
 	free2(rules_new);
 	rules_new = rules2;
-	
+
 	free2(old);
 	free2(new);
 	return rules_new;
@@ -6998,19 +7019,19 @@ void domain_cleanup()
 	char *res, *res2, *res3, *temp, *temp2, *temp3;
 	char *tdomf_new, *rules, *rules2, *rules_temp, *rule_type;
 	int c;
-	
+
 	/* alloc mem for new policy */
 	tdomf_new = memget2(MAX_CHAR);
 	/* alloc mem for sorted rules */
 	rules = memget2(MAX_CHAR);
-	
+
 	/* cycle through domains and sort and make unique the rules of each */
 	temp = tdomf;
 	while(1){
 		/* get next domain policy */
 		res = domain_get_next(&temp);
 		if (!res) break;
-		
+
 		/* copy header part of domain (first 2 lines: <kernel> and use_profile) */
 		temp2 = res;
 		res2 = string_get_next_line(&temp2);
@@ -7018,13 +7039,13 @@ void domain_cleanup()
 			strcat2(&tdomf_new, res2);
 			strcat2(&tdomf_new, "\n");
 			free2(res2);
-			
+
 			res2 = string_get_next_line(&temp2);
 			if (res2){
 				strcat2(&tdomf_new, res2);
 				strcat2(&tdomf_new, "\n");
 				free2(res2);
-				
+
 				/* get only rules */
 				strnull2(&rules);
 				while(1){
@@ -7076,13 +7097,13 @@ void domain_cleanup()
 			strcat2(&tdomf_new, res2);
 			strcat2(&tdomf_new, "\n");
 			free2(res2);
-			
+
 			res2 = string_get_next_line(&temp2);
 			if (res2){
 				strcat2(&tdomf_new, res2);
 				strcat2(&tdomf_new, "\n");
 				free2(res2);
-				
+
 				/* get only same type of rules and sort and unique them in a specific way */
 				c = 0;
 				strnull2(&rules_temp);
@@ -7173,7 +7194,7 @@ void domain_cleanup()
 	free2(rule_type);
 	free2(rules);
 	free2(rules_temp);
-	
+
 	/* replace old policy with new one */
 	free2(tdomf);
 	tdomf = tdomf_new;
@@ -7185,10 +7206,10 @@ void domain_merge_same()
 {
 	char *d1, *d2, *temp1, *temp2, *temp3;
 	char *name1, *name2, *tdomf_new, *list = 0;
-	
+
 	/* get mem for new policy */
 	tdomf_new = memget2(MAX_CHAR);
-	
+
 	/* cycle through domains */
 	temp1 = tdomf;
 	while(1){
@@ -7197,11 +7218,11 @@ void domain_merge_same()
 		if (!d1) break;
 		/* get domain's full name */
 		name1 = domain_get_name_full(d1);
-		
+
 		/* is this domain in the list yet? if so, then skip it
 		 * this list is to filter out same domain names and use domain only once */
 		if (string_search_line(list, name1) == -1){
-			
+
 			/* add domain to new policy */
 			strcat2(&tdomf_new, d1);
 
@@ -7214,7 +7235,7 @@ void domain_merge_same()
 				if (!d2) break;
 				/* get domain's full name */
 				name2 = domain_get_name_full(d2);
-				
+
 				/* domains match? */
 				if (name1 && name2){
 					if (!strcmp(name1, name2)){
@@ -7241,7 +7262,7 @@ void domain_merge_same()
 		free2(name1);
 		free2(d1);
 	}
-	
+
 	/* store new policy */
 	free2(tdomf);
 	tdomf = tdomf_new;
@@ -7264,7 +7285,7 @@ void domain_reshape_rules_recursive_dirs()
 	/* alloc mem for new rule */
 	rules  = memget2(MAX_CHAR);
 	rules2 = memget2(MAX_CHAR);
-	
+
 	/* cycle through domains and change all subdir names of all recursive dirs to fully wildcarded */
 	temp = tdomf;
 	while(1){
@@ -7279,13 +7300,13 @@ void domain_reshape_rules_recursive_dirs()
 			strcat2(&tdomf_new, res2);
 			strcat2(&tdomf_new, "\n");
 			free2(res2);
-			
+
 			res2 = string_get_next_line(&temp2);
 			if (res2){
 				strcat2(&tdomf_new, res2);
 				strcat2(&tdomf_new, "\n");
 				free2(res2);
-				
+
 				/* cycle through the rules */
 				strnull2(&rules);
 				strnull2(&rules2);
@@ -7293,7 +7314,7 @@ void domain_reshape_rules_recursive_dirs()
 					/* get next rule */
 					res2 = string_get_next_line(&temp2);
 					if (!res2) break;
-					
+
 					strcat2(&tdomf_new, res2);
 					strcat2(&tdomf_new, "\n");
 
@@ -7327,7 +7348,7 @@ void domain_reshape_rules_recursive_dirs()
 	}
 	free2(rules);
 	free2(rules2);
-	
+
 	/* replace old policy with new one */
 	free2(tdomf);
 	tdomf = tdomf_new;
@@ -7369,7 +7390,7 @@ void domain_reshape_rules_wildcard_spec()
 	 * because in kernel 2.6.36 and above Tomoyo checks for DAC's permission
 	 * more info on kernel differences: http://tomoyo.sourceforge.jp/comparison.html */
 	char *cre4[] = {"allow_create", "allow_mkdir", "allow_mkfifo", "allow_mksock", "allow_chmod", 0};
-	
+
 
 	/* cycle through rules of all domains and collect more special dirs (that will be wildcarded) */
 	temp = tdomf;
@@ -7377,7 +7398,7 @@ void domain_reshape_rules_wildcard_spec()
 		/* get next rule */
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		
+
 		/* is it a rule starting with "allow_" tag and not my uid entry? */
 		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ") && !string_search_keyword_first(res, myuid_base)){
 
@@ -7416,7 +7437,7 @@ void domain_reshape_rules_wildcard_spec()
 						}
 					}
 				}
-				
+
 				/* ************************************* */
 				/* check if rule is a special mkdir rule */
 				/* ************************************* */
@@ -7442,7 +7463,7 @@ void domain_reshape_rules_wildcard_spec()
 						}
 					}
 				}
-				
+
 				free2(pdir1);
 				free2(pdir2);
 				free2(param1);
@@ -7462,7 +7483,7 @@ void domain_reshape_rules_wildcard_spec()
 		/* get next rule */
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		
+
 		/* is it a rule starting with "allow_" tag? */
 		if (string_search_keyword_first(res, "allow_") && !string_search_keyword_first(res, "allow_execute ") && !string_search_keyword_first(res, myuid_base)){
 
@@ -7494,13 +7515,13 @@ void domain_reshape_rules_wildcard_spec()
 							/* wildcard socket param */
 							strcpy2(&param1, "socket:[\\*]");
 						}
-						
+
 						/* check for pipe param */
 						if (string_search_keyword_first(param1, "pipe:[")){
 							/* wildcard socket param */
 							strcpy2(&param1, "pipe:[\\*]");
 						}
-						
+
 						/* wildcard param2 if it exists, or always add it above kernel 2.6.36 */
 						if (param2 || (kernel_version() >= 263600)){
 							strcpy2(&param2, "0-0xFFFFFFFF");
@@ -7543,13 +7564,13 @@ void domain_reshape_rules_wildcard_spec()
 					if (c == 1){ strcpy2(&param, param1); strcpy2(&pdir, pdir1); }
 					if (c == 2){ strcpy2(&param, param2); strcpy2(&pdir, pdir2); }
 					if (param){
-						
+
 						/* check param only if it's a dir starting with "/" char */
 						if (param[0] == '/'){
 
 							/* check dir in exception */
 							if (compare_path_search_dir_in_list(spec_exception3, pdir)) flag_ex = 1;
-							
+
 							/* is it in spec_wildcard? */
 							if (!flag_ex){
 								if (compare_path_search_dir_in_list(spec_wildcard3, pdir)) flag = 1;
@@ -7580,19 +7601,19 @@ void domain_reshape_rules_wildcard_spec()
 								free2(param);
 								param = res2;
 							}
-							
+
 							/* path is in spec_ex */
 							if (flag_ex){
 								res2 = path_wildcard_temp(param);
 								free2(param); param = res2;
 							}
-							
+
 							/* path is in spec or spec2 */
 							if (flag){
 								res2 = path_wildcard_dir(param);
 								free2(param); param = res2;
 							}
-							
+
 							/* path is in spec3_mkdir */
 							if (flag3){
 								res2 = path_wildcard_dir_plus_parent(param);
@@ -7602,7 +7623,7 @@ void domain_reshape_rules_wildcard_spec()
 							/* wildcard library files version numbers */
 							res2 = path_wildcard_lib(param);
 							free2(param); param = res2;
-							
+
 							/* wildcard /proc/$PID/ if it's in "/proc/[0-9]+/" form */
 							res2 = path_wildcard_proc(param);
 							free2(param); param = res2;
@@ -7611,7 +7632,7 @@ void domain_reshape_rules_wildcard_spec()
 							res2 = path_wildcard_home(param);
 							free2(param); param = res2;
 						}
-						
+
 						/* add param to rule */
 						strcat2(&tdomf_new, " ");
 						strcat2(&tdomf_new, param);
@@ -7622,8 +7643,8 @@ void domain_reshape_rules_wildcard_spec()
 
 				/* new lin in new policy */
 				strcat2(&tdomf_new, "\n");
-				
-				
+
+
 				free2(pdir1);
 				free2(pdir2);
 				free2(param1);
@@ -7631,13 +7652,13 @@ void domain_reshape_rules_wildcard_spec()
 				free2(rule_type);
 			}
 		}
-		
+
 		/* add line to new policy */
 		else{
 			strcat2(&tdomf_new, res);
 			strcat2(&tdomf_new, "\n");
 		}
-		
+
 		free2(res);
 	}
 
@@ -7658,13 +7679,13 @@ void domain_reshape_rules_create_double()
 	char *res, *temp, *temp2;
 	char *rule_type, *param1, *param2;
 	char *tdomf_new;
-	
+
 	char *cre[] = {"allow_create", "allow_read/write", "allow_write", "allow_unlink",
 		"allow_truncate", 0};
-		
+
 	/* alloc mem for new policy */
 	tdomf_new = memget2(MAX_CHAR);
-	
+
 	/* cycle through rules of all domains and on create rules, add create, read/write,
 	 * unlink and truncate too */
 	temp = tdomf;
@@ -7672,7 +7693,7 @@ void domain_reshape_rules_create_double()
 		/* get next rule */
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		
+
 		/* get rule type and params */
 		temp2 = res;
 		rule_type = string_get_next_word(&temp2);
@@ -7708,19 +7729,19 @@ void domain_reshape_rules_create_double()
 			strcat2(&tdomf_new, "allow_truncate ");
 			strcat2(&tdomf_new, param1);
 			strcat2(&tdomf_new, "\n");
-			
+
 		}
 		else{
 			strcat2(&tdomf_new, res);
 			strcat2(&tdomf_new, "\n");
 		}
-		
+
 		free2(param1);
 		free2(param2);
 		free2(rule_type);
 		free2(res);
 	}
-	
+
 	/* replace old policy with new one */
 	free2(tdomf);
 	tdomf = tdomf_new;
@@ -7734,20 +7755,20 @@ void domain_reshape_rules_remove_tomld_dir()
 	char *res, *temp, *temp2;
 	char *rule_type, *param1, *param2;
 	char *tdomf_new;
-	
+
 	/* alloc mem for new policy */
 	tdomf_new = memget2(MAX_CHAR);
-	
+
 	/* cycle through rules of all domains */
 	temp = tdomf;
 	while(1){
 		/* get next rule */
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		
+
 		/* is it a rule? */
 		if (!string_search_keyword_first(res, myuid_base) && string_search_keyword_first(res, "allow_")){
-			
+
 			/* get rule type and params */
 			temp2 = res;
 			rule_type = string_get_next_word(&temp2);
@@ -7759,7 +7780,7 @@ void domain_reshape_rules_remove_tomld_dir()
 				strcat2(&tdomf_new, res);
 				strcat2(&tdomf_new, "\n");
 			}
-			
+
 			free2(param1);
 			free2(param2);
 			free2(rule_type);
@@ -7773,7 +7794,7 @@ void domain_reshape_rules_remove_tomld_dir()
 
 		free2(res);
 	}
-	
+
 	/* replace old policy with new one */
 	free2(tdomf);
 	tdomf = tdomf_new;
@@ -7803,7 +7824,7 @@ void domain_reshape_rules_temp_dir()
 	int flag_match1 = 0;
 	int flag_match2 = 0;
 	int flag_first = 0;
-	
+
 	/* alloc mem for new policy */
 	tdomf_new = memget2(MAX_CHAR);
 
@@ -7814,12 +7835,12 @@ void domain_reshape_rules_temp_dir()
 		/* get next rule */
 		res = string_get_next_line(&temp);
 		if (!res) break;
-		
+
 		/* is it a rule? */
 		if (string_search_keyword_first(res, "allow_")){
 			/* do not run check on my uid entries */
 			if (!string_search_keyword_first(res, myuid_base)){
-				
+
 				/* get rule type and params */
 				temp2 = res;
 				rule_type = string_get_next_word(&temp2);
@@ -7896,7 +7917,7 @@ void domain_reshape_rules_temp_dir()
 										if (param1[end] == '/'){ break; }
 										end++;
 									}
-									
+
 									/* store positions on first run */
 									if (!match_counter1){
 										start_old1 = start;
@@ -7909,7 +7930,7 @@ void domain_reshape_rules_temp_dir()
 										end_old1 = end;
 									}
 									else{
-									
+
 										/* copy only the differing subdirs */
 										temp3 = param1_old + start;
 										strcpy2(&diff1, temp3);
@@ -7946,7 +7967,7 @@ void domain_reshape_rules_temp_dir()
 											}
 											free2(p1); free2(p2);
 										}
-										
+
 										/* success? */
 										/* run only once at exactly 5 matches, and then don't run until fail again
 										 * that will reset the match counter */
@@ -7970,7 +7991,7 @@ void domain_reshape_rules_temp_dir()
 											/* replace param1 with wildcarded one */
 											strcpy2(&param1, new);
 											free2(new);
-											
+
 											/* reset counter */
 											match_counter1 = 0;
 										}
@@ -8054,7 +8075,7 @@ void domain_reshape_rules_temp_dir()
 										if (param2[end] == '/'){ break; }
 										end++;
 									}
-									
+
 									/* store positions on first run */
 									if (!match_counter2){
 										start_old2 = start;
@@ -8067,7 +8088,7 @@ void domain_reshape_rules_temp_dir()
 										end_old2 = end;
 									}
 									else{
-									
+
 										/* copy only the differing subdirs */
 										temp3 = param2_old + start;
 										strcpy2(&diff1, temp3);
@@ -8104,7 +8125,7 @@ void domain_reshape_rules_temp_dir()
 											}
 											free2(p1); free2(p2);
 										}
-										
+
 										/* success? */
 										/* run only once at exactly 5 matches, and then don't run until fail again
 										 * that will reset the match counter */
@@ -8128,7 +8149,7 @@ void domain_reshape_rules_temp_dir()
 											/* replace param2 with wildcarded one */
 											strcpy2(&param2, new);
 											free2(new);
-											
+
 											/* reset counter */
 											match_counter2 = 0;
 										}
@@ -8210,14 +8231,14 @@ void domain_reshape_rules()
 {
 	sand_clock(0);
 	domain_cleanup();
-	
+
 	domain_reshape_rules_recursive_dirs();
 
 	sand_clock(0);
 	domain_cleanup();
-	
+
 	domain_reshape_rules_wildcard_spec();
-	
+
 	sand_clock(0);
 	domain_cleanup();
 
@@ -8227,7 +8248,7 @@ void domain_reshape_rules()
 	domain_cleanup();
 
 	domain_reshape_rules_remove_tomld_dir();
-	
+
 	domain_reshape_rules_temp_dir();
 
 	sand_clock(0);
@@ -8247,7 +8268,7 @@ void domain_update_change_time()
 	int flag_match, flag_change;
 /*	char *res1, *res2, *ŧemp1;
 	int i1, i2;*/
-	
+
 	/* backup policy exists yet? if not, then copy policy */
 	if (!tdomf_bak2){
 		/* copy policy to backup */
@@ -8259,7 +8280,7 @@ void domain_update_change_time()
 		if (!strcmp(tdomf_bak2, tdomf)) return;
 	}
 
-	
+
 	/* if backup policy exists but it doesn't match to current policy,
 	 * then update change times in current one and copy it to backup */
 	tdomf_new = memget2(MAX_CHAR);
@@ -8276,7 +8297,7 @@ void domain_update_change_time()
 		/* get domain name */
 		name1 = domain_get_name_full(d1);
 		if (name1){
-			
+
 			temp2 = tdomf_bak2;
 			while(1){
 				/* get next domain from backup */
@@ -8285,7 +8306,7 @@ void domain_update_change_time()
 				/* get domain name */
 				name2 = domain_get_name_full(d2);
 				if (name2){
-					
+
 					/* compare backup domain to current one */
 					if (!strcmp(name1, name2)){
 						/* there was a match */
@@ -8296,7 +8317,7 @@ void domain_update_change_time()
 							/* there is a difference */
 							flag_change = 1;
 						}
-						
+
 						/* jump out because there was a matching domain name */
 						free2(name2);
 						free2(d2);
@@ -8306,7 +8327,7 @@ void domain_update_change_time()
 				}
 				free2(d2);
 			}
-			
+
 			/* if there was no match, then this is a new domain,
 			 * so i add it to new policy */
 			if (!flag_match){
@@ -8339,7 +8360,7 @@ void domain_update_change_time()
 								strcat2(&tdomf_new, t);
 								strcat2(&tdomf_new, "\n");
 								free2(t);
-								
+
 								flag_one_change_entry = 1;
 							}
 						}
@@ -8348,7 +8369,7 @@ void domain_update_change_time()
 							strcat2(&tdomf_new, res);
 							strcat2(&tdomf_new, "\n");
 						}
-						
+
 						free2(res);
 					}
 					strcat2(&tdomf_new, "\n");
@@ -8377,16 +8398,16 @@ void domain_update_cpu_time_all()
 	char *res, *res2, *res3;
 	char *temp, *temp2, *temp3;
 	int flag_list_match, flag_rule_match, t;
-	
+
 	tdomf_new = memget2(MAX_CHAR);
-	
+
 	/* update cpu times in all domains */
 	temp = tdomf;
 	while(1){
 		/* get next domain */
 		res = domain_get_next(&temp);
 		if (!res) break;
-		
+
 		/* get domain name */
 		name = domain_get_name_full(res);
 		if (name){
@@ -8415,7 +8436,7 @@ void domain_update_cpu_time_all()
 				}
 				free2(res2);
 			}
-			
+
 			/* if match, then update my uid cpu time rule in domain 1 by 1 */
 			if (flag_list_match){
 				int flag_one_change_entry;
@@ -8428,7 +8449,7 @@ void domain_update_cpu_time_all()
 					/* get next rule */
 					res2 = string_get_next_line(&temp2);
 					if (!res2) break;
-					
+
 					/* is rule my uid cpu time entry? */
 					if (string_search_keyword_first(res2, myuid_cputime)){
 						if (!flag_one_change_entry){
@@ -8446,7 +8467,7 @@ void domain_update_cpu_time_all()
 							strcat2(&tdomf_new, ptime);
 							strcat2(&tdomf_new, "\n");
 							free2(ptime);
-							
+
 							flag_one_change_entry = 1;
 						}
 					}
@@ -8455,10 +8476,10 @@ void domain_update_cpu_time_all()
 						strcat2(&tdomf_new, res2);
 						strcat2(&tdomf_new, "\n");
 					}
-					
+
 					free2(res2);
 				}
-				
+
 				/* if there was no match, then create my uid of cpu time anyway */
 				if (!flag_rule_match){
 					/* convert new cpu time value */
@@ -8475,13 +8496,13 @@ void domain_update_cpu_time_all()
 			else{
 				strcat2(&tdomf_new, res);
 			}
-			
+
 			free2(name);
 			strcat2(&tdomf_new, "\n");
 		}
 		free2(res);
 	}
-	
+
 	free2(tdomf);
 	tdomf = tdomf_new;
 }
@@ -8518,7 +8539,7 @@ void check_learn()
 
 		/* check global var for temporary learning mode request */
 		if (file_exist(tlearn)){
-			
+
 			int tlearnf_mod_time2;
 			/* check modification time of learn file and read its content only if modified */
 			tlearnf_mod_time2 = file_get_mod_time(tlearn);
@@ -8531,20 +8552,9 @@ void check_learn()
 				f = file_read(tlearn, 1);
 				/* check if length is not null */
 				if (strlen2(&f)){
-					
+
 					/* create backup on every user request for temporary learning mode too */
 					backup();
-
-					/* end former temporary learning mode if new one is requested */
-					if (flag_learn2){
-						/* clear flag */
-						flag_learn  = 0;
-						flag_learn2 = 0;
-						color("* end temporary learning mode because of new request ", yellow);
-						mytime_print_date(); newl();
-						/* switch back to enforcing mode */
-						domain_set_enforce_old();
-					}
 
 					/* clear list */
 					free2(opt_learn2); opt_learn2 = 0;
@@ -8557,10 +8567,10 @@ void check_learn()
 					t = mytime();
 					color("* user request for temporary learning mode (max 1 hour) ", yellow);
 					mytime_print_date(); newl();
-					
+
 					/* notification */
 					notify("temporary learning mode (max 1 hour)");
-					
+
 					if (opt_learn2){
 						char *temp6;
 						color("  for domains matching patterns:", yellow);
@@ -8595,6 +8605,7 @@ void check_learn()
 				/* clear flag */
 				flag_learn  = 0;
 				flag_learn2 = 0;
+				flag_learn4 = 0;
 				color("* time ended for temporary learning mode ", yellow);
 				mytime_print_date(); newl();
 
@@ -8602,10 +8613,11 @@ void check_learn()
 				 * and if so, then sleep more every cycle for more power saving */
 				if (domain_all_in_enforcing_yet()) check_time_set_long();
 				else check_time_set_short();
-				
+
 				/* notification */
 				notify("time ended for temporary learning mode");
-				/* switch back to enforcing mode */
+
+				/* switch domains back to enforcing mode */
 				domain_set_enforce_old();
 			}
 		}
@@ -8620,11 +8632,11 @@ void check()
 	/* load config files */
 	sand_clock(0);
 	load();
-	
+
 	/* print programs already in domain but not in progs list */
 	sand_clock(0);
 	domain_print_list_not_progs();
-	
+
 	/* check if domain exist and which mode it's in */
 	sand_clock(0);
 	domain_print_mode();
@@ -8632,21 +8644,21 @@ void check()
 	/* get recent access deny logs */
 	sand_clock(0);
 	domain_get_log();
-	
+
 	/* check change of policy and run if there is any change only, don't do unnecessary work */
 	if (check_policy_change()){
 
 		/* reshape rules */
 		domain_reshape_rules();
-		
+
 		/* domain update change times */
 		domain_update_change_time();
-		
+
 		/* check if all domains are in enforcing mode yet,
 		 * and if so, then sleep more every cycle for more power saving */
 		if (domain_all_in_enforcing_yet()) check_time_set_long();
 		else check_time_set_short();
-		
+
 		/* reload config files into memory */
 		sand_clock(0);
 		reload();
@@ -8679,7 +8691,7 @@ void check_exceptions()
 			strcat2(&tshellf2, "\n");
 		}
 	}
-	
+
 	/* add shells to exceptions */
 	if (strlen2(&tshellf2)){
 		temp = tshellf2;
@@ -8714,7 +8726,7 @@ void check_exceptions()
 		strcat2(&tprogs_exc, my_exe_path);
 		strcat2(&tprogs_exc, "\n");
 	}
-	
+
 	/* add command line exceptions to the list */
 	strcat2(&tprogs_exc, opt_nodomain2);
 
@@ -8777,7 +8789,7 @@ void print_info_config()
 		if (dirs_recursive){
 			char *res, *temp;
 			color("* recursive directories set:\n", yellow);
-			
+
 			/* print recursive dirs */
 			temp = dirs_recursive;
 			while(1){
@@ -8813,7 +8825,7 @@ void check_chroot()
 	strcpy2(&spec_exception3, spec_exception2);
 	strcpy2(&spec_wildcard3,  spec_wildcard2);
 	strcpy2(&spec_replace3,   spec_replace2);
-	
+
 	/* ************************************ */
 	/* search for processes run from chroot */
 	/* ************************************ */
@@ -8894,46 +8906,46 @@ void check_chroot()
 		/* get next chroot dir */
 		char *res = string_get_next_line(&temp);
 		if (!res) break;
-		
+
 		temp2 = spec_exception2;
 		while(1){
 			/* get next special path */
 			char *res2 = string_get_next_line(&temp2);
 			if (!res2) break;
-			
+
 			/* add chroot dir as a prefix to new list */
 			strcat2(&spec_exception3, res);
 			strcat2(&spec_exception3, res2);
 			strcat2(&spec_exception3, "\n");
-			
+
 			free2(res2);
 		}
-		
+
 		temp2 = spec_wildcard2;
 		while(1){
 			/* get next special path */
 			char *res2 = string_get_next_line(&temp2);
 			if (!res2) break;
-			
+
 			/* add chroot dir as a prefix to new list */
 			strcat2(&spec_wildcard3, res);
 			strcat2(&spec_wildcard3, res2);
 			strcat2(&spec_wildcard3, "\n");
-			
+
 			free2(res2);
 		}
-		
+
 		temp2 = spec_replace2;
 		while(1){
 			/* get next special path */
 			char *res2 = string_get_next_line(&temp2);
 			if (!res2) break;
-			
+
 			/* add chroot dir as a prefix to new list */
 			strcat2(&spec_replace3, res);
 			strcat2(&spec_replace3, res2);
 			strcat2(&spec_replace3, "\n");
-			
+
 			free2(res2);
 		}
 
@@ -8972,7 +8984,7 @@ void check_processes()
 			color("* additional programs on demand\n", green);
 			color(tprogs, blue);
 		}
-		
+
 		/* check processes using network */
 		color("* new processes using network\n", green);
 	}
@@ -8983,7 +8995,7 @@ void check_processes()
 
 		DIR *mydir;
 		struct dirent *mydir_entry;
-		
+
 		/* read up all net stat files and create a list of inode numbers (column 10)
 		   of all processes using network */
 		netf2 = memget2(MAX_CHAR);
@@ -9058,7 +9070,7 @@ void check_processes()
 					strcat2(&myfd, mypid);
 					strcat2(&myfd, "/fd/");
 					mydir2 = opendir(myfd);
-					
+
 					if (mydir2){
 						/* cycle through files in /proc/pid/fd/ */
 						while((mydir_entry2 = readdir(mydir2))) {
@@ -9117,7 +9129,7 @@ void statistics()
 	float tt;
 	/* converting jiffies to second, this is from manpage of proc */
 	int jiffies_per_second=sysconf(_SC_CLK_TCK);
-	
+
 	/* count domains */
 	temp = tdomf;
 	while(1){
@@ -9135,7 +9147,7 @@ void statistics()
 		if (string_search_keyword_first(res, "allow_")) r++;
 		free2(res);
 	}
-	
+
 	/* print stat */
 	sd = string_itos(d);
 	sr = string_itos(r);
@@ -9145,7 +9157,7 @@ void statistics()
 	color(" rules\n", clr);
 	free2(sd);
 	free2(sr);
-	
+
 	/* print stat about the min, max and average time of check cycle */
 	printf("cycle times min/avg/max %.2f/%.2f/%.2f sec\n", time_min_cycle, time_avg_cycle / (float)(time_avg_cycle_counter), time_max_cycle);
 	fflush(stdout);
@@ -9178,7 +9190,7 @@ void statistics()
 	free2(ptime);
 	/* convert clock ticks to seconds */
 	t = t / jiffies_per_second;
-	
+
 	/* get uptime of process */
 	temp = pstat;
 	/* get starttime of process in jiffies */
@@ -9187,14 +9199,14 @@ void statistics()
 	t2 = sys_get_uptime() - atoi(ptime) / jiffies_per_second;
 	free2(ptime);
 	free2(pstat);
-	
+
 	/* calculate cpu usage of process in percentage
 	 * process_cpu_time / process_uptime * 100 */
 	tt = 0;
 	if (t2) tt = (float)(t) * 100 / (float)(t2);
 	printf("used cpu %.2f %%, ", tt);
 	fflush(stdout);
-	
+
 
 	/* create dirname like /proc/pid/status */
 	strcpy2(&mydir_name, "/proc/");
@@ -9202,7 +9214,7 @@ void statistics()
 	strcat2(&mydir_name, "/status");
 	/* read process stat value */
 	pstat = file_read(mydir_name, -1);
-	
+
 	/* get virtual and resident peak of memory usage */
 	/* get VM peak */
 	temp = pstat;
@@ -9218,7 +9230,7 @@ void statistics()
 	res = string_get_next_wordn(&temp2, 1);
 	t2 = atoi(res);
 	free2(res);
-	
+
 	/* calculate values to MB and print them */
 	printf("vm peak %.1f MB, rss peak %.1f MB\n", (float)(t) / 1024, (float)(t2) / 1024);
 	fflush(stdout);
@@ -9262,10 +9274,10 @@ void finish()
 
 		/* clear temporary learning mode flag file on exit for security */
 		file_write(tlearn, 0);
-		
+
 		/* print statistics */
 		statistics();
-		
+
 		/* print end time */
 		color("ended ", clr); mytime_print_date(); newl(); newl();
 
@@ -9282,11 +9294,11 @@ void myinit()
 
 	/* store start time */
 	t_start = mytime();
-	
+
 	/* store check times */
 	const_time_check2 = const_time_check;
 	const_time_check_long2 = const_time_check_long;
-	
+
 	/* create my uids */
 	strcpy2(&myuid_base,    "allow_read /tomld/");
 	strcat2(&myuid_base,    myuid);
@@ -9296,7 +9308,7 @@ void myinit()
 	strcat2(&myuid_create,  "/create_time/");
 	strcat2(&myuid_change,  "/change_time/");
 	strcat2(&myuid_cputime, "/cpu_time/");
-	
+
 	/* create tomld paths from its vars */
 	res = path_get_dir(tpid);
 	string_add_line_uniq(&tomld_path, res); free2(res);
@@ -9377,11 +9389,11 @@ int main(int argc, char **argv)
 
 	/* print version info */
 	color("tomld (tomoyo learning daemon) ", clr); color(ver, clr); newl();
-	
+
 	/* print system info */
 	sysinfo = file_read("/proc/version", -1);
 	color(sysinfo, clr); free2(sysinfo);
-	
+
 	/* print message about incompatible config file */
 	if (flag_incomp_conf){
 		color("* warning: incompatible config files found, created new ones after backup\n", red); }
@@ -9507,14 +9519,14 @@ int main(int argc, char **argv)
 
 			/* manage policy and rules */
 			check();
-			
+
 			/* store longest time of cycle */
 			t3 = mytime() - t3;
 			if (time_max_cycle < t3) time_max_cycle = t3;
 			if (time_min_cycle > t3) time_min_cycle = t3;
 			time_avg_cycle += t3;
 			time_avg_cycle_counter++;
-			
+
 			/* send warning on too long time cycle */
 			if (t3 > const_time_check_warning){
 				color("* warning: running cycles take too long ", red);
@@ -9525,7 +9537,7 @@ int main(int argc, char **argv)
 
 				notify("warning: running cycles take too long");
 			}
-			
+
 			/* run only once */
 			if (flag_firstrun){
 				flag_firstrun = 0;
@@ -9544,14 +9556,14 @@ int main(int argc, char **argv)
 
 			/* now it's safe to enforce mode and save config on interrupt, cause check() finished running */
 			flag_safe = 1;
-			
+
 			/* exit if --once option is on */
 			if (opt_once) break;
-			
+
 			/* reset time */
 			t = mytime();
 		}
-		
+
 		/* sleep some */
 		usleep(const_time_check2 * 1000000);
 		/* exit if 'q' key is pressed */
@@ -9568,7 +9580,6 @@ int main(int argc, char **argv)
 	}
 
 	finish();
-	
+
 	return 0;
 }
-
