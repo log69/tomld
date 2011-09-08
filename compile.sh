@@ -13,4 +13,3 @@ cc $CFLAGS -c tio.c 		-o tio.o
 cc $CFLAGS -c tomld.c 		-o tomld.o
 
 cc $CFLAGS -o tomld tomld.o tio.o tpath.o tstring.o
-
