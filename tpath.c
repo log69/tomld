@@ -9,7 +9,7 @@
 	This program is free software; you can redistribute it and/or
 	modify it under the terms of the GNU General Public License as
 	published by the Free Software Foundation; either version 3 of the
-	License, or	(at your option) any later version.
+	License, or (at your option) any later version.
 
 	This program is distributed in the hope that it will be useful,	but
 	WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -33,7 +33,7 @@ char *path_link_read(const char *name)
 	int flag = 0;
 	char *temp = 0;
 	char *buff;
-	
+
 	buff = memget2(max_char);
 
 	/* resolve links until no more link */
@@ -66,7 +66,7 @@ char *path_get_filename(const char *path)
 	char *res;
 	char c;
 	int i, i2, l;
-	
+
 	if (path)
 	{
 		/* alloc mem for result */
@@ -94,7 +94,7 @@ char *path_get_filename(const char *path)
 				return res;
 			}
 		}
-		
+
 		free2(res);
 	}
 	return 0;
@@ -133,7 +133,7 @@ int path_count_subdirs_name(const char *path)
 {
 	char c, d;
 	int i, i2;
-	
+
 	i = 0;
 	i2 = 0;
 	c = 0;
@@ -160,13 +160,13 @@ char *path_get_subdirs_name(const char *path, int num)
 
 	/* alloc mem for new path name */
 	path_new = memget2(max_char);
-	
+
 	/* return empty string if num is null */
 	if (!num) return path_new;
 
 	/* copy path to new path */
 	strcpy2(&path_new, path);
-	
+
 	n = 0;
 	i = 0;
 	i2 = 0;
@@ -185,7 +185,7 @@ char *path_get_subdirs_name(const char *path, int num)
 	/* give back only subdir names */
 	path_new[i2] = 0;
 	strlenset3(&path_new, i2);
-	
+
 	return path_new;
 }
 
@@ -196,13 +196,13 @@ char *path_join(char *path1, char *path2)
 {
 	long l1 = strlen(path1);
 	char *res = 0;
-	
+
 	/* create new joined path */
 	strcpy2(&res, path1);
 	/* does path1 end with "/" char? if not, then add "/" char too */
 	if (path1[l1 - 1] != '/') strcat2(&res, "/");
 	strcat2(&res, path2);
-	
+
 	return res;
 }
 
@@ -214,12 +214,12 @@ char *path_get_parent_dir(char *path)
 	char c;
 	int i;
 	long l;
-	
+
 	/* alloc mem for new path */
 	char *path_new = 0;
 	/* copy old path */
 	strcpy2(&path_new, path);
-	
+
 	l = strlen2(&path_new) - 1;
 
 	/* if path is a dir, then remove "/" chars from the end */
@@ -231,7 +231,7 @@ char *path_get_parent_dir(char *path)
 			l--;
 		}
 	}
-	
+
 	/* get the dir part */
 	i = 0;
 	while(1){
@@ -254,15 +254,15 @@ char *path_get_dir(char *path)
 	char c;
 	int i;
 	long l;
-	
+
 	/* alloc mem for new path */
 	char *path_new = 0;
 	/* copy old path */
 	strcpy2(&path_new, path);
-	
+
 	/* if path is a dir, then return it */
 	if (path_is_dir(path_new)) return path_new;
-	
+
 	/* if it's a file, then get dir part */
 	l = strlen2(&path_new) - 1;
 	i = 0;
@@ -285,7 +285,7 @@ int path_count_dir_depth_r(char *path)
 	DIR *mydir;
 	struct dirent *md;
 	static int depth = 0;
-	
+
 	if (!depth) depth = path_count_subdirs_name(path);
 
 	/* open path dir */
@@ -315,7 +315,7 @@ int path_count_dir_depth_r(char *path)
 		}
 	}
 	closedir(mydir);
-	
+
 	/* return dir depth by calculating depth minus number of original subdir names */
 	return (depth - path_count_subdirs_name(path) + 1);
 }
@@ -326,15 +326,14 @@ int path_count_dir_depth(char *path)
 {
 	char *res;
 	int c;
-	
+
 	/* get parent dir */
 	res = path_get_dir(path);
 
-	/* get dir depth */	
+	/* get dir depth */
 	c = path_count_dir_depth_r(res);
-	
+
 	free2(res);
-	
+
 	return c;
 }
-
