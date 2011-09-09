@@ -22,9 +22,11 @@
 
 changelog:
 -----------
+09/09/2011 - tomld v0.61 - setup a minimum time needed to pass for domains before switching them to enforcing mode
+                           this is minimum 1 day since domain creation and minimum 1 hour since last domain change
 08/09/2011 - tomld v0.60 - major bugfix in domain_get_log() in switching domains to learning mode
-                         - change concept of temporary learning mode: from now when the user request a temporary learning mode,
-                           the former one won't be closed if any, so it's time will simply be extended
+                         - change concept of temporary learning mode: from now when the user requests a temporary learning mode,
+                           the former one won't be closed if there was any, so its time will simply be extended
                            this is to resolve the situtation when other domains need temporary learning mode too
                            while having one already (thanks to Szabolcs Gyuris for the tests and reporting the issue)
                          - cosmetical code cleanup (thanks to Laszlo Dvornik)
@@ -63,14 +65,14 @@ changelog:
 31/08/2011 - tomld v0.46 - add logrotate to package
 30/08/2011 - tomld v0.45 - make notification messages more readable by prefixing an "*" char to every new message
 30/08/2011 - tomld v0.44 - create backup on every user request for temporary learning mode too
-                         - change concept of temporary learning mode: from now when the user request a temporary learning mode,
+                         - change concept of temporary learning mode: from now when the user requests a temporary learning mode,
                            only those domains will get switched back to learning mode that produced deny logs previously,
                            this is for simplicity, reliability and security.
                          - bugfix: load configs before backup if they aren't loaded yet
 29/08/2011 - tomld v0.43 - bugfix: do not repack sources and make all packages from the same original one
 29/08/2011 - tomld v0.42 - bugfix: print name of directory with most file in it properly when running time takes too long
 29/08/2011 - tomld v0.41 - bugfix: let a temporary learning mode be rerequested by user while the former one hasn't ended yet
-                         - bugfix: don't check if the domain's last change time is greater than const_time_max_change
+                         - bugfix: don't check if the domain's last change time is greater than const_time_max_dcreate
                            during temporary learning mode
 26/08/2011 - tomld v0.40 - bugfix: fix a segfault because of an uninitialized variable
                          - bugfix: manage access denies for subdomains too beside main domains
@@ -146,7 +148,7 @@ changelog:
                          - change creation time to last change time in message when switching a domain to enforcing mode
                          - add possibility to use domain names with --learn option switch, so it switches back
                            only those domains to learning mode which we ask for, and the given patterns match the domain name
-                           (thanks to muczy for the idea)
+                           (thanks to Péter Mihály Avramucz for the idea)
                          - add feature to --info option to print enforcing mode domains in different colors or with a star sing
                          - add tab as a separator beside space character in string functions
                          - don't let several instance of tomld processes with root privileges run together
@@ -315,9 +317,9 @@ changelog:
                          - add --yes switch for auto confirmation
                          - function for --info switch rewritten to speed up search
                          - remove rules and domains marked as (deleted) on startup
-                           (thanks to Ritesh Raj Sarraf)
+                           (thanks to Ritesh Raj Sarraf for reporting it)
                          - debian kernel has Tomoyo enabled already, fix package check (only tomoyo-tools is needed)
-                           (thanks to Ritesh Raj Sarraf)
+                           (thanks to Ritesh Raj Sarraf for reporting it)
                          - bugfix: variables of config files were not initialized
 21/03/2011 - tomld v0.15 - remove disabled mode domains automatically to speed up the things
                          - change directory parameters' handling in rule reshape code to speed up more
@@ -399,7 +401,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.60";
+char *ver = "0.61";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -428,10 +430,14 @@ int const_time_save = 300;
 /* interval of maximum time in seconds to wait in temporary learning mode for domains with deny logs
  * (1 hour) */
 int const_time_max_learn = 60 * 60;
-/* interval of maximum time in seconds that needs to pass since last domain change for tomld
- * to automatically switch domain to enforcing mode, otherwise it calculates it
- * to make a decision (2 weeks) */
-int const_time_max_change = 60 * 60 * 24 * 14;
+/* interval of minimum time in seconds that needs to pass since last domain change for the domains
+ * before switching them to enforcing mode */
+int const_time_min_dchange = 60 * 60;
+/* interval of minimum and maximum time in seconds that needs to pass since domain creation
+ * for the domains before switching them to enforcing mode, otherwise it calculates it
+ * to make a decision (from i day to 2 weeks) */
+int const_time_min_dcreate = 60 * 60 * 24 * 1;
+int const_time_max_dcreate = 60 * 60 * 24 * 14;
 /* constant for minimum cputime needed with timeout to switch domain to enforcing mode */
 int const_min_cputime = 100;
 /* constant for measuring the complexity of a domain
@@ -710,7 +716,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Thu Sep  8 16:39:45 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Fri Sep  9 11:30:20 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4381,11 +4387,11 @@ int domain_check_enforcing(char *domain, int flag_info)
 
 					/* have the processes' cpu time reached a value compared to the complexity
 					 * of the domain? (i measure it by the number of its rules)
-					 * or is the domain's last change time greater than const_time_max_change?
+					 * or is the domain's last change time greater than const_time_max_dcreate?
 					 * if so, then i switch the domain to enforcing mode,
 					 * but only, if there is no temporary learning mode on currently */
 					flag_enforcing = 0;
-					if ((!flag_learn2) && (d_create > const_time_max_change && d_cputime + p_cputime > const_min_cputime)) flag_enforcing = 1;
+					if ((!flag_learn2) && (d_create > const_time_max_dcreate && d_cputime + p_cputime > const_min_cputime)) flag_enforcing = 1;
 					if (!flag_enforcing){
 						/* a minimum time has to pass since last domain change to let the
 						 * completness of domain grow, or else i reset cpu time of processes
@@ -4465,7 +4471,10 @@ int domain_check_enforcing(char *domain, int flag_info)
 
 						/* **************************************************************** */
 					}
-					if (flag_enforcing){
+
+					/* if former conditions satisfy and at least a minimum time has passed since domain
+					 * creation, then i switch the domain to enforcing mode */
+					if (d_create > const_time_min_dcreate && d_change > const_time_min_dchange && flag_enforcing){
 						result = 100;
 
 						if (flag_info){
