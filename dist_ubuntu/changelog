@@ -1,3 +1,9 @@
+tomld (0.62-1) natty; urgency=low
+
+  * New upstream release
+
+ -- Andras Horvath <mail@log69.com>  Fri, 09 Sep 2011 09:44:08 +0000
+
 tomld (0.61-1) natty; urgency=low
 
   * New upstream release
