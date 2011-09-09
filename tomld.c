@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+09/09/2011 - tomld v0.62 - reupload sources
 09/09/2011 - tomld v0.61 - setup a minimum time needed to pass for domains before switching them to enforcing mode
                            this is minimum 1 day since domain creation and minimum 1 hour since last domain change
 08/09/2011 - tomld v0.60 - major bugfix in domain_get_log() in switching domains to learning mode
@@ -401,7 +402,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.61";
+char *ver = "0.62";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
