@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+10/09/2011 - tomld v0.63 - bugfix: check the presence of mounted encrypted volumes in every cycle, not only on startup
 09/09/2011 - tomld v0.62 - reupload sources
 09/09/2011 - tomld v0.61 - setup a minimum time needed to pass for domains before switching them to enforcing mode
                            this is minimum 1 day since domain creation and minimum 1 hour since last domain change
@@ -402,7 +403,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.62";
+char *ver = "0.63";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -717,7 +718,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Fri Sep  9 11:30:20 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Fri Sep  9 11:43:33 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -3952,6 +3953,65 @@ void check_tomoyo()
 }
 
 
+/* lookup of mounted ecryptfs and add them to recursive dirs if any */
+void check_crypt()
+{
+	if (!opt_nocrypt){
+		char *res, *res2, *res3, *temp, *temp2;
+		char *cmd = file_read("/proc/mounts", -1);
+		if (cmd){
+			temp = cmd;
+			while(1){
+				/* get next line of mount */
+				res = string_get_next_line(&temp);
+				if (!res) break;
+
+				/* get fs type
+				 * mount line should look like this:
+				 * crypt_dir normal_dir ecryptfs options 0 0 */
+				temp2 = res;
+				res2 = string_get_next_wordn(&temp2, 2);
+				if (res2){
+					/* is the fs type ecryptfs? this is the 3rd word */
+					if (!strcmp(res2, "ecryptfs")){
+						free2(res2);
+						temp2 = res;
+						res2 = string_get_next_word(&temp2);
+						if (res2){
+							/* get recursive link of dir */
+							res3 = path_link_read(res2);
+							if (res3){
+								/* expand dir name with "/" char if missing */
+								if (res3[strlen2(&res3) - 1] != '/'){
+									strcat2(&res3, "/"); }
+								/* is there a recursive dir like that yet? */
+								if (string_search_line(dirs_recursive, res3) == -1){
+									/* add dir to recursive dirs */
+									strcat2(&dirs_recursive, res3);
+									strcat2(&dirs_recursive, "\n");
+									/* set recursive option on */
+									opt_recursive  = 1;
+									flag_crypt = 1;
+
+									/* print info if crypted fs was found */
+									color("* new ecryptfs mount found and added to recursive directories:\n", yellow);
+									color(res3, yellow); newl();
+								}
+								free2(res3);
+							}
+							free2(res2);
+						}
+					}
+					else free2(res2);
+				}
+				free2(res);
+			}
+			free2(cmd);
+		}
+	}
+}
+
+
 /* check and load config data from /etc/tomld/tomld.config file */
 void check_config()
 {
@@ -4084,54 +4144,6 @@ void check_config()
 	mydir = path_get_parent_dir(tmark);
 	chmod (mydir, strtol(mode, 0, 8));
 	free2(mydir);
-
-	/* lookup of mounted ecryptfs and add them to recursive dirs */
-	if (!opt_nocrypt){
-		char *res, *res2, *res3, *temp, *temp2;
-		char *cmd = file_read("/proc/mounts", -1);
-		if (cmd){
-			temp = cmd;
-			while(1){
-				/* get next line of mount */
-				res = string_get_next_line(&temp);
-				if (!res) break;
-
-				/* get fs type
-				 * mount line should look like this:
-				 * crypt_dir normal_dir ecryptfs options 0 0 */
-				temp2 = res;
-				res2 = string_get_next_wordn(&temp2, 2);
-				if (res2){
-					/* is the fs type ecryptfs? this is the 3rd word */
-					if (!strcmp(res2, "ecryptfs")){
-						free2(res2);
-						temp2 = res;
-						res2 = string_get_next_word(&temp2);
-						if (res2){
-							/* get recursive link of dir */
-							res3 = path_link_read(res2);
-							if (res3){
-								/* add dir to recursive dirs */
-								strcat2(&dirs_recursive, res3);
-								/* expand dir name with "/" char if missing */
-								if (res3[strlen2(&res3) - 1] != '/'){
-									strcat2(&dirs_recursive, "/"); }
-								strcat2(&dirs_recursive, "\n");
-								/* set recursive option on */
-								opt_recursive  = 1;
-								flag_crypt = 1;
-								free2(res3);
-							}
-							free2(res2);
-						}
-					}
-					else free2(res2);
-				}
-				free2(res);
-			}
-			free2(cmd);
-		}
-	}
 }
 
 /* disable all domains and delete all rules from kernel memory */
@@ -8792,11 +8804,6 @@ void print_info_config()
 		}
 	}
 
-	/* was any crypted fs found? */
-	if (flag_crypt){
-		color("* encrypted fs found\n", yellow);
-	}
-
 	/* is there any recursive dir? */
 	if (opt_recursive){
 		if (dirs_recursive){
@@ -8810,7 +8817,6 @@ void print_info_config()
 				res = string_get_next_line(&temp);
 				if (!res) break;
 				/* print it */
-				color("  ", yellow);
 				color(res, yellow); newl();
 				free2(res);
 			}
@@ -9526,6 +9532,9 @@ int main(int argc, char **argv)
 
 			/* store time for speed comparision */
 			t3 = mytime();
+
+			/* lookup of mounted ecryptfs and add them to recursive dirs if any */
+			check_crypt();
 
 			/* check if there are processes run from chroot */
 			check_chroot();
