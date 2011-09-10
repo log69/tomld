@@ -22,6 +22,10 @@
 
 changelog:
 -----------
+10/09/2011 - tomld v0.64 - no minimum cpu time is needed for the domains from now after the maximum time is reached
+                           to switch to enforcing mode
+                           this is because there are processes that use minimum cpu resources
+                           and would never get switched to enforcing mode
 10/09/2011 - tomld v0.63 - bugfix: check the presence of mounted encrypted volumes in every cycle, not only on startup
 09/09/2011 - tomld v0.62 - reupload sources
 09/09/2011 - tomld v0.61 - setup a minimum time needed to pass for domains before switching them to enforcing mode
@@ -403,7 +407,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.63";
+char *ver = "0.64";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -440,8 +444,6 @@ int const_time_min_dchange = 60 * 60;
  * to make a decision (from i day to 2 weeks) */
 int const_time_min_dcreate = 60 * 60 * 24 * 1;
 int const_time_max_dcreate = 60 * 60 * 24 * 14;
-/* constant for minimum cputime needed with timeout to switch domain to enforcing mode */
-int const_min_cputime = 100;
 /* constant for measuring the complexity of a domain
  * i raise the number of rules of the domain to the power of 2 and
  * multiply it by this factor and compare it to its processes' cpu time */
@@ -718,7 +720,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Fri Sep  9 11:43:33 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sat Sep 10 16:07:23 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4404,7 +4406,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 					 * if so, then i switch the domain to enforcing mode,
 					 * but only, if there is no temporary learning mode on currently */
 					flag_enforcing = 0;
-					if ((!flag_learn2) && (d_create > const_time_max_dcreate && d_cputime + p_cputime > const_min_cputime)) flag_enforcing = 1;
+					if ((!flag_learn2) && d_create > const_time_max_dcreate) flag_enforcing = 1;
 					if (!flag_enforcing){
 						/* a minimum time has to pass since last domain change to let the
 						 * completness of domain grow, or else i reset cpu time of processes
