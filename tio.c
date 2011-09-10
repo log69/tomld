@@ -434,6 +434,9 @@ char *which(const char *name)
 	if (name[0] == '/'){
 		/* file exists? if not, then fail */
 		if (file_exist(name)){
+			/* file must not be a dir */
+			if (dir_exist(name)) return 0;
+
 			/* return resolved link path */
 			return path_link_read(name);
 		}
@@ -449,6 +452,8 @@ char *which(const char *name)
 	strcat2(&full, "/");
 	strcat2(&full, name);
 	if (file_exist(full)){
+		if (dir_exist(full)){ free2(full); return 0; }
+
 		/* return resolved link path */
 		res = path_link_read(full);
 		free2(full);
@@ -464,6 +469,8 @@ char *which(const char *name)
 		strcat2(&full, "/");
 		strcat2(&full, name);
 		if (file_exist(full)){
+			if (dir_exist(full)){ free2(full); return 0; }
+
 			/* return resolved link path */
 			res = path_link_read(full);
 			free2(full);
