@@ -22,6 +22,9 @@
 
 changelog:
 -----------
+10/09/2011 - tomld v0.65 - bugfix: check whether path is not a directory in which() function
+                           to not let tomld take directories as executables
+                           bugfix: check whether enforcing mode should be switched on for not running processes too
 10/09/2011 - tomld v0.64 - no minimum cpu time is needed for the domains from now after the maximum time is reached
                            to switch to enforcing mode
                            this is because there are processes that use minimum cpu resources
@@ -407,7 +410,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.64";
+char *ver = "0.65";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -720,7 +723,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sat Sep 10 16:07:23 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sat Sep 10 21:29:23 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4343,175 +4346,171 @@ int domain_check_enforcing(char *domain, int flag_info)
 	/* get main domain name */
 	name = domain_get_name(domain);
 
-	/* domain's process is running currently? */
-	if (process_running(process_get_pid(name)) || !flag_info){
+	/* get process uptime of domain */
+	p_uptime = process_get_least_uptime(name);
+	/* get creation time of domain */
+	i = string_search_keyword_first_all(domain, myuid_create);
+	if (i > -1){
+		temp = domain + i;
+		/* get my unique id with the creation time in it */
+		res = string_get_next_line(&temp);
+		/* get epoch time from my uid */
+		res2 = string_get_number_last(res);
+		/* convert epoch string to integer */
+		d_create = time(0) - atoi(res2);
 
-		/* get process uptime of domain */
-		p_uptime = process_get_least_uptime(name);
-		/* get creation time of domain */
-		i = string_search_keyword_first_all(domain, myuid_create);
-		if (i > -1){
-			temp = domain + i;
-			/* get my unique id with the creation time in it */
-			res = string_get_next_line(&temp);
-			/* get epoch time from my uid */
-			res2 = string_get_number_last(res);
-			/* convert epoch string to integer */
-			d_create = time(0) - atoi(res2);
+		free2(res); free2(res2);
 
-			free2(res); free2(res2);
+		/* are all processes' uptime greater than the time passed since domain creation time?
+		 * if so, then this means that none of the domain's processes has been restarted since then
+		 * so this one blocks switching it to enforcing mode */
+		if (d_create > p_uptime + 1){
 
-			/* are all processes' uptime greater than the time passed since domain creation time?
-			 * if so, then this means that none of the domain's processes has been restarted since then
-			 * so this one blocks switching it to enforcing mode */
-			if (d_create > p_uptime + 1){
+			/* get the sum of cpu times of the domain's all processes */
+			p_cputime = process_get_cpu_time_all(name, 0);
+			/* get the formerly stored cpu time of domain */
+			d_cputime = 0;
+			i = string_search_keyword_first_all(domain, myuid_cputime);
+			if (i > -1){
+				temp = domain + i;
+				/* get my unique id with the cpu time in it */
+				res = string_get_next_line(&temp);
+				/* get time string from my uid */
+				res2 = string_get_number_last(res);
+				/* convert time string to integer */
+				d_cputime = atoi(res2);
+				free2(res2); free2(res);
+			}
 
-				/* get the sum of cpu times of the domain's all processes */
-				p_cputime = process_get_cpu_time_all(name, 0);
-				/* get the formerly stored cpu time of domain */
-				d_cputime = 0;
-				i = string_search_keyword_first_all(domain, myuid_cputime);
-				if (i > -1){
-					temp = domain + i;
-					/* get my unique id with the cpu time in it */
-					res = string_get_next_line(&temp);
-					/* get time string from my uid */
-					res2 = string_get_number_last(res);
-					/* convert time string to integer */
-					d_cputime = atoi(res2);
-					free2(res2); free2(res);
-				}
+			/* get last change time of domain */
+			i = string_search_keyword_first_all(domain, myuid_change);
+			if (i > -1){
+				temp = domain + i;
+				/* get my unique id with the last change time in it */
+				res = string_get_next_line(&temp);
+				/* get epoch time from my uid */
+				res2 = string_get_number_last(res);
+				/* convert epoch string to integer */
+				d_change = time(0) - atoi(res2);
+				/* change time must not be greater than system uptime,
+				 * bacuse if the user turns off the computer immediately and then later back on,
+				 * the change time would be huge without any sense */
+				s_uptime = sys_get_uptime();
+				if (d_change > s_uptime) d_change = s_uptime;
 
-				/* get last change time of domain */
-				i = string_search_keyword_first_all(domain, myuid_change);
-				if (i > -1){
-					temp = domain + i;
-					/* get my unique id with the last change time in it */
-					res = string_get_next_line(&temp);
-					/* get epoch time from my uid */
-					res2 = string_get_number_last(res);
-					/* convert epoch string to integer */
-					d_change = time(0) - atoi(res2);
-					/* change time must not be greater than system uptime,
-					 * bacuse if the user turns off the computer immediately and then later back on,
-					 * the change time would be huge without any sense */
-					s_uptime = sys_get_uptime();
-					if (d_change > s_uptime) d_change = s_uptime;
+				free2(res); free2(res2);
 
-					free2(res); free2(res2);
-
-					/* have the processes' cpu time reached a value compared to the complexity
-					 * of the domain? (i measure it by the number of its rules)
-					 * or is the domain's last change time greater than const_time_max_dcreate?
-					 * if so, then i switch the domain to enforcing mode,
-					 * but only, if there is no temporary learning mode on currently */
-					flag_enforcing = 0;
-					if ((!flag_learn2) && d_create > const_time_max_dcreate) flag_enforcing = 1;
-					if (!flag_enforcing){
-						/* a minimum time has to pass since last domain change to let the
-						 * completness of domain grow, or else i reset cpu time of processes
-						 * but if it is after reboot, then take uptime into account too
-						 * i calculate min time from time of check constant because this is the
-						 * intervall to check if domain has changed */
-						if (s_uptime > const_time_check_long2 * 2 && d_change < const_time_check_long2 * 2){
-							/* reset cpu times */
-							process_get_cpu_time_all(name, 1);
-							p_cputime = 0;
-							d_cputime = 0;
-						}
-						/* count complexity of domain by counting rules, then
-						 * raising it to the power of 2 and multiplying it by another factor,
-						 * and it has to have a minimum limit too */
-						d_rules = string_count_lines(domain) + 10;
-						d_rules = d_rules * d_rules * const_domain_complexity_factor;
-						/* if a particular cpu time has grown compared to the domain complexity
-						 * since the last time of domain change, then i switch domain to enforcing mode */
-						if (d_rules <= d_cputime + p_cputime) flag_enforcing = 1;
+				/* have the processes' cpu time reached a value compared to the complexity
+				 * of the domain? (i measure it by the number of its rules)
+				 * or is the domain's last change time greater than const_time_max_dcreate?
+				 * if so, then i switch the domain to enforcing mode,
+				 * but only, if there is no temporary learning mode on currently */
+				flag_enforcing = 0;
+				if ((!flag_learn2) && d_create > const_time_max_dcreate) flag_enforcing = 1;
+				if (!flag_enforcing){
+					/* a minimum time has to pass since last domain change to let the
+					 * completness of domain grow, or else i reset cpu time of processes
+					 * but if it is after reboot, then take uptime into account too
+					 * i calculate min time from time of check constant because this is the
+					 * intervall to check if domain has changed */
+					if (s_uptime > const_time_check_long2 * 2 && d_change < const_time_check_long2 * 2){
+						/* reset cpu times */
+						process_get_cpu_time_all(name, 1);
+						p_cputime = 0;
+						d_cputime = 0;
+					}
+					/* count complexity of domain by counting rules, then
+					 * raising it to the power of 2 and multiplying it by another factor,
+					 * and it has to have a minimum limit too */
+					d_rules = string_count_lines(domain) + 10;
+					d_rules = d_rules * d_rules * const_domain_complexity_factor;
+					/* if a particular cpu time has grown compared to the domain complexity
+					 * since the last time of domain change, then i switch domain to enforcing mode */
+					if (d_rules <= d_cputime + p_cputime) flag_enforcing = 1;
 
 
-						cputime_all_percent = (d_cputime + p_cputime) * 100 / d_rules;
-						result = cputime_all_percent;
+					cputime_all_percent = (d_cputime + p_cputime) * 100 / d_rules;
+					result = cputime_all_percent;
 
-						if (flag_info){
-							/* ***************************************************************
-							 * print domain status on change
-							 * ******************************/
-							flag_cputime_change = 0;
-							/* convert cputime integer to string */
-							ptime = string_itos(cputime_all_percent);
-							/* domain cpu time list current entry exists? */
-							i = string_search_keyword_first_all(domain_cputime_list_current, name);
-							if (i > -1){
-								/* read old value */
-								temp = domain_cputime_list_current + i;
-								ptime2 = string_get_next_wordn(&temp, 1);
-								t2 = atoi(ptime2);
-								free2(ptime2);
+					if (flag_info){
+						/* ***************************************************************
+						 * print domain status on change
+						 * ******************************/
+						flag_cputime_change = 0;
+						/* convert cputime integer to string */
+						ptime = string_itos(cputime_all_percent);
+						/* domain cpu time list current entry exists? */
+						i = string_search_keyword_first_all(domain_cputime_list_current, name);
+						if (i > -1){
+							/* read old value */
+							temp = domain_cputime_list_current + i;
+							ptime2 = string_get_next_wordn(&temp, 1);
+							t2 = atoi(ptime2);
+							free2(ptime2);
 
-								/* old value match new one? */
-								if (t2 != cputime_all_percent){
-									/* if no, then i will print status info */
-									flag_cputime_change = 1;
-									/* update entry by removing old entry and adding new one */
-									res2 = string_remove_line_from_pos(domain_cputime_list_current, i);
-									free2(domain_cputime_list_current);
-									domain_cputime_list_current = res2;
-									/* add entry */
-									strcat2(&domain_cputime_list_current, name);
-									strcat2(&domain_cputime_list_current, " ");
-									strcat2(&domain_cputime_list_current, ptime);
-									strcat2(&domain_cputime_list_current, "\n");
-								}
-							}
-							else{
+							/* old value match new one? */
+							if (t2 != cputime_all_percent){
+								/* if no, then i will print status info */
+								flag_cputime_change = 1;
+								/* update entry by removing old entry and adding new one */
+								res2 = string_remove_line_from_pos(domain_cputime_list_current, i);
+								free2(domain_cputime_list_current);
+								domain_cputime_list_current = res2;
 								/* add entry */
 								strcat2(&domain_cputime_list_current, name);
 								strcat2(&domain_cputime_list_current, " ");
 								strcat2(&domain_cputime_list_current, ptime);
 								strcat2(&domain_cputime_list_current, "\n");
 							}
-							free2(ptime);
-
-							/* if there was a change in cputime, then print status */
-							if (flag_cputime_change){
-								color(name, blue);
-								/* get human readable seconds */
-								res = mytime_get_sec_human(d_change);
-								if (opt_color) printf(", changed %s ago, %s%d%%%s complete\n", res, red, cputime_all_percent, clr);
-								else           printf(", changed %s ago, %d%% complete\n", res, cputime_all_percent);
-								fflush(stdout);
-								free2(res);
-							}
 						}
+						else{
+							/* add entry */
+							strcat2(&domain_cputime_list_current, name);
+							strcat2(&domain_cputime_list_current, " ");
+							strcat2(&domain_cputime_list_current, ptime);
+							strcat2(&domain_cputime_list_current, "\n");
+						}
+						free2(ptime);
 
-						/* **************************************************************** */
-					}
-
-					/* if former conditions satisfy and at least a minimum time has passed since domain
-					 * creation, then i switch the domain to enforcing mode */
-					if (d_create > const_time_min_dcreate && d_change > const_time_min_dchange && flag_enforcing){
-						result = 100;
-
-						if (flag_info){
-							char *nn = 0;
-
-							/* switch domain to enforcing mode */
+						/* if there was a change in cputime, then print status */
+						if (flag_cputime_change){
 							color(name, blue);
-							color(", ", clr);
-							color("switch to enforcing mode", purple);
+							/* get human readable seconds */
 							res = mytime_get_sec_human(d_change);
-							color(" after ", clr);
-							color(res, clr);
-							newl();
+							if (opt_color) printf(", changed %s ago, %s%d%%%s complete\n", res, red, cputime_all_percent, clr);
+							else           printf(", changed %s ago, %d%% complete\n", res, cputime_all_percent);
+							fflush(stdout);
 							free2(res);
-
-							/* notification */
-							strcpy2(&nn, name); strcat2(&nn, ", switch to enforcing mode");
-							notify(nn); free2(nn);
 						}
-						domain_set_profile_for_prog(name, 3);
-						notify_check_enforce_all();
 					}
+
+					/* **************************************************************** */
+				}
+
+				/* if former conditions satisfy and at least a minimum time has passed since domain
+				 * creation, then i switch the domain to enforcing mode */
+				if (d_create > const_time_min_dcreate && d_change > const_time_min_dchange && flag_enforcing){
+					result = 100;
+
+					if (flag_info){
+						char *nn = 0;
+
+						/* switch domain to enforcing mode */
+						color(name, blue);
+						color(", ", clr);
+						color("switch to enforcing mode", purple);
+						res = mytime_get_sec_human(d_change);
+						color(" after ", clr);
+						color(res, clr);
+						newl();
+						free2(res);
+
+						/* notification */
+						strcpy2(&nn, name); strcat2(&nn, ", switch to enforcing mode");
+						notify(nn); free2(nn);
+					}
+					domain_set_profile_for_prog(name, 3);
+					notify_check_enforce_all();
 				}
 			}
 		}
