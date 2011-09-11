@@ -1718,7 +1718,7 @@ int path_recursive_dir_add(char *dir)
 		if (string_search_line(dirs_recursive, res) == -1){
 			strcat2(&dirs_recursive, res);
 			strcat2(&dirs_recursive, "\n");
-			
+
 			/* new dir, so I'll return true in the end */
 			flag = 1;
 		}
@@ -1765,7 +1765,7 @@ int path_recursive_dir_add(char *dir)
 			}
 		}
 	}
-	
+
 	return flag;
 }
 
