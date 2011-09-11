@@ -22,6 +22,8 @@
 
 changelog:
 -----------
+11/09/2011 - tomld v0.66 - bugfix: no configuration compatibility check on empty files
+                           bugfix: manage the list of recursive dirs and its components properly
 10/09/2011 - tomld v0.65 - bugfix: check whether path is not a directory in which() function
                            to not let tomld take directories as executables
                            bugfix: check whether enforcing mode should be switched on for not running processes too
@@ -410,7 +412,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.65";
+char *ver = "0.66";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -723,7 +725,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sat Sep 10 21:29:23 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sat Sep 10 22:34:40 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -1692,6 +1694,79 @@ char *path_wildcard_temp(char *path)
 	else strcpy2(&new, path);
 
 	return new;
+}
+
+
+/* add directory path to recursive directory list if it's not in it yet
+ * and expand and reinitialize the depth and sub values */
+/* return true if directory was new entry in the list */
+int path_recursive_dir_add(char *dir)
+{
+	int flag = 0;
+
+	/* dir is not null? */
+	if (dir){
+		char *res = 0;
+
+		/* copy dir */
+		strcpy2(&res, dir);
+		/* expand dir name with "/" char if missing */
+		if (res[strlen2(&res) - 1] != '/'){
+			strcat2(&res, "/"); }
+
+		/* is there a dir like that yet? */
+		if (string_search_line(dirs_recursive, res) == -1){
+			strcat2(&dirs_recursive, res);
+			strcat2(&dirs_recursive, "\n");
+			
+			/* new dir, so I'll return true in the end */
+			flag = 1;
+		}
+		free2(res);
+	}
+
+	/* initialize recursive dirs' depth and sub values */
+	if (dirs_recursive){
+		int i2, i = string_count_lines(dirs_recursive);
+		if (i > 0){
+			if (!dirs_recursive_depth || !dirs_recursive_sub){
+				if (dirs_recursive_depth) free(dirs_recursive_depth);
+				if (dirs_recursive_sub)   free(dirs_recursive_sub);
+				/* alloc new mem */
+				dirs_recursive_depth = memget_int(i+1);
+				dirs_recursive_sub   = memget_int(i+1);
+				/* init new entries */
+				i2 = i;
+				while(i2--){
+					dirs_recursive_depth[i2] = -1;
+					dirs_recursive_sub[i2]   = -1;
+				}
+			}
+			else{
+				int *dirs_recursive_depth2 = 0;
+				int *dirs_recursive_sub2 = 0;
+				/* alloc new mem */
+				dirs_recursive_depth2 = memget_int(i+1);
+				dirs_recursive_sub2   = memget_int(i+1);
+				/* copy old content */
+				i2 = i;
+				while(i2--){
+					dirs_recursive_depth2[i2] = dirs_recursive_depth[i2];
+					dirs_recursive_sub2[i2]   = dirs_recursive_sub[i2];
+				}
+				/* init new entry */
+				dirs_recursive_depth2[i] = -1;
+				dirs_recursive_sub2[i]   = -1;
+
+				free(dirs_recursive_depth);
+				free(dirs_recursive_sub);
+				dirs_recursive_depth = dirs_recursive_depth2;
+				dirs_recursive_sub   = dirs_recursive_sub2;
+			}
+		}
+	}
+	
+	return flag;
 }
 
 
@@ -3947,12 +4022,15 @@ void check_tomoyo()
 	if (file_exist(tdom)){
 		/* load configs */
 		load();
-		/* my unique id matches in domain policy? */
-		if (string_search_keyword_first_all(tdomf, myuid_base) == -1){
-			backup();
-			clear();
-			/* set incompatibility flag to print message later, so it gets into the log file too */
-			flag_incomp_conf = 1;
+		/* are there any configs? */
+		if (strlen2(&tdomf) && strlen2(&texcf)){
+			/* my unique id matches in domain policy? */
+			if (string_search_keyword_first_all(tdomf, myuid_base) == -1){
+				backup();
+				clear();
+				/* set incompatibility flag to print message later, so it gets into the log file too */
+				flag_incomp_conf = 1;
+			}
 		}
 	}
 }
@@ -3986,14 +4064,9 @@ void check_crypt()
 							/* get recursive link of dir */
 							res3 = path_link_read(res2);
 							if (res3){
-								/* expand dir name with "/" char if missing */
-								if (res3[strlen2(&res3) - 1] != '/'){
-									strcat2(&res3, "/"); }
-								/* is there a recursive dir like that yet? */
-								if (string_search_line(dirs_recursive, res3) == -1){
-									/* add dir to recursive dirs */
-									strcat2(&dirs_recursive, res3);
-									strcat2(&dirs_recursive, "\n");
+								/* add dir to recursive dirs */
+								if (path_recursive_dir_add(res3)){
+
 									/* set recursive option on */
 									opt_recursive  = 1;
 									flag_crypt = 1;
@@ -8771,17 +8844,7 @@ void check_exceptions()
 	}
 
 	/* initialize recursive dirs' depth and sub values */
-	if (dirs_recursive){
-		i = string_count_lines(dirs_recursive);
-		if (i > 0){
-			if (!dirs_recursive_depth) dirs_recursive_depth = memget_int(i+1);
-			if (!dirs_recursive_sub)   dirs_recursive_sub   = memget_int(i+1);
-			while(i--){
-				dirs_recursive_depth[i] = -1;
-				dirs_recursive_sub[i]   = -1;
-			}
-		}
-	}
+	if (dirs_recursive) path_recursive_dir_add(0);
 }
 
 
