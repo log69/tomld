@@ -134,14 +134,43 @@ char *memget2(unsigned long num)
 	/* convert pointer */
 	p2 = (unsigned long*)(p);
 	/* store memory size as the first data in pointer */
-	*p2 = num + 1; p2++;
+	*p2 = num + 1;
 	/* store string length as the second data in pointer */
-	*p2 = 0; p2++;
+	*(p2 + 1) = 0;
 	/* set pointer to string data */
-	p = (char*)(p2);
+	p = (char*)(p2 + 2);
 	/* clear string */
 	p[0] = 0;
 	return p;
+}
+
+
+/* reallocate dynamic string memory for char */
+/* my dynamic string looks like this: */
+/* [maxlen] [len] [s t r i n g c h a r s \0 \0 \0] */
+/* i make the pointer point to the data part after maxlen and len data */
+void memget3(char **s1, unsigned long num)
+{
+	/* get long pointer for extra datas */
+	unsigned long *p2;
+	if (!(*s1)) *s1 = memget2(num);
+	else{
+		/* get original length */
+		unsigned long l1 = strlen2(s1);
+		/* alloc mem */
+		char *p = realloc((unsigned long*)(*s1) - 2, sizeof(char) * (num + 1) + sizeof(unsigned long) + sizeof(unsigned long));
+		if (!p){ error("error: out of memory\n"); exit(1); }
+		/* convert pointer */
+		p2 = (unsigned long*)(p);
+		/* store memory size as the first data in pointer */
+		*p2 = num + 1;
+		/* store string length as the second data in pointer */
+		*(p2 + 1) = l1;
+		/* set pointer to string data */
+		*s1 = (char*)(p2 + 2);
+		/* clear string */
+		(*s1)[l1] = 0;
+	}
 }
 
 
@@ -216,36 +245,40 @@ void strnull2(char **s1)
 /* my strcpy for dynamic strings */
 void strcpy2(char **s1, const char *s2)
 {
-	unsigned long *p2, l2, size;
+	unsigned long *p2, l2;
 	/* safety check for null pointers */
 	if (!s2) return;
 	/* length of source string */
 	l2 = strlen(s2) + 1;
 	/* alloc mem and initialize it if destination string is a null pointer */
-	if (!(*s1)) *s1 = memget2(l2 * 2);
-	/* get long pointer for extra datas */
-	p2 = (unsigned long*)(*s1);
-	/* maximum size of string memory */
-	size = *(p2 - 2);
-	/* allocate new bigger one if space is smaller than needed */
-	if (size < l2){
-		/* new mem */
-		char *s3 = memget2(l2 * 2);
-		free2(*s1);
-		*s1 = s3;
+	if (!(*s1)){
+		*s1 = memget2(l2 * 2);
+		/* get long pointer for extra datas */
 		p2 = (unsigned long*)(*s1);
+	}
+	else{
+		/* get long pointer for extra datas */
+		p2 = (unsigned long*)(*s1);
+		/* allocate new bigger one if space is smaller than needed */
+		if (*(p2 - 2) < l2){
+			/* new mem */
+			char *s3 = memget2(l2 * 2);
+			free2(*s1);
+			*s1 = s3;
+			p2 = (unsigned long*)(*s1);
+		}
 	}
 	/* store length of new result string */
 	*(p2 - 1) = l2 - 1;
 	/* copy source to dest string */
-	while(l2--) (*s1)[l2] = s2[l2];
+	memcpy(*s1, s2, l2);
 }
 
 
 /* my strcat for dynamic strings */
 void strcat2(char **s1, const char *s2)
 {
-	unsigned long *p2, l1, l2, l3, size;
+	unsigned long *p2, l1, l2, l3;
 	/* safety check for null pointers */
 	if (!s2) return;
 	/* length of source string */
@@ -258,23 +291,16 @@ void strcat2(char **s1, const char *s2)
 	l1 = *(p2 - 1);
 	/* total length needed to store result */
 	l3 = l1 + l2;
-	/* maximum size of string memory */
-	size = *(p2 - 2);
 	/* allocate new bigger one if space is smaller than needed */
-	if (size < l3){
+	if (*(p2 - 2) < l3){
 		/* new mem */
-		char *s3 = memget2(l3 * 2);
-		unsigned long l4 = l1 + 1;
-		/* copy old string */
-		while(l4--) s3[l4] = (*s1)[l4];
-		free2(*s1);
-		*s1 = s3;
+		memget3(s1, l3 * 2);
 		p2 = (unsigned long*)(*s1);
 	}
 	/* store length of new result string */
 	*(p2 - 1) = l3 - 1;
 	/* copy source behind dest string */
-	while(l2--) (*s1)[l1 + l2] = s2[l2];
+	memcpy((*s1) + l1, s2, l2);
 }
 
 
