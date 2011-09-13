@@ -107,9 +107,8 @@ char *mytime_get_sec_human(int sec)
 void mytime_print()
 {
 	static float t = 0;
-	t = mytime() - t;
-
-	printf("-- time %.2f sec\n", t);
+	printf("-- time %.2f sec\n", mytime() - t);
+	t = mytime();
 }
 
 
