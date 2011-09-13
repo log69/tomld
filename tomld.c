@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+13/09/2011 - tomld v0.67 - optimizations in string handling and speed up init
 11/09/2011 - tomld v0.66 - bugfix: no configuration compatibility check on empty files
                            bugfix: manage the list of recursive dirs and its components properly
 10/09/2011 - tomld v0.65 - bugfix: check whether path is not a directory in which() function
@@ -412,7 +413,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.66";
+char *ver = "0.67";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -725,7 +726,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sat Sep 10 22:34:40 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sun Sep 11 09:46:55 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4020,18 +4021,19 @@ void check_tomoyo()
 	/* load domain config file and search for my unique id in domain policy
 	 * and create new one if incompatible */
 	if (file_exist(tdom)){
-		/* load configs */
-		load();
+		/* load config */
+		char *f = file_read(tdomk, -1);
 		/* are there any configs? */
-		if (strlen2(&tdomf) && strlen2(&texcf)){
+		if (strlen2(&f)){
 			/* my unique id matches in domain policy? */
-			if (string_search_keyword_first_all(tdomf, myuid_base) == -1){
+			if (string_search_keyword_first_all(f, myuid_base) == -1){
 				backup();
 				clear();
 				/* set incompatibility flag to print message later, so it gets into the log file too */
 				flag_incomp_conf = 1;
 			}
 		}
+		free2(f);
 	}
 }
 
