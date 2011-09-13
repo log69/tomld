@@ -1,165 +1,165 @@
 What is this?
 
-The project was created to ease the usage of Tomoyo security tool. The main priority is to create a more secure software environment with full automation without the need of user interaction. 
+The project was created to ease the usage of Tomoyo security tool. The main priority is to create a more secure software environment with full automation without the need of user interaction.
 
 
 How does it work?
 
-Tomld creates domains with rules for applications listening on sockets or applications suggested by the user. It increases security by enclosing all applications within a domain by enforcing a policy. 
+Tomld creates domains with rules for applications listening on sockets or applications suggested by the user. It increases security by enclosing all applications within a domain by enforcing a policy.
 
-Tomld keeps track of all domains' creation time, last change time and cpu usage. With an algorithm, the complexity of the domain is calculated and the more complex it is, the more time it gets in learning mode. Once the cpu usage gets over a limit taken the complexity, the domain gets switched to enforcing mode. Once in this mode, the learning time is over. 
+Tomld keeps track of all domains' creation time, last change time and cpu usage. With an algorithm, the complexity of the domain is calculated and the more complex it is, the more time it gets in learning mode. Once the cpu usage gets over a limit taken the complexity, the domain gets switched to enforcing mode. Once in this mode, the learning time is over.
 
-There is an absolute limit to the learning time, this is currently 2 weeks. 
+There is an absolute limit to the learning time, this is currently 2 weeks.
 
 
 What if a domain has enforcing mode too early?
 
-If a domain is in enforcing mode, then it cannot have access to more than it is defined in its rules in the policy. 
+If a domain is in enforcing mode, then it cannot have access to more than it is defined in its rules in the policy.
 
-if the domain would need more time because of something missing (it may happen that some functionality wasn't used during the learning time), there is a possibiliy for the user to request a temporary learning mode by running 'tomld --learn'. This signals the running tomld daemon to switch all domains having access denies currently back into learning mode at the next cycle, but only these ones. This temporary learning time can take maximum 1 hour, or until the domain gets turned again into enforcing mode or tomld exists. 
+if the domain would need more time because of something missing (it may happen that some functionality wasn't used during the learning time), there is a possibiliy for the user to request a temporary learning mode by running 'tomld --learn'. This signals the running tomld daemon to switch all domains having access denies currently back into learning mode at the next cycle, but only these ones. This temporary learning time can take maximum 1 hour, or until the domain gets turned again into enforcing mode or tomld exists.
 
 
 How easy is it to use?
 
-Installing tomld from a .deb package is pretty much all that is necessary. Only one reboot may still be needed to activate Tomoyo if it's not active yet, and that covers everything. Tomld will run as a service and do the rest from there. 
+Installing tomld from a .deb package is pretty much all that is necessary. Only one reboot may still be needed to activate Tomoyo if it's not active yet, and that covers everything. Tomld will run as a service and do the rest from there.
 
-There's no need to use the command line even on the desktop. The package creates two icons. One is for starting the notification service and the second for requesting temporary learning mode in case any problem happens. 
+There's no need to use the command line even on the desktop. The package creates two icons. One is for starting the notification service and the second for requesting temporary learning mode in case any problem happens.
 
 
 What are the requirements?
 
-Tomld is a Linux only solution, so you need a Linux kernel version 2.6.30 or above with Tomoyo compiled in it (this is the version where Tomoyo was introduced into the mainline kernel) and you also need the Tomoyo tools to be installed. 
+Tomld is a Linux only solution, so you need a Linux kernel version 2.6.30 or above with Tomoyo compiled in it (this is the version where Tomoyo was introduced into the mainline kernel) and you also need the Tomoyo tools to be installed.
 
-On a Debian or Ubuntu system, install tomoyo-tools package. 
+On a Debian or Ubuntu system, install tomoyo-tools package.
 
-The tomld Debian package itself depends on two other packages: libnotify-bin and su-to-root for the better desktop integration, but these are not necessary. 
+The tomld Debian package itself depends on two other packages: libnotify-bin and su-to-root for the better desktop integration, but these are not necessary.
 
 
 What are the features?
 
-- 1 click solution, no need to use the command line 
+- 1 click solution, no need to use the command line
 
-- analysis of the current rules without storing much extra information externally in a database or any other way 
+- analysis of the current rules without storing much extra information externally in a database or any other way
 
-- full automation including deciding which files get wildcarded and which domains can be switched to enforcing mode and when 
+- full automation including deciding which files get wildcarded and which domains can be switched to enforcing mode and when
 
-- determines processes run from chroot automatically and handles their rules according to their chroot directory 
+- determines processes run from chroot automatically and handles their rules according to their chroot directory
 
-- remembers creation time, last change time and the amount of cpu usage of the domain even after a reboot 
+- remembers creation time, last change time and the amount of cpu usage of the domain even after a reboot
 
-- saves policy on reboot or on application closure 
+- saves policy on reboot or on application closure
 
-- creates backup automatically on particular operations 
+- creates backup automatically on particular operations
 
-- restore function to restore datas from last backup 
+- restore function to restore datas from last backup
 
-- helps to avoid denial of service caused by too many rules if one running cycle takes too long by printing a warning message with the name of the directory containing the most files (this directory can be put then to recursive tag by user) 
+- helps to avoid denial of service caused by too many rules if a running cycle takes too long by printing a warning message with the solution (--info option gives an overview about the topmost directories with the most entries, and so some of them may be put under [recursive] tag in the config file)
 
-- secure design by not listening on any socket or to any external input 
+- secure design by not listening on any socket or to any external input
 
-- coded in clean C without any external dependencies apart from Tomoyo 
+- coded in clean C without any external dependencies apart from Tomoyo
 
-- relatively small memory footprint on a modern desktop or server 
+- relatively small memory footprint on a modern desktop or server
 
-- saves hard disk I/O whenever possible 
+- saves hard disk I/O whenever possible
 
-- switch to power saving mode after all domains in enforcing mode by sleeping 10 times more in every cycle 
+- switch to power saving mode after all domains in enforcing mode by sleeping 10 times more in every cycle
 
 
 How to get it?
 
-If you want to compile it yourself, download the tarball and extract it. If the correct build tools are installed on the system, then running 'make install' will create the executable and install it on the system. You need to have tomoyo-tools installed for tomld to work. 
+If you want to compile it yourself, download the tarball and extract it. If the correct build tools are installed on the system, then running 'make install' will create the executable and install it on the system. You need to have tomoyo-tools installed for tomld to work.
 
-If you intend to use packages, Debian packages (32 and 64 bit) are already available inside tomld.tgz in a dist_debian directory. These are for Debian (6.x and up) and Ubuntu (10.10 and up) systems. 
+If you intend to use packages, Debian packages (32 and 64 bit) are already available inside tomld.tgz in a dist_debian directory. These are for Debian (6.x and up) and Ubuntu (10.10 and up) systems.
 
-To install it, run this command with the appropriate .deb file: sudo dpkg -i tomld*.deb; sudo apt-get -f install 
+To install it, run this command with the appropriate .deb file: sudo dpkg -i tomld*.deb; sudo apt-get -f install
 
-OpenSUSE will enable Tomoyo in the default kernel from version 12.1, so I'm planning to create an .rpm package for it too. 
+OpenSUSE will enable Tomoyo in the default kernel from version 12.1, so I'm planning to create an .rpm package for it too.
 
 
 How general a solution is this?
 
-There are no hardcoded settings or directory names of any particular software in tomld so as to make it as general a solution as possible. It should work in any Linux based environment. 
+There are no hardcoded settings or directory names of any particular software in tomld so as to make it as general a solution as possible. It should work in any Linux based environment.
 
-The line between security and usability must be drawn, tomld provides good security without the trade-off of effecting usability. 
+The line between security and usability must be drawn, tomld provides good security without the trade-off of effecting usability.
 
 
 How secure is it?
 
-The tomld service does not call any external application while running (without --mail and --notify options), except the tomoyo-loadpolicy binary on the first run to allow itself permission to modify Tomoyo domains later. 
+The tomld service does not call any external application while running (without --mail and --notify options), except the tomoyo-loadpolicy binary on the first run to allow itself permission to modify Tomoyo domains later.
 
-It doesn't listen on any sockets and you cannot communicate with it except requesting temporary learning mode through the /var/run/tomld/tomld.learn file by running 'tomld --learn' (domains do not have access to tomld's working directory). 
+It doesn't listen on any sockets and you cannot communicate with it except requesting temporary learning mode through the /var/run/tomld/tomld.learn file by running 'tomld --learn' (domains do not have access to tomld's working directory).
 
 
 How much CPU and memory intensive is it?
 
-An average of around 1-3% of CPU is used by tomld while running. An older computer (say 3-4 years old) may take a longer time to run it. The maximum virtual memory may be somewhere between 6 and 60 MB, and the resident somewhere between 1 and 20 MB. 
+An average of around 1-3% of CPU is used by tomld while running. An older computer (say 3-4 years old) may take a longer time to run it. The maximum virtual memory may be somewhere between 6 and 60 MB, and the resident somewhere between 1 and 20 MB.
 
-Tomld requires a higher CPU load while generating rules. 
+Tomld requires a higher CPU load while generating rules.
 
 
 Isn't it better to create Tomoyo rules by hand?
 
-Alas, not from a practical viewpoint; while trying to create rules and domains manually, you have to figure out which applications you want to enforce policy on and which processes belong to those apps. You also need to know the system on an advanced level. You have to be able to decide which files the apps may write to or read from, when the learning mode of the domain should end, which domain should be switched back from enforcing mode in the event of a problem. Also you still have to keep those rules updated from time to time because the library versions may change with every update or new software may get installed, or simply any part of the system may change in day to day use. 
+Alas, not from a practical viewpoint; while trying to create rules and domains manually, you have to figure out which applications you want to enforce policy on and which processes belong to those apps. You also need to know the system on an advanced level. You have to be able to decide which files the apps may write to or read from, when the learning mode of the domain should end, which domain should be switched back from enforcing mode in the event of a problem. Also you still have to keep those rules updated from time to time because the library versions may change with every update or new software may get installed, or simply any part of the system may change in day to day use.
 
-What makes the usage of Mandatory Access Control (MAC) more difficult is that even seemingly similar systems will have differing MAC requirements. Differences may be what kind of software is installed and by which method or where the relevant directories and files are, because of this it is not viable to copy rules between systems. 
+What makes the usage of Mandatory Access Control (MAC) more difficult is that even seemingly similar systems will have differing MAC requirements. Differences may be what kind of software is installed and by which method or where the relevant directories and files are, because of this it is not viable to copy rules between systems.
 
-While there may be situations when there is a need to create Tomoyo rules manually and those rules may be better and more secure in some way, this should not be a task for the average user. Additionally with the prospect of the generation of several thousand rules this seems impractical, time consuming and hard to achieve. 
+While there may be situations when there is a need to create Tomoyo rules manually and those rules may be better and more secure in some way, this should not be a task for the average user. Additionally with the prospect of the generation of several thousand rules this seems impractical, time consuming and hard to achieve.
 
 
 Can existing manually-created Tomoyo rules be used for tomld?
 
-No. Tomld uses its own method and logic while creating rules. There may be incompatibility with manually created rules. It is not recommended. 
+No. Tomld uses its own method and logic while creating rules. There may be incompatibility with manually created rules. It is not recommended.
 
-When running tomld, it creates empty rules and backs up the current ones if those rules weren't created originally by tomld. 
+When running tomld, it creates empty rules and backs up the current ones if those rules weren't created originally by tomld.
 
 
 What are the settings in /etc/tomld/tomld.conf?
 
-Every tag has values under it, one per line. Spaces and empty lines don't matter. Lines starting with '#' characters mean remark and will be ignored. Paths can have wildcard in them. '\*' is a wildcard and '\{\*\}' is a recursive wildcard meaning any number of subdirs with any names here. Recursive wildcard should be used only once per path and only at the end of it. 
+Every tag has values under it, one per line. Spaces and empty lines don't matter. Lines starting with '#' characters mean remark and will be ignored. Paths can have wildcard in them. '\*' is a wildcard and '\{\*\}' is a recursive wildcard meaning any number of subdirs with any names here. Recursive wildcard should be used only once per path and only at the end of it.
 
-[mail] Tomld will send e-mails to the persons specified below with all the recent deny logs. If unset, you can also use the file /var/log/tomld.log for checking the logs. 
+[mail] Tomld will send e-mails to the persons specified below with all the recent deny logs. If unset, you can also use the file /var/log/tomld.log for checking the logs.
 
-[notify] Tomld will run the following command expanding it with its info message when important event happens. 
+[notify] Tomld will run the following command expanding it with its info message when important event happens.
 
-[exception] The files in the directories specified won't get automatically wildcarded. If the file is a temporary file, then only its random part will be wildcarded. The idea behind it is to not to let all files be read automatically in these directories, for instance .gnupg in the home directory or /etc/passwd. 
+[exception] The files in the directories specified won't get automatically wildcarded. If the file is a temporary file, then only its random part will be wildcarded. The idea behind it is to not to let all files be read automatically in these directories, for instance .gnupg in the home directory or /etc/passwd.
 
-[wildcard] The files in these directories will always be wildcarded, regardless of the type of the rule, whether it is a writing rule or just a reading one (the idea of tomld is to wildcard all files in "writing" rules, like create, rename, truncate etc., and leave the rest untouched). This is useful to have it in not so important directories, so the chance of a final rule and the completion of learning mode is higher. 
+[wildcard] The files in these directories will always be wildcarded, regardless of the type of the rule, whether it is a writing rule or just a reading one (the idea of tomld is to wildcard all files in "writing" rules, like create, rename, truncate etc., and leave the rest untouched). This is useful to have it in not so important directories, so the chance of a final rule and the completion of learning mode is higher.
 
-[replace] The paths in the rules of domains will be replaced with these directories, if these dirs seem more "general" with the wildcards in them. The idea here is to manually wildcard a directory if tomld cannot do it automatically. Sometimes there are randomly-generated strings in directory names. Although this is unusual, it is hard to provide a general solution for it. An example is the GDM v3 directory structure that looks like /var/run/gdm/auth-for-X5gGF53/, where "X5gGF53" here is the randomized part generated every time the system is rebooted, without wild-carding this there would never be an end to tomld rule generation. 
+[replace] The paths in the rules of domains will be replaced with these directories, if these dirs seem more "general" with the wildcards in them. The idea here is to manually wildcard a directory if tomld cannot do it automatically. Sometimes there are randomly-generated strings in directory names. Although this is unusual, it is hard to provide a general solution for it. An example is the GDM v3 directory structure that looks like /var/run/gdm/auth-for-X5gGF53/, where "X5gGF53" here is the randomized part generated every time the system is rebooted, without wild-carding this there would never be an end to tomld rule generation.
 
-[recursive] Everything will be recursively wildcarded in these directories. It may make sense to place a directory here that tomld couldn't create a general rule for and as a result it keeps generating new rules continually (like new randomly-named directories). Direcories like '/home/user/.mozilla' or the directories of samba shares may also be inserted here. Note that this option should be used with caution as over-enthusiastic recursive wildcarding negates the usefulness of Tomoyo. 
+[recursive] Everything will be recursively wildcarded in these directories. It may make sense to place a directory here that tomld couldn't create a general rule for and as a result it keeps generating new rules continually (like new randomly-named directories). Direcories like '/home/user/.mozilla' or the directories of samba shares may also be inserted here. Note that this option should be used with caution as over-enthusiastic recursive wildcarding negates the usefulness of Tomoyo.
 
-[nocrypt] Disables the automatic lookup of mounted enrcypted filesystems. 
+[nocrypt] Disables the automatic lookup of mounted enrcypted filesystems.
 
-[nodomain] All the entries below this will be interpreted as extra executables _not_ to create domain for. 
+[nodomain] All the entries below this will be interpreted as extra executables _not_ to create domain for.
 
-[extra] All the entries below this will be interpreted as extra executables to create domain for. 
+[extra] All the entries below this will be interpreted as extra executables to create domain for.
 
 
 Why are all shell binaries marked as exceptions?
 
-Exception means tomld doesn't create a main domain for the given binaries or processes. But they still can be subdomains of any other sub or main domain. 
+Exception means tomld doesn't create a main domain for the given binaries or processes. But they still can be subdomains of any other sub or main domain.
 
-Let's say a user encloses the bash binary in a domain. If tomld creates the initialize_domain tag for this in the exception policy of Tomoyo, then every bash process would transit into this domain and the rules here would be applied to them. And because a shell must do anything a general rule cannot be created for it. 
+Let's say a user encloses the bash binary in a domain. If tomld creates the initialize_domain tag for this in the exception policy of Tomoyo, then every bash process would transit into this domain and the rules here would be applied to them. And because a shell must do anything a general rule cannot be created for it.
 
-However this is not even necessary because every main domain using a shell would create its own subdomain, and the rules created here would be applied to those shells that are run from these domains only. 
+However this is not even necessary because every main domain using a shell would create its own subdomain, and the rules created here would be applied to those shells that are run from these domains only.
 
-sshd and screen are also default exceptions. The options here may still vary, further testing needs to establish what are the best general rules or what to allow the user to specify. 
+sshd and screen are also default exceptions. The options here may still vary, further testing needs to establish what are the best general rules or what to allow the user to specify.
 
 
 Who sponsors this project?
 
-Nobody. I contribute my own time for free. 
+Nobody. I contribute my own time for free.
 
 
 Other remarks
 
-- tomld assumes it will be run in a fully trusted environment 
+- tomld assumes it will be run in a fully trusted environment
 
-- applications should be used as comprehensively as possible during the learning phase to create rules for all kinds of behaviour 
+- applications should be used as comprehensively as possible during the learning phase to create rules for all kinds of behaviour
 
-- using the --clear or --reset switch config files will be backed up and former log entries will be ignored, this is equivalent to a start from a clean set up 
+- using the --clear or --reset switch config files will be backed up and former log entries will be ignored, this is equivalent to a start from a clean set up
 
 - tomld files:
 /var/local/tomld.logmark (this contains a mark to identify the end of the recently read message logs)
@@ -169,21 +169,22 @@ Other remarks
 /var/run/tomld/tomld.learn.list (pattern list for the temporary learning mode for those domains that match these patterns)
 /var/run/tomld/tomld.message (file containing important recent logs for the notification service)
 /var/run/tomld/tomld.message.lock (lock file for former one)
-/etc/tomld/tomld.conf (settings file) 
+/etc/tomld/tomld.conf (settings file)
 
-- in case an application or its settings change with a new version, the rules can be regenerated easily 
+- in case an application or its settings change with a new version, the rules can be regenerated easily
 
-- the running processes need to be restarted on newly created domains 
+- the running processes need to be restarted on newly created domains
 
-- auto yes option is always disabled in manual mode regarding deny logs 
+- auto yes option is always disabled in manual mode regarding deny logs
 
-- if someone doesn't want to run tomld all the time, it can simply be turned off and removed from the services after all domains' learning mode is over and it can be rerun anytime if needed 
+- if someone doesn't want to run tomld all the time, it can simply be turned off and removed from the services after all domains' learning mode is over and it can be rerun anytime if needed
 
-- the flow chart can be found in the beginning of the source code 
+- the flow chart can be found in the beginning of the source code
 
-- tested with over 6000 inactive domains and over 60 active domains with over 3000 rules in kernel memory, tomld still runs at an acceptable speed 
+- tested with over 6000 inactive domains and over 60 active domains with over 3000 rules in kernel memory, tomld still runs at an acceptable speed
 
 
 Errata
 
-- none that i know of currently 
+- none that I know of currently
+
