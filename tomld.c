@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+16/09/2011 - tomld v0.68 - bugfix: make list of deny log unique for temporary learning mode too
 13/09/2011 - tomld v0.67 - optimizations in string handling and speed up init
 11/09/2011 - tomld v0.66 - bugfix: no configuration compatibility check on empty files
                            bugfix: manage the list of recursive dirs and its components properly
@@ -413,7 +414,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.67";
+char *ver = "0.68";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -726,7 +727,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sun Sep 11 09:46:55 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Tue Sep 13 17:13:53 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -5519,8 +5520,9 @@ void domain_get_log()
 
 		/* sort and unique rules */
 		res = string_sort_uniq_lines(prog_rules);
-		free2(prog_rules);
-		prog_rules = res;
+		free2(prog_rules); prog_rules = res;
+		res = string_sort_uniq_lines(prog_rules2);
+		free2(prog_rules2); prog_rules2 = res;
 
 		if (strlen2(&prog_rules)){
 			color("* access deny log messages ", yellow);
