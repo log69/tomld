@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+17/09/2011 - tomld v0.69 - bugfix: show true percentages in --info output taking the min and max times into account too
 16/09/2011 - tomld v0.68 - bugfix: make list of deny log unique for temporary learning mode too
 13/09/2011 - tomld v0.67 - optimizations in string handling and speed up init
 11/09/2011 - tomld v0.66 - bugfix: no configuration compatibility check on empty files
@@ -414,7 +415,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.68";
+char *ver = "0.69";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -727,7 +728,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Tue Sep 13 17:13:53 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Fri Sep 16 14:28:56 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4482,14 +4483,14 @@ int domain_check_enforcing(char *domain, int flag_info)
 				 * if so, then i switch the domain to enforcing mode,
 				 * but only, if there is no temporary learning mode on currently */
 				flag_enforcing = 0;
-				if ((!flag_learn2) && d_create > const_time_max_dcreate) flag_enforcing = 1;
+				if ((!flag_learn2) && d_create >= const_time_max_dcreate) flag_enforcing = 1;
 				if (!flag_enforcing){
 					/* a minimum time has to pass since last domain change to let the
 					 * completness of domain grow, or else i reset cpu time of processes
 					 * but if it is after reboot, then take uptime into account too
 					 * i calculate min time from time of check constant because this is the
 					 * intervall to check if domain has changed */
-					if (s_uptime > const_time_check_long2 * 2 && d_change < const_time_check_long2 * 2){
+					if (s_uptime >= const_time_check_long2 * 2 && d_change < const_time_check_long2 * 2){
 						/* reset cpu times */
 						process_get_cpu_time_all(name, 1);
 						p_cputime = 0;
@@ -4563,10 +4564,32 @@ int domain_check_enforcing(char *domain, int flag_info)
 					/* **************************************************************** */
 				}
 
+				/* calculate percentage taking the min and max times into account too
+				 * giving the lowest percent */
+				if (flag_enforcing){
+					if (d_create < const_time_min_dcreate){
+						result = d_create * 100 / const_time_min_dcreate;
+					}
+					else result = 100;
+				}
+				else{
+					int res2;
+					if (d_create < const_time_min_dcreate){
+						res2 = d_create * 100 / const_time_min_dcreate;
+						if (res2 < result) result = res2;
+					}
+					else{
+						if (d_create < const_time_max_dcreate){
+							res2 = d_create * 100 / const_time_max_dcreate;
+							if (res2 > result) result = res2;
+						}
+						else result = 100;
+					}
+				}
+
 				/* if former conditions satisfy and at least a minimum time has passed since domain
 				 * creation, then i switch the domain to enforcing mode */
-				if (d_create > const_time_min_dcreate && d_change > const_time_min_dchange && flag_enforcing){
-					result = 100;
+				if (d_create >= const_time_min_dcreate && d_change >= const_time_min_dchange && flag_enforcing){
 
 					if (flag_info){
 						char *nn = 0;
