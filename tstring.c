@@ -1001,6 +1001,7 @@ char *string_remove_line(char *text, const char *line)
 			strcat2(&text_new, res);
 			strcat2(&text_new, "\n");
 		}
+		free2(res);
 	}
 
 	/* return result */
