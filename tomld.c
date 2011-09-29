@@ -22,6 +22,12 @@
 
 changelog:
 -----------
+29/09/2011 - tomld v0.70 - change --learn-all option name to --learn-more and make it use a pattern of domain name
+                         - consider patterns in domain names only after the <kernel> tags in --remove and --learn-more
+                         - change the way --remove works: remove only main domains instead of single subdomains
+                           so it avoids the user to leave a corrupt domain policy behind
+                         - add uid entries to main domains when switching them to learning mode if the uids are missing
+                         - bugfix: fix more memleaks
 17/09/2011 - tomld v0.69 - bugfix: show true percentages in --info output taking the min and max times into account too
 16/09/2011 - tomld v0.68 - bugfix: make list of deny log unique for temporary learning mode too
 13/09/2011 - tomld v0.67 - optimizations in string handling and speed up init
@@ -221,7 +227,7 @@ changelog:
                            and also this is to determine if the config was created by tomld
                          - add --manual switch to effect the enforcing mode
                          - reorder option switch handling so the not so effective switches run first
-                         - add process_get_cpu_time_all()
+                         - add domain_get_cpu_time_all()
                          - add domain_check_enforcing()
                          - add domain_update_change_time()
                          - check if tomoyo support is compiled into kernel above version 2.6.36
@@ -605,7 +611,7 @@ int opt_version		= 0;
 int opt_help		= 0;
 int opt_color		= 0;
 int opt_learn		= 0;
-int opt_learn_all	= 0;
+int opt_learn_more	= 0;
 int opt_manual		= 0;
 int opt_clear		= 0;
 int opt_reset		= 0;
@@ -622,13 +628,14 @@ int opt_nodomain	= 0;
 int opt_nocrypt		= 0;
 int opt_notify		= 0;
 
-char *opt_notify2	= 0;
-char *opt_learn2	= 0;
-char *opt_nodomain2	= 0;
-char *opt_log2		= 0;
-char *opt_info2		= 0;
-char *opt_remove2	= 0;
-char *dirs_recursive = 0;
+char *opt_notify2		= 0;
+char *opt_learn2		= 0;
+char *opt_learn_more2	= 0;
+char *opt_nodomain2		= 0;
+char *opt_log2			= 0;
+char *opt_info2			= 0;
+char *opt_remove2		= 0;
+char *dirs_recursive	= 0;
 int  *dirs_recursive_depth = 0;
 int  *dirs_recursive_sub = 0;
 
@@ -728,7 +735,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Fri Sep 16 14:28:56 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sat Sep 17 15:00:16 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -794,6 +801,8 @@ void help() {
 	printf ("    -l   --learn  [patterns] **request temporary learning mode for all domains,\n");
 	printf ("                             or for those domains that match the patterns\n");
 	printf ("                             (this is the recommended way if still necessary)\n");
+	printf ("      --learn-more [pattern] switch domain back to learning mode and\n");
+	printf ("                             give it another whole amount of learning time\n");
 	printf ("    -i   --info    [pattern] **print domains' rules by pattern\n");
 	printf ("                             (without pattern, print a list of main domains)\n");
 	printf ("    -r   --remove  [pattern] remove domains by pattern\n");
@@ -802,8 +811,6 @@ void help() {
 	printf ("                             all old learning mode domains to enforcing mode\n");
 	printf ("    -k   --keep              don't change domain's mode for this session\n");
 	printf ("                             (learning mode domains will stay so on exit)\n");
-	printf ("         --learn-all         switch all domains back to learning mode\n");
-	printf ("                             (this is not advised, only for correction purposes)\n");
 	printf ("         --mail      [users] send mail to users with recent deny logs\n");
 	printf ("    -1   --once              quit after first cycle\n");
 	printf ("         --yes               auto confirm everything with yes\n");
@@ -837,6 +844,7 @@ void myfree()
 	if (dirs_recursive_sub)		free(dirs_recursive_sub);
 	free2(opt_notify2);
 	free2(opt_learn2);
+	free2(opt_learn_more2);
 	free2(opt_nodomain2);
 	free2(opt_log2);
 	free2(opt_info2);
@@ -2042,6 +2050,28 @@ char *domain_get_name_sub(char *domain)
 }
 
 
+/* return true if domain is a main domain */
+int domain_is_main(char *domain)
+{
+	char *res, *res2;
+
+	res  = domain_get_name(domain);
+	res2 = domain_get_name_full(domain);
+
+	if (res && res2){
+		if (!strcmp(res, res2)){
+			free2(res);
+			free2(res2);
+			return 1;
+		}
+	}
+
+	free2(res);
+	free2(res2);
+	return 0;
+}
+
+
 /* return true if prog exists as a main domain */
 int domain_main_exist(char *prog)
 {
@@ -2049,13 +2079,15 @@ int domain_main_exist(char *prog)
 
 	temp = tdomf;
 	while(1){
-		/* get first line containing the name of the domain */
+		/* get next domain */
 		res = domain_get_next(&temp);
 		if (!res) break;
+
 		/* get main domain name */
 		res2 = domain_get_name_full(res);
 		if (res2){
-			/* if prog names matches main domain name, then prog exists as a main domain and success */
+			/* if prog names matches main domain name
+			 * then prog exists as a main domain and success */
 			if (!strcmp(prog, res2)){
 				free2(res2);
 				free2(res);
@@ -2551,7 +2583,7 @@ int process_get_least_uptime(const char *name)
  * the flag_clear option decides, whether i reset all processes' cpu time values of the same name,
  * or just read it out */
 /* return null if no process is running like that */
-int process_get_cpu_time_all(const char *name, int flag_clear)
+int domain_get_cpu_time_all(const char *name, int flag_clear)
 {
 	DIR *mydir;
 	struct dirent *mydir_entry;
@@ -2796,6 +2828,13 @@ int process_get_cpu_time_all(const char *name, int flag_clear)
 	free2(list_entry);
 
 	return mycputime;
+}
+
+
+/* reset cpu time of domain of prog */
+void domain_reset_cpu_time(char *prog)
+{
+	domain_get_cpu_time_all(prog, 1);
 }
 
 
@@ -3836,14 +3875,14 @@ void check_options(int argc, char **argv){
 			if (!strcmp(myarg, "-l") || !strcmp(myarg, "--learn"))	    { opt_learn      = 1; flag_ok = 8; }
 			if (!strcmp(myarg, "-n") || !strcmp(myarg, "--notify"))	    { opt_notify     = 1; flag_ok = 9; }
 
-			if (!strcmp(myarg, "--mail" ))	   { opt_mail     = 1; flag_ok = 5; }
-			if (!strcmp(myarg, "--log"  ))	   { opt_log      = 1; flag_ok = 6; }
-			if (!strcmp(myarg, "--no-domain")) { opt_nodomain = 1; flag_ok = 7; }
+			if (!strcmp(myarg, "--mail" ))	     { opt_mail        = 1; flag_ok = 5;  }
+			if (!strcmp(myarg, "--log"  ))	     { opt_log         = 1; flag_ok = 6;  }
+			if (!strcmp(myarg, "--no-domain"))   { opt_nodomain    = 1; flag_ok = 7;  }
+			if (!strcmp(myarg, "--learn-more")) { opt_learn_more = 1; flag_ok = 10; }
 
 			if (!strcmp(myarg, "--yes"  ))	   { opt_yes       = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--clear"))	   { opt_clear     = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--reset"))	   { opt_reset     = 1; flag_reset = 1;  flag_ok = 1; }
-			if (!strcmp(myarg, "--learn-all")) { opt_learn_all = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--no-crypt"))  { opt_nocrypt   = 1; flag_ok = 1; }
 			if (!strcmp(myarg, "--restore"))   { opt_restore   = 1; flag_ok = 1; }
 
@@ -3928,6 +3967,8 @@ void check_options(int argc, char **argv){
 						}
 					}
 				}
+				/* if last option arg was --learn-more, then this belongs to it */
+				if (flag_type == 10) strcpy2(&opt_learn_more2, myarg);
 				/* if argument doesn't belong to any option, then it goes to the extra executables */
 				if (flag_type == 1 || flag_type == 99){
 					char *res;
@@ -3961,6 +4002,8 @@ void check_options(int argc, char **argv){
 
 		/* fail if no arguments for --remove option */
 		if (opt_remove && !opt_remove2){ error("error: argument missing for --remove option\n"); myexit(1); }
+		/* fail if no arguments for --learn-more option */
+		if (opt_learn_more && !opt_learn_more2){ error("error: argument missing for --learn-more option\n"); myexit(1); }
 		/* fail if no arguments for --mail option */
 		if (opt_mail && !mail_users){ error("error: argument missing for --mail option\n"); myexit(1); }
 		/* fail if no arguments for --log option */
@@ -4301,7 +4344,7 @@ void domain_delete_all()
 
 
 /* disable domain name and delete all rules of it from kernel memory */
-void domain_delete(const char *name)
+void domain_delete_sub(const char *name)
 {
 	char *res, *res2, *res3, *temp, *temp2;
 	char *tdomf_old, *tdomf_old2;
@@ -4309,10 +4352,10 @@ void domain_delete(const char *name)
 
 	if (!name) return;
 
-	while(1){
-		/* load old policy from kernel memory */
-		tdomf_old = file_read(tdomk, -1);
+	/* load old policy from kernel memory */
+	tdomf_old = file_read(tdomk, -1);
 
+	while(1){
 		/* zero my config */
 		strnull2(&myappend);
 
@@ -4323,16 +4366,17 @@ void domain_delete(const char *name)
 			res = domain_get_next(&temp);
 			if (!res) break;
 			/* get domain name */
-			temp2 = res;
-			res2 = string_get_next_line(&temp2);
+			res2 = domain_get_name_full(res);
 			if (res2){
 				/* does it match with the domain name to be deleted? */
 				if (!strcmp(res2, name)){
 					/* select domain name */
-					strcat2(&myappend, "select ");
+					strcat2(&myappend, "select <kernel> ");
 					strcat2(&myappend, res2);
 					strcat2(&myappend, "\nuse_profile 0\n");
 					/* skip "use_profile" line */
+					temp2 = res;
+					string_jump_next_line(&temp2);
 					res3 = string_get_next_line(&temp2);
 					if (res3){
 						free2(res3);
@@ -4365,12 +4409,13 @@ void domain_delete(const char *name)
 			file_write(tdomk, myappend);
 			break;
 		}
-		else{
-			/* reload changed policy and run again */
-			free2(tdomf_old);
-			tdomf_old = tdomf_old2;
-		}
+		/* reload changed policy and run again */
+		free2(tdomf_old);
+		tdomf_old = tdomf_old2;
 	}
+
+	free2(tdomf_old);
+	free2(myappend);
 }
 
 
@@ -4444,7 +4489,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 		if (d_create > p_uptime + 1){
 
 			/* get the sum of cpu times of the domain's all processes */
-			p_cputime = process_get_cpu_time_all(name, 0);
+			p_cputime = domain_get_cpu_time_all(name, 0);
 			/* get the formerly stored cpu time of domain */
 			d_cputime = 0;
 			i = string_search_keyword_first_all(domain, myuid_cputime);
@@ -4492,7 +4537,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 					 * intervall to check if domain has changed */
 					if (s_uptime >= const_time_check_long2 * 2 && d_change < const_time_check_long2 * 2){
 						/* reset cpu times */
-						process_get_cpu_time_all(name, 1);
+						domain_reset_cpu_time(name);
 						p_cputime = 0;
 						d_cputime = 0;
 					}
@@ -4651,8 +4696,7 @@ void domain_info(const char *pattern)
 
 			/* get first line */
 			/* here res2 should be something, so i don't check data availability */
-			temp = res;
-			res2 = string_get_next_line(&temp);
+			res2 = domain_get_name_full(res);
 
 			/* search for a keyword */
 			i = string_search_keyword(res2, pattern);
@@ -4669,10 +4713,12 @@ void domain_info(const char *pattern)
 				if (!flag_first){ newl_(); flag_first = 1; }
 				else newl();
 				/* print header part in purple if domain is in enforcing mode or else in blue */
-				if (prof == 3){ color(res2, purple); newl(); }
-				else{ color(res2, blue); newl(); }
+				if (prof == 3){ color("<kernel> ", purple); color(res2, purple); newl(); }
+				else{ color("<kernel> ", blue); color(res2, blue); newl(); }
 				free2(res2);
 				/* print use_profile here too */
+				temp = res;
+				string_jump_next_line(&temp);
 				res2 = string_get_next_line(&temp);
 				color(res2, green); newl();
 				free2(res2);
@@ -4928,8 +4974,9 @@ void domain_remove(const char *pattern)
 	}
 
 	if (flag_pattern){
-		char *res, *res2, *res3, *temp, *temp2, *temp3;
+		char *res, *res2, *res3, *temp;
 		char *tdomf_new, *texcf_new;
+		char *list = 0, *list2 = 0;
 		int i;
 		int count = 0;
 		int count2 = 0;
@@ -4942,107 +4989,132 @@ void domain_remove(const char *pattern)
 			/* exit on end */
 			if (!res) break;
 
-			/* get full domain name */
-			temp2 = res;
-			res2 = string_get_next_line(&temp2);
-			if (res2){
-				/* search for a keyword */
-				i = string_search_keyword(res2, pattern);
-				/* count domain if match */
-				if (i > -1) count++;
-				free2(res2);
-			}
-			free2(res);
-		}
-
-		/* print summary */
-		if (count){
-			char *res = string_itos(count);
-			newl();
-			color("(found ", clr); color(res, clr);
-			if (count == 1) color(" domain)\n", clr);
-			else            color(" domains)\n", clr);
-			free2(res);
-
-			/* alloc mem for new domain policy */
-			tdomf_new = memget2(MAX_CHAR);
-
-			temp = tdomf;
-			while(1){
-				/* get next domain */
-				res = domain_get_next(&temp);
-				/* exit on end */
-				if (!res) break;
-
+			/* is it main domain name? */
+			if (domain_is_main(res)){
 				/* get full domain name */
-				temp2 = res;
-				res2 = string_get_next_line(&temp2);
+				res2 = domain_get_name(res);
 				if (res2){
 					/* search for a keyword */
 					i = string_search_keyword(res2, pattern);
-					/* remove domain if match */
 					if (i > -1){
-						/* print info */
-						color(res2, blue);
-						color("  ", clr);
-						if (!choice("remove domain?")){
-							/* add domain if answer is no */
+						if (string_search_line(list, res2) == -1){
+							strcat2(&list, res2);
+							strcat2(&list, "\n");
+							/* count domain if match */
+							count++;
+						}
+					}
+					free2(res2);
+				}
+			}
+			free2(res);
+		}
+		
+		if (count){
+			/* print summary */
+			char *res = string_itos(count);
+			newl();
+			color("(found ", clr); color(res, clr);
+			if (count == 1) color(" main domain)\n", clr);
+			else            color(" main domains)\n", clr);
+			free2(res);
+
+			/* ask for confirmation */
+			temp = list;
+			while(1){
+				/* get next main domain name */
+				res = string_get_next_line(&temp);
+				if (!res) break;
+				
+				/* print info */
+				color(res, blue);
+				color("  ", clr);
+				/* ask */
+				if (choice("remove domain?")){
+					strcat2(&list2, res);
+					strcat2(&list2, "\n");
+				}
+				free2(res);
+			}
+			free2(list);
+			list = list2;
+			if (list){
+
+				/* create backup before removing any domain */
+				backup();
+				color("policy file backups created\n", green);
+
+				/* alloc mem for new domain policy */
+				tdomf_new = memget2(MAX_CHAR);
+
+				/* remove domains from domain policy */
+				temp = tdomf;
+				while(1){
+					/* get next domain */
+					res = domain_get_next(&temp);
+					/* exit on end */
+					if (!res) break;
+
+					/* get full domain name */
+					res2 = domain_get_name(res);
+					if (res2){
+						/* remove domain if match
+						 * saying it otherwise, add domain to new policy if no match */
+						if (string_search_line(list, res2) == -1){
 							strcat2(&tdomf_new, res);
 							strcat2(&tdomf_new, "\n");
 						}
 						else{
-							char *s = 0;
+							/* get full domain name */
+							res3 = domain_get_name_full(res);
+							/* remove domain from active kernel domains */
+							domain_delete_sub(res3);
 							/* count for remove */
 							count2++;
-							/* remove domain from active kernel domains */
-							domain_delete(res2);
-							/* remove domain from exception policy too */
-							/* get main domain name */
-							temp3 = res2;
-							res3 = string_get_next_wordn(&temp3, 1);
-							/* create domain entry */
-							strcpy2(&s, "initialize_domain ");
-							strcat2(&s, res3);
-							/* remove domain entry from exception policy */
-							texcf_new = string_remove_line(texcf, s);
-							free2(texcf); texcf = texcf_new;
 							free2(res3);
-							free2(s);
 						}
+						free2(res2);
 					}
-					/* add domain to new policy if no match */
-					else{
-						strcat2(&tdomf_new, res);
-						strcat2(&tdomf_new, "\n");
-					}
-					free2(res2);
+					free2(res);
 				}
-				free2(res);
-			}
+				/* replace old policy with new one */
+				free2(tdomf);
+				tdomf = tdomf_new;
+						
+				/* remove domains from exception policy */
+				temp = list;
+				while(1){
+					char *s = 0;
 
-			/* create backup before removing any domain */
-			if (count2 > 0){
-				backup();
-				color("policy file backups created\n", green);
-			}
+					/* get next main domain name */
+					res = string_get_next_line(&temp);
+					/* exit on end */
+					if (!res) break;
 
-			/* replace old policy with new one */
-			free2(tdomf);
-			tdomf = tdomf_new;
-
-			/* print info */
-			if (count2 > 0){
-				if (count2 == 1) color("1 domain removed\n\n", red);
-				else{
-					char *s = string_itos(count2);
-					color(s, red);
-					color(" domains removed\n\n", red);
+					/* create domain entry */
+					strcpy2(&s, "initialize_domain ");
+					strcat2(&s, res);
+					/* remove domain entry from exception policy */
+					texcf_new = string_remove_line(texcf, s);
+					free2(texcf); texcf = texcf_new;
 					free2(s);
+
+					free2(res);
 				}
 
 				/* reload and save new policy */
 				reload();
 				save();
+
+				/* print info */
+				if (count2 == 1) color("1 main domain removed\n\n", red);
+				else{
+					char *s = string_itos(count2);
+					color(s, red);
+					color(" main domains removed\n\n", red);
+					free2(s);
+				}
+				free2(list);
 			}
 			else color("no domain was removed\n\n", green);
 		}
@@ -5051,45 +5123,252 @@ void domain_remove(const char *pattern)
 }
 
 
-/* switch all domains with profile 2-3 back to learning mode */
-void domain_set_learn_all()
+/* reset create time and change time of domain of prog or add them if missing */
+void domain_reset_create_change_time(char *prog)
 {
-	char *res, *name, *name_sub, *temp, *orig;
+	char *res, *res2, *res3, *temp, *temp2;
+	char *tdomf_new;
 
-	/* load config files */
-	load();
+	if (!prog) return;
+
+	/* alloc mem for new domain policy */
+	tdomf_new = memget2(MAX_CHAR);
 
 	/* cycle through domains */
 	temp = tdomf;
 	while(1){
 		/* get next domain */
-		orig = temp;
 		res = domain_get_next(&temp);
 		if (!res) break;
-		/* switch domain to learning mode */
-		domain_set_profile(&orig, 1);
-		/* reset cpu time counter for prog because of learning mode */
-		/* get domain names */
-		name     = domain_get_name(res);
-		name_sub = domain_get_name_full(res);
-		/* is it a main domain? */
-		if (name && name_sub){
-			if (!strcmp(name, name_sub)){
-				process_get_cpu_time_all(name, 1);
-			}
-			free2(name);
-			free2(name_sub);
-		}
+		
+		/* get main domain name */
+		res2 = domain_get_name(res);
+		if (res2){
+			/* domain name macthes to prog? */
+			if (!strcmp(res2, prog)){
+				int flag_myuid_create  = 0;
+				int flag_myuid_change  = 0;
+				int flag_myuid_cputime = 0;
+				char *t;
 
+				/* alloc mem for new domain */
+				char *domain_new = memget2(strlen2(&res));
+
+				/* cycle through rules of domain */
+				temp2 = res;
+				while(1){
+					/* get next line */
+					res3 = string_get_next_line(&temp2);
+					if (!res3) break;
+
+					/* is the line a myuid rule? */
+					if (!string_search_keyword_first(res3, myuid_base)){
+						/* if not, then add it to new domain */
+						strcat2(&domain_new, res3);
+						strcat2(&domain_new, "\n");
+					}
+					else{
+						/* get epoch time in string */
+						t = string_ltos(time(0));
+
+						if (string_search_keyword_first(res3, myuid_create)){
+							strcat2(&domain_new, myuid_create);
+							strcat2(&domain_new, t);
+							strcat2(&domain_new, "\n");
+							flag_myuid_create = 1;
+						}
+						else if (string_search_keyword_first(res3, myuid_change)){
+							strcat2(&domain_new, myuid_change);
+							strcat2(&domain_new, t);
+							strcat2(&domain_new, "\n");
+							flag_myuid_change = 1;
+						}
+						else if (string_search_keyword_first(res3, myuid_cputime)){
+							strcat2(&domain_new, myuid_cputime);
+							strcat2(&domain_new, "0\n");
+							flag_myuid_cputime = 1;
+						}
+						else{
+							strcat2(&domain_new, res3);
+							strcat2(&domain_new, "\n");
+						}
+
+						free2(t);
+					}
+					free2(res3);
+				}
+				
+				/* add uids if missing */
+				t = string_ltos(time(0));
+				if (!flag_myuid_create){
+					strcat2(&domain_new, myuid_create);
+					strcat2(&domain_new, t);
+					strcat2(&domain_new, "\n");
+				}
+				if (!flag_myuid_change){
+					strcat2(&domain_new, myuid_change);
+					strcat2(&domain_new, t);
+					strcat2(&domain_new, "\n");
+				}
+				if (!flag_myuid_cputime){
+					strcat2(&domain_new, myuid_cputime);
+					strcat2(&domain_new, "0\n");
+				}
+				free2(t);
+				
+				/* add domain to new policy */
+				strcat2(&tdomf_new, domain_new);
+				strcat2(&tdomf_new, "\n");
+				free2(domain_new);
+			}
+			else{
+				/* add domain to new policy */
+				strcat2(&tdomf_new, res);
+				strcat2(&tdomf_new, "\n");
+			}
+			free2(res2);
+		}
 		free2(res);
 	}
 
-	/* update cpu times in domain policy too (not only in memory) */
-	domain_update_cpu_time_all();
+	/* replace old policy with new one */
+	free2(tdomf);
+	tdomf = tdomf_new;
+}
 
-	/* save config files and load them to kernel */
-	save();
-	reload();
+
+/* switch domain belonging to prog back to learning mode
+ * and reset all its myuid values in domain */
+void domain_learn_more(char *prog)
+{
+	if (prog){;
+		/* switch domian to learning mode */
+		domain_set_profile_for_prog(prog, 1);
+
+		/* reset cpu counter */
+		domain_reset_cpu_time(prog);
+		
+		/* reset create time and change time or add them if missing */
+		domain_reset_create_change_time(prog);
+	}
+}
+
+
+/* switch domains with profile 2-3 matching pattern back to learning mode
+ * and reset their uid values */
+void domain_set_learn_more(const char *pattern)
+{
+	int flag_pattern = 0;
+
+	/* load config files from kernel memory */
+	load();
+
+	/* is there any pattern? */
+	if (pattern){
+		if (pattern[0]) flag_pattern = 1;
+	}
+
+	if (flag_pattern){
+		char *res, *res2, *temp;
+		char *list = 0;
+		char *list2 = 0;
+		int i;
+		int count = 0;
+		int count2 = 0;
+
+		/* count matching domains */
+		temp = tdomf;
+		while(1){
+			/* get next domain */
+			res = domain_get_next(&temp);
+			/* exit on end */
+			if (!res) break;
+
+			/* is it main domain name? */
+			if (domain_is_main(res)){
+				/* get full domain name */
+				res2 = domain_get_name(res);
+				if (res2){
+					/* search for a keyword */
+					i = string_search_keyword(res2, pattern);
+					if (i > -1){
+						if (string_search_line(list, res2) == -1){
+							strcat2(&list, res2);
+							strcat2(&list, "\n");
+							/* count domain if match */
+							count++;
+						}
+					}
+					free2(res2);
+				}
+			}
+			free2(res);
+		}
+
+		if (count){
+			/* print summary */
+			char *res = string_itos(count);
+			newl();
+			color("(found ", clr); color(res, clr);
+			if (count == 1) color(" main domain)\n", clr);
+			else            color(" main domains)\n", clr);
+			free2(res);
+
+			/* ask for confirmation */
+			temp = list;
+			while(1){
+				/* get next main domain name */
+				res = string_get_next_line(&temp);
+				if (!res) break;
+				
+				/* print info */
+				color(res, blue);
+				color("  ", clr);
+				/* ask */
+				if (choice("relearn domain?")){
+					strcat2(&list2, res);
+					strcat2(&list2, "\n");
+				}
+				free2(res);
+			}
+			free2(list);
+			list = list2;
+			if (list){
+
+				/* create backup before changing any domain */
+				backup();
+				color("policy file backups created\n", green);
+
+				/* reset domains' uids and switch them back to learning mode */
+				temp = list;
+				while(1){
+					res = string_get_next_line(&temp);
+					if (!res) break;
+					/* reset domain uids and switch it back to learning mode */
+					domain_learn_more(res);
+					/* count it */
+					count2++;
+					free2(res);
+				}
+
+				/* reload and save new policy */
+				reload();
+				save();
+
+				/* print info */
+				if (count2 == 1) color("1 domain set to relearn\n\n", red);
+				else{
+					char *s = string_itos(count2);
+					color(s, red);
+					color(" domains set to relearn\n\n", red);
+					free2(s);
+				}
+				free2(list);
+			}
+			else color("no domain changed\n\n", green);
+		}
+		else color("error: no domains found\n", clr);
+	}
 }
 
 
@@ -5783,10 +6062,7 @@ void domain_get_log()
 					if (!res) break;
 
 					/* switch domain to learning mode */
-					domain_set_profile_for_prog(res, 1);
-					/* reset cpu time counter for prog because of switching it to learning mode,
-					 * or else it would switch back to enforcing mode immediately */
-					process_get_cpu_time_all(res, 1);
+					domain_learn_more(res);
 
 					free2(res);
 				}
@@ -6011,9 +6287,7 @@ void domain_print_mode()
 					color("switch to learning mode", green);
 				}
 				/* switch the domain and all its subdomains to learning mode */
-				domain_set_profile_for_prog(prog, 1);
-				/* reset cpu time counter for prog because of switching it to learning mode */
-				process_get_cpu_time_all(prog, 1);
+				domain_learn_more(prog);
 			}
 
 			/* learning mode */
@@ -8880,7 +9154,7 @@ void print_info_config()
 	/* check if mta binary exists */
 	if (opt_mail){
 		if (file_exist(mail_mta)){
-			if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn_all){
+			if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn_more){
 				color("* mail requested to following recipients: ", yellow);
 				color(mail_users, yellow);
 				newl();
@@ -9493,7 +9767,7 @@ int main(int argc, char **argv)
 	if (opt_log) file_std_redir(opt_log2);
 
 	/* print start time */
-	if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn_all){
+	if (!opt_info && !opt_remove && !opt_help && !opt_version && !opt_learn_more){
 		color("started ", clr); mytime_print_date(); newl();
 	}
 
@@ -9530,18 +9804,9 @@ int main(int argc, char **argv)
 		file_write(tlearn, 0);
 	}
 
-	/* on --learn-all, switch all domains to learning mode */
-	if (opt_learn_all){
-		color("* switching all domains to learning mode on demand\n", red);
-		if (!choice("are you sure?")){
-			color("no change\n", green);
-			myexit(0);
-		}
-		/* create backup */
-		backup();
-		color("policy file backups created\n", green);
-		domain_set_learn_all();
-		color("all domains switched back to learning mode\n", red);
+	/* on --learn-more, switch all domains to learning mode */
+	if (opt_learn_more){
+		domain_set_learn_more(opt_learn_more2);
 		myexit(0);
 	}
 
