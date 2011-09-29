@@ -1,8 +1,8 @@
-tomld (tomoyo learning daemon) 0.69
+tomld (tomoyo learning daemon) 0.70
 Copyright (C) 2011 Andras Horvath
 E-mail: mail@log69.com - suggestions & feedback are welcome
 URL: http://log69.com - the official site
-(last update Sat Sep 17 15:00:16 CEST 2011)
+(last update Thu Sep 29 14:48:28 CEST 2011)
 
 LICENSE:
 This program is free software; you can redistribute it and/or modify it under 
@@ -64,6 +64,8 @@ The following options are supported:
     -l   --learn  [patterns] **request temporary learning mode for all domains,
                              or for those domains that match the patterns
                              (this is the recommended way if still necessary)
+      --learn-more [pattern] switch domain back to learning mode and
+                             give it another whole amount of learning time
     -i   --info    [pattern] **print domains' rules by pattern
                              (without pattern, print a list of main domains)
     -r   --remove  [pattern] remove domains by pattern
@@ -72,8 +74,6 @@ The following options are supported:
                              all old learning mode domains to enforcing mode
     -k   --keep              don't change domain's mode for this session
                              (learning mode domains will stay so on exit)
-         --learn-all         switch all domains back to learning mode
-                             (this is not advised, only for correction purposes)
          --mail      [users] send mail to users with recent deny logs
     -1   --once              quit after first cycle
          --yes               auto confirm everything with yes
