@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+30/09/2011 - tomld v0.71 - bugfix: sort percentage of top most directories in --info output properly
 29/09/2011 - tomld v0.70 - change --learn-all option name to --learn-more and make it use a pattern of domain name
                          - consider patterns in domain names only after the <kernel> tags in --remove and --learn-more
                          - change the way --remove works: remove only main domains instead of single subdomains
@@ -421,7 +422,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.69";
+char *ver = "0.71";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -735,7 +736,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sat Sep 17 15:00:16 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Thu Sep 29 14:48:28 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -1786,7 +1787,7 @@ int path_recursive_dir_add(char *dir)
 /* returned value must be freed by caller */
 void stat_print_top_dirs_with_most_entries()
 {
-	char *res, *res2, *temp, *temp2;
+	char *res, *res2, *res3, *temp, *temp2;
 	char *type, *param1, *param2;
 	char *list = 0, *top = 0, *new = 0;
 	int count, count2;
@@ -1831,7 +1832,7 @@ void stat_print_top_dirs_with_most_entries()
 	}
 
 	/* sort list */
-	res = string_sort_lines(list);
+	res = string_sort_lines(list, 0);
 	free2(list); list = res;
 
 	/* are there any dirs? */
@@ -1841,7 +1842,6 @@ void stat_print_top_dirs_with_most_entries()
 		/* run a check at different levels of dir depths */
 		depth = min_depth - 1;
 		while(depth++ < max_depth){
-			int i, l;
 			char *d;
 
 			/* cycle through the list */
@@ -1894,35 +1894,63 @@ void stat_print_top_dirs_with_most_entries()
 			if (count2){
 				/* count percentage */
 				d = string_itos_zeros(count2 * 100 / num_of_rules, 4);
-				strcpy2(&new, d);
+
+				/* store dirs in new list */
+				strcat2(&new, d);
 				strcat2(&new, " %) ");
-				free2(d);
-
-				/* remove leading zeros from percentage */
-				i = 0;
-				l = strlen2(&new);
-				while(1){
-					char cc;
-					if (i > l - 1) break;
-					if (new[i] != '0') break;
-					cc = new[i + 1];
-					if (cc != '0'){
-						if (cc < '0' || cc > '9'){ if (i > 0) new[i - 1] = '('; }
-						else                  new[i] = '(';
-					}
-					else                  new[i] = ' ';
-					i++;
-				}
-
-				/* print percentage */
-				color(new, blue);
-
-				/* print path */
-				strcpy2(&new, top);
+				strcat2(&new, top);
 				strcat2(&new, "\n");
-				color(new, red);
+				free2(d);
 			}
 		}
+
+		/* sort new result list */
+		res = string_sort_lines(new, 1);
+		free2(new); new = res;
+
+		/* remove leading zeros from percentage and print them */
+		temp = new;
+		while(1){
+			int i, l;
+			/* get next line of top most dir */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+
+			/* cut the percentage part (7 chars) */
+			res2 = 0;
+			strcpy2(&res2, res);
+			res2[8] = 0;
+			strlenset3(&res2, 8);
+
+			/* cut the path part (the rest from 8. char) */
+			res3 = 0;
+			strcpy2(&res3, res + 8);
+
+			i = 0;
+			l = strlen2(&res2);
+			while(1){
+				char cc;
+				if (i > l - 1) break;
+				if (res2[i] != '0') break;
+				cc = res2[i + 1];
+				if (cc != '0'){
+					if (cc < '0' || cc > '9'){ if (i > 0) res2[i - 1] = '('; }
+					else                  res2[i] = '(';
+				}
+				else                  res2[i] = ' ';
+				i++;
+			}
+
+			/* print info */
+			color(res2, blue);
+			color(res3, red);
+			newl();
+
+			free2(res);
+			free2(res2);
+			free2(res3);
+		}
+
 		free2(top);
 		free2(new);
 	}
@@ -2184,7 +2212,7 @@ char *domain_get_list()
 
 	/* sort and unique list because there many same entries because of subdomains */
 	if (strlen2(&list)){
-		list2 = string_sort_uniq_lines(list);
+		list2 = string_sort_uniq_lines(list, 0);
 		free2(list);
 		list = list2;
 	}
@@ -2221,7 +2249,7 @@ char *domain_get_list_full()
 
 	/* sort and unique list because there many same entries because of subdomains */
 	if (strlen2(&list)){
-		list2 = string_sort_uniq_lines(list);
+		list2 = string_sort_uniq_lines(list, 0);
 		free2(list);
 		list = list2;
 	}
@@ -3790,9 +3818,9 @@ void create_prof()
 	strcat2(&tmanf2, "\n");
 
 	/* sort lines before compare */
-	res = string_sort_uniq_lines(tmanf_old);
+	res = string_sort_uniq_lines(tmanf_old, 0);
 	free2(tmanf_old); tmanf_old = res;
-	res = string_sort_uniq_lines(tmanf2);
+	res = string_sort_uniq_lines(tmanf2, 0);
 	free2(tmanf2); tmanf2 = res;
 
 	/* compare kernel manager config and mine */
@@ -3821,9 +3849,9 @@ void create_prof()
 	tprof_old = file_read(tprok, -1);
 
 	/* sort lines before compare */
-	res = string_sort_uniq_lines(tprof_old);
+	res = string_sort_uniq_lines(tprof_old, 0);
 	free2(tprof_old); tprof_old = res;
-	tprof2 = string_sort_uniq_lines(tprof);
+	tprof2 = string_sort_uniq_lines(tprof, 0);
 
 	/* compare kernel profile config and mine */
 	/* reload it to kernel if they are not identical */
@@ -4724,7 +4752,7 @@ void domain_info(const char *pattern)
 				free2(res2);
 
 				/* sort the rest of the policy text */
-				text_new = string_sort_uniq_lines(temp);
+				text_new = string_sort_uniq_lines(temp, 0);
 				text_temp = text_new;
 
 				/* print the rest of the domain part */
@@ -4875,7 +4903,7 @@ void domain_info(const char *pattern)
 			}
 
 			/* sort list */
-			res = string_sort_lines(texcf_new);
+			res = string_sort_lines(texcf_new, 0);
 			free2(texcf_new); texcf_new = res;
 
 
@@ -5009,7 +5037,7 @@ void domain_remove(const char *pattern)
 			}
 			free2(res);
 		}
-		
+
 		if (count){
 			/* print summary */
 			char *res = string_itos(count);
@@ -5025,7 +5053,7 @@ void domain_remove(const char *pattern)
 				/* get next main domain name */
 				res = string_get_next_line(&temp);
 				if (!res) break;
-				
+
 				/* print info */
 				color(res, blue);
 				color("  ", clr);
@@ -5080,7 +5108,7 @@ void domain_remove(const char *pattern)
 				/* replace old policy with new one */
 				free2(tdomf);
 				tdomf = tdomf_new;
-						
+
 				/* remove domains from exception policy */
 				temp = list;
 				while(1){
@@ -5124,7 +5152,7 @@ void domain_remove(const char *pattern)
 
 
 /* reset create time and change time of domain of prog or add them if missing */
-void domain_reset_create_change_time(char *prog)
+void domain_reset_myuids(char *prog)
 {
 	char *res, *res2, *res3, *temp, *temp2;
 	char *tdomf_new;
@@ -5140,7 +5168,7 @@ void domain_reset_create_change_time(char *prog)
 		/* get next domain */
 		res = domain_get_next(&temp);
 		if (!res) break;
-		
+
 		/* get main domain name */
 		res2 = domain_get_name(res);
 		if (res2){
@@ -5197,7 +5225,7 @@ void domain_reset_create_change_time(char *prog)
 					}
 					free2(res3);
 				}
-				
+
 				/* add uids if missing */
 				t = string_ltos(time(0));
 				if (!flag_myuid_create){
@@ -5215,7 +5243,7 @@ void domain_reset_create_change_time(char *prog)
 					strcat2(&domain_new, "0\n");
 				}
 				free2(t);
-				
+
 				/* add domain to new policy */
 				strcat2(&tdomf_new, domain_new);
 				strcat2(&tdomf_new, "\n");
@@ -5247,9 +5275,9 @@ void domain_learn_more(char *prog)
 
 		/* reset cpu counter */
 		domain_reset_cpu_time(prog);
-		
+
 		/* reset create time and change time or add them if missing */
-		domain_reset_create_change_time(prog);
+		domain_reset_myuids(prog);
 	}
 }
 
@@ -5320,7 +5348,7 @@ void domain_set_learn_more(const char *pattern)
 				/* get next main domain name */
 				res = string_get_next_line(&temp);
 				if (!res) break;
-				
+
 				/* print info */
 				color(res, blue);
 				color("  ", clr);
@@ -5821,9 +5849,9 @@ void domain_get_log()
 		if (flag_learn && prog_rules2) flag_learn4 = 1;
 
 		/* sort and unique rules */
-		res = string_sort_uniq_lines(prog_rules);
+		res = string_sort_uniq_lines(prog_rules, 0);
 		free2(prog_rules); prog_rules = res;
-		res = string_sort_uniq_lines(prog_rules2);
+		res = string_sort_uniq_lines(prog_rules2, 0);
 		free2(prog_rules2); prog_rules2 = res;
 
 		if (strlen2(&prog_rules)){
@@ -6124,7 +6152,7 @@ void domain_print_list_not_progs()
 		free2(res);
 	}
 	/* sort list */
-	res = string_sort_uniq_lines(tprogs);
+	res = string_sort_uniq_lines(tprogs, 0);
 	free2(tprogs); tprogs = res;
 
 
@@ -6135,7 +6163,7 @@ void domain_print_list_not_progs()
 	if (flag_firstrun && strlen2(&list)){
 
 		/* sort list */
-		list2 = string_sort_uniq_lines(list);
+		list2 = string_sort_uniq_lines(list, 0);
 		free2(list); list = list2;
 
 		color("* already existing main domains\n", green);
@@ -6156,7 +6184,7 @@ void domain_print_list_not_progs()
 		}
 
 		/* sort filename list */
-		list3 = string_sort_uniq_lines(list2);
+		list3 = string_sort_uniq_lines(list2, 0);
 		free2(list2);
 		list2 = list3;
 
@@ -7402,7 +7430,7 @@ char *domain_sort_uniq_rules(char *rules)
 	}
 
 	/* sort new rule list */
-	rules2 = string_sort_uniq_lines(rules_new);
+	rules2 = string_sort_uniq_lines(rules_new, 0);
 	free2(rules_new);
 	rules_new = rules2;
 
@@ -7460,7 +7488,7 @@ void domain_cleanup()
 					free2(res2);
 				}
 				/* sort rules */
-				res2 = string_sort_uniq_lines(rules);
+				res2 = string_sort_uniq_lines(rules, 0);
 				/* add sorted rules to new policy */
 				strcat2(&tdomf_new, res2);
 				strcat2(&tdomf_new, "\n");
@@ -7582,7 +7610,7 @@ void domain_cleanup()
 					free2(res2);
 				}
 				/* sort temp rules */
-				rules2 = string_sort_uniq_lines(rules_temp);
+				rules2 = string_sort_uniq_lines(rules_temp, 0);
 				/* add sorted rules to new policy */
 				strcat2(&tdomf_new, rules2);
 				strcat2(&tdomf_new, "\n");
@@ -9132,14 +9160,14 @@ void check_exceptions()
 
 	/* sort exception list */
 	if (tprogs_exc){
-		res = string_sort_uniq_lines(tprogs_exc);
+		res = string_sort_uniq_lines(tprogs_exc, 0);
 		free2(tprogs_exc);
 		tprogs_exc = res;
 	}
 
 	/* sort program list */
 	if (strlen2(&tprogs)){
-		res = string_sort_uniq_lines(tprogs);
+		res = string_sort_uniq_lines(tprogs, 0);
 		free2(tprogs);
 		tprogs = res;
 	}
@@ -9416,7 +9444,7 @@ void check_processes()
 		}
 
 		/* sort pid list */
-		netf3 = string_sort_uniq_lines(netf2);
+		netf3 = string_sort_uniq_lines(netf2, 0);
 		free2(netf2);
 
 
