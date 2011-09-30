@@ -1043,9 +1043,18 @@ int string_cmp(const void *a, const void *b)
 }
 
 
+/* compare strings for qsort */
+int string_cmp_reverse(const void *a, const void *b)
+{
+	const char **ia = (const char **)a;
+	const char **ib = (const char **)b;
+	return strcmp(*ib, *ia);
+}
+
+
 /* sort lines of a string */
 /* returned value must be freed by caller */
-char *string_sort_lines(const char *text)
+char *string_sort_lines(const char *text, int order)
 {
 	char c, **ptr;
 	char *text_new, *text_sort;
@@ -1098,7 +1107,8 @@ char *string_sort_lines(const char *text)
 	}
 
 	/* sort it */
-	qsort(ptr, count, sizeof(char *), string_cmp);
+	if (!order) qsort(ptr, count, sizeof(char *), string_cmp);
+	else        qsort(ptr, count, sizeof(char *), string_cmp_reverse);
 
 	/* create another string holder */
 	text_new = memget2(maxl);
@@ -1120,7 +1130,7 @@ char *string_sort_lines(const char *text)
 
 /* sort lines of a string and make it uniq */
 /* returned value must be freed by caller */
-char *string_sort_uniq_lines(const char *text)
+char *string_sort_uniq_lines(const char *text, int order)
 {
 	char c, *res, *text_temp, **ptr;
 	char *text_new, *text_final, *text_sort;
@@ -1176,7 +1186,8 @@ char *string_sort_uniq_lines(const char *text)
 	}
 
 	/* sort it */
-	qsort(ptr, count, sizeof(char *), string_cmp);
+	if (!order) qsort(ptr, count, sizeof(char *), string_cmp);
+	else        qsort(ptr, count, sizeof(char *), string_cmp_reverse);
 
 	/* create another string holder */
 	text_new = memget2(maxl);
