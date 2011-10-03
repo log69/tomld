@@ -22,6 +22,11 @@
 
 changelog:
 -----------
+03/10/2011 - tomld v0.72 - bugfix: convert domain deny messages to access deny messages with an allow_execute type
+                           and add subdomain if missing
+                         - bugfix: add missing uid entries to main domains only instead of subdomains
+                         - bugfix: don't print "restart needed" message for enforcing mode domains on startup
+                         - bugfix: remove deleted domain from kernel memory too on --restore
 30/09/2011 - tomld v0.71 - bugfix: sort percentage of top most directories in --info output properly
 29/09/2011 - tomld v0.70 - change --learn-all option name to --learn-more and make it use a pattern of domain name
                          - consider patterns in domain names only after the <kernel> tags in --remove and --learn-more
@@ -422,7 +427,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.71";
+char *ver = "0.72";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -722,12 +727,10 @@ char *spec_replace3 = 0;
 
 
 void clear();
-
 void domain_cleanup();
-
 void domain_update_cpu_time_all();
-
 int compare_paths(char *path1, char *path2);
+void domain_delete_all();
 
 
 /* print version info */
@@ -736,7 +739,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Thu Sep 29 14:48:28 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Fri Sep 30 22:00:28 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -2288,9 +2291,27 @@ char *domain_get_subdomain_belong(const char *name)
 }
 
 
+/* return true if domain exists */
+int domain_exist(const char *text)
+{
+	int i;
+	char *temp;
+
+	temp = memget2(MAX_CHAR);
+	strcpy2(&temp, "<kernel> ");
+	strcat2(&temp, text);
+	i = string_search_line(tdomf, temp);
+	free2(temp);
+	
+	if (i == -1) return 0;
+
+	return 1;
+}
+
+
 /* return the index position in domain policy where domain starts */
 /* return -1 if domain does not exist */
-int domain_exist(const char *text)
+int domain_exist_where(const char *text)
 {
 	int i;
 	char *temp;
@@ -3554,6 +3575,9 @@ void restore()
 		/* load configs from backup files from disk */
 		tdomf = file_read(tdom3, 0);
 		texcf = file_read(texc3, 0);
+
+		/* delete all other domains from memory too */
+		domain_delete_all();
 
 		/* reload configs to kernel and save them to disk */
 		reload();
@@ -5151,7 +5175,7 @@ void domain_remove(const char *pattern)
 }
 
 
-/* reset create time and change time of domain of prog or add them if missing */
+/* reset create time and change time of main domain of prog or add them if missing */
 void domain_reset_myuids(char *prog)
 {
 	char *res, *res2, *res3, *temp, *temp2;
@@ -5172,8 +5196,8 @@ void domain_reset_myuids(char *prog)
 		/* get main domain name */
 		res2 = domain_get_name(res);
 		if (res2){
-			/* domain name macthes to prog? */
-			if (!strcmp(res2, prog)){
+			/* it's a main domain and domain name matches to prog? */
+			if (domain_is_main(res) && !strcmp(res2, prog)){
 				int flag_myuid_create  = 0;
 				int flag_myuid_change  = 0;
 				int flag_myuid_cputime = 0;
@@ -5200,21 +5224,27 @@ void domain_reset_myuids(char *prog)
 						t = string_ltos(time(0));
 
 						if (string_search_keyword_first(res3, myuid_create)){
-							strcat2(&domain_new, myuid_create);
-							strcat2(&domain_new, t);
-							strcat2(&domain_new, "\n");
-							flag_myuid_create = 1;
+							if (!flag_myuid_create){
+								strcat2(&domain_new, myuid_create);
+								strcat2(&domain_new, t);
+								strcat2(&domain_new, "\n");
+								flag_myuid_create = 1;
+							}
 						}
 						else if (string_search_keyword_first(res3, myuid_change)){
-							strcat2(&domain_new, myuid_change);
-							strcat2(&domain_new, t);
-							strcat2(&domain_new, "\n");
-							flag_myuid_change = 1;
+							if (!flag_myuid_change){
+								strcat2(&domain_new, myuid_change);
+								strcat2(&domain_new, t);
+								strcat2(&domain_new, "\n");
+								flag_myuid_change = 1;
+							}
 						}
 						else if (string_search_keyword_first(res3, myuid_cputime)){
-							strcat2(&domain_new, myuid_cputime);
-							strcat2(&domain_new, "0\n");
-							flag_myuid_cputime = 1;
+							if (!flag_myuid_cputime){
+								strcat2(&domain_new, myuid_cputime);
+								strcat2(&domain_new, "0\n");
+								flag_myuid_cputime = 1;
+							}
 						}
 						else{
 							strcat2(&domain_new, res3);
@@ -5548,12 +5578,13 @@ void domain_set_enforce_old()
 char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_timex)
 {
 	/* vars */
-	char *res, *res2, *res3, *temp, *temp2, *temp3, *orig, *dlist = 0;
+	char *res, *res2, *res3, *res4, *temp, *temp2, *temp3, *orig, *dlist = 0;
 	char *start, *tlogf2 = 0, *tlogf3 = 0;
 	char *rules = 0, *prog_rules = 0;
 	char *key = 0;
 	char key2[] = "denied for ";
-	int i, i2, l;
+	char key3[] = "\' not defined.";
+	int i, i2, l, l2;
 	int key2_len = 11;
 	int tlogf_mod_time3;
 
@@ -5635,13 +5666,8 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 				free2(res);
 			}
 		}
-
 		free2(key);
 
-		/* debug part to print domain deny messages if any */
-		if (strlen2(&tlogf3)){
-			debug(tlogf3);
-		}
 
 		/* set mark to the last log line */
 		temp = tlogf;
@@ -5687,9 +5713,78 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 		/* ----- convert logs to rules ----- */
 		/* --------------------------------- */
 
-		if (tomoyo_version() <= 2299) l = 23;
-		else l = 15;
+		if (tomoyo_version() <= 2299){ l = 23; l2 = 32; }
+		else{ l = 15; l2 = 24; }
 
+		/* convert domain deny messages to access deny types
+		 * by creating a rule from it with an allow_execute type,
+		 * so when i later check the deny rules, i will create
+		 * a domain for the allow_execute type if missing */
+		temp = tlogf3;
+		while(1){
+			/* next rule */
+			temp2 = temp;
+			res = string_get_next_line(&temp);
+			if (!res) break;
+			/* get full domain name */
+			temp2 += l2;
+			res2 = string_get_next_line(&temp2);
+			if (!res2){
+				error("error: unexpected error, log message format is not correct\n");
+				free2(res);
+				free2(tlogf2);
+				free2(tlogf3);
+				free2(prog_rules);
+				free2(rules);
+				myexit(1);
+			}
+			/* cut off the end that's not needed */
+			i = string_search_keyword(res2, key3);
+			if (i < 1){
+				error("error: unexpected error, log message format is not correct\n");
+				free2(res);
+				free2(tlogf2);
+				free2(tlogf3);
+				free2(prog_rules);
+				free2(rules);
+				myexit(1);
+			}
+			res2[i] = 0;
+			strlenset3(&res2, i);
+			/* put together the rule with an allow_execute type */
+			/* i take all domain names with the subdomains except the last one,
+			 * this one will be the calling domain while that one will be the
+			 * parameter after the allow_execute command */
+			temp3 = res2;
+			res4 = 0;
+			while(1){
+				/* get next word meaning the parent domain name of the next domain */
+				res3 = string_get_next_word(&temp3);
+				if (!res3){
+					/* add the rule type and the parameter finally */
+					strcat2(&prog_rules, "allow_execute ");
+					strcat2(&prog_rules, res4);
+					strcat2(&prog_rules, "\n");
+					free2(res4);
+					break;
+				}
+				
+				/* add parent domain name to converted rule */
+				if (res4){
+					strcat2(&prog_rules, res4);
+					strcat2(&prog_rules, " ");
+				}
+				/* store name for next cycle */
+				strcpy2(&res4, res3);
+				free2(res3);
+			}
+
+			free2(res);
+			free2(res2);
+		}
+
+
+		/* convert access deny messages */
 		temp = tlogf2;
 		while(1){
 			/* next rule */
@@ -5813,6 +5908,10 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 	free2(tlogf2);
 	free2(tlogf3);
 
+	/* sort and unique rules */
+	res = string_sort_uniq_lines(prog_rules, 0);
+	free2(prog_rules); prog_rules = res;
+
 	return prog_rules;
 }
 
@@ -5842,17 +5941,12 @@ void domain_get_log()
 	/* ------------------------------- */
 
 	if ((prog_rules) || (flag_learn && prog_rules2)){
-		char *tdomf_new, *prog, *prog_main, *rule, *rules_new = 0, *prog_rules_new = 0;
+		char *tdomf_new, *prog, *prog_main, *rule, *type, *param;
+		char *rules_new = 0, *prog_rules_new = 0;
 		char *log_recent = 0;
 
 		/* signal that there was a request for temporary learning mode with deny logs too */
 		if (flag_learn && prog_rules2) flag_learn4 = 1;
-
-		/* sort and unique rules */
-		res = string_sort_uniq_lines(prog_rules, 0);
-		free2(prog_rules); prog_rules = res;
-		res = string_sort_uniq_lines(prog_rules2, 0);
-		free2(prog_rules2); prog_rules2 = res;
 
 		if (strlen2(&prog_rules)){
 			color("* access deny log messages ", yellow);
@@ -6057,7 +6151,7 @@ void domain_get_log()
 									flag_once = 1;
 								}
 							}
-
+							
 							free2(prog_main);
 							free2(prog);
 							free2(rule);
@@ -6073,13 +6167,60 @@ void domain_get_log()
 				free2(res);
 			}
 			free2(rules_new);
+			
+			/* add missing subdomains for allow_execute types of rules */
+			temp = prog_rules;
+			while(1){
+				int i3;
+				/* get next rule */
+				res = string_get_next_line(&temp);
+				if (!res) break;
 
-			color("* switch domains with new rules to learning mode\n", red);
+				/* get prog name and its rules */
+				i3 = string_search_keyword(res, "allow_");
+				if (i3 >= 1){
+					prog = 0;
+					strcpy2(&prog, res);
+					prog[i3 - 1] = 0;
+					strlenset3(&prog, i3 - 1);
+					temp3 = prog;
+					prog_main = string_get_next_word(&temp3);
+					temp3 = res + i3;
+					rule = string_get_next_line(&temp3);
+					temp3 = rule;
+					type = string_get_next_word(&temp3);
+					param = string_get_next_line(&temp3);
+
+					if (!strcmp(type, "allow_execute")){
+						/* put subdomain name together from rule */
+						char *dom = 0;
+						strcpy2(&dom, prog);
+						strcat2(&dom, " ");
+						strcat2(&dom, param);
+						/* does domain not exist? */
+						if (!domain_exist(dom)){
+							/* create subdomain in learning mode */
+							strcat2(&tdomf_new, "\n<kernel> ");
+							strcat2(&tdomf_new, dom);
+							strcat2(&tdomf_new, "\nuse_profile 1\n\n");
+						}
+						free2(dom);
+					}
+					free2(prog_main);
+					free2(prog);
+					free2(rule);
+					free2(type);
+					free2(param);
+				}
+				free2(res);
+			}
 
 			/* replace old policy with new one */
 			free2(tdomf);
 			tdomf = tdomf_new;
 
+
+			color("* switch domains with new rules to learning mode\n", red);
 
 			/* ****************************************************************************** */
 			/* switch all previous domains to learning mode and reset their cpu time counters */
@@ -6236,7 +6377,7 @@ void domain_print_mode()
 
 
 		/* does the domain exist for the program? */
-		pos = domain_exist(prog);
+		pos = domain_exist_where(prog);
 		if (pos == -1){
 			char *t;
 
@@ -6278,7 +6419,9 @@ void domain_print_mode()
 			}
 		}
 		else{
-			int profile;
+			/* get profile mode for domain */
+			int profile = domain_get_profile(tdomf + pos);
+
 			if (flag_firstrun){
 				int p_uptime, d_create;
 
@@ -6297,13 +6440,12 @@ void domain_print_mode()
 				/* are all processes' uptime greater than the time passed since domain creation time?
 				 * if so, then this means that none of the domain's processes has been restarted since then
 				 * so this one blocks switching it to enforcing mode */
-				if (p_uptime && (d_create == -1 || d_create < p_uptime + 1)) color(" (restart needed)", red);
+				if (profile < 3){
+					if (p_uptime && (d_create == -1 || d_create < p_uptime + 1)) color(" (restart needed)", red); }
 				/* *************************************** */
 
 			}
 
-			/* get profile mode for domain */
-			profile = domain_get_profile(tdomf + pos);
 			if (profile == -1){ error("error: domain policy is corrupt\n"); free2(prog); myexit(1); }
 			/* check which mode is on */
 
