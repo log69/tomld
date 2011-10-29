@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+15/10/2011 - tomld v0.73 - bugfix: sort dir names in --info output in ascending order beside percentage
 03/10/2011 - tomld v0.72 - bugfix: convert domain deny messages to access deny messages with an allow_execute type
                            and add subdomain if missing
                          - bugfix: add missing uid entries to main domains only instead of subdomains
@@ -427,7 +428,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.72";
+char *ver = "0.73";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -739,7 +740,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Fri Sep 30 22:00:28 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Sat Oct 15 12:22:51 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -1792,7 +1793,7 @@ void stat_print_top_dirs_with_most_entries()
 {
 	char *res, *res2, *res3, *temp, *temp2;
 	char *type, *param1, *param2;
-	char *list = 0, *top = 0, *new = 0;
+	char *list = 0, *top = 0, *new = 0, *new2 = 0;
 	int count, count2;
 	int depth;
 	const int min_depth = 1;
@@ -1907,9 +1908,64 @@ void stat_print_top_dirs_with_most_entries()
 			}
 		}
 
-		/* sort new result list */
-		res = string_sort_lines(new, 1);
+
+		/* negate percentage numbers, so the sorting order will be good,
+		 * sorted by first column, then by second */
+		temp = new; new2 = 0;
+		while(1){
+			int i;
+			
+			/* get next line */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+
+			/* negate percentage numbers by substracting every char number from 9 */
+			i = 3;
+			while (i >= 0){
+				char c = res[i];
+				c = c - 48;
+				c = 9 - c;
+				c = c + 48;
+				res[i] = c;
+				i--;
+			}
+			strcat2(&new2, res);
+			strcat2(&new2, "\n");
+
+			free2(res);
+		}
+		free2(new); new = new2;
+		
+		/* sort new result list in ascending order because of negation */
+		res = string_sort_lines(new, 0);
 		free2(new); new = res;
+
+		/* negate percentage numbers back to original */
+		temp = new; new2 = 0;
+		while(1){
+			int i;
+			
+			/* get next line */
+			res = string_get_next_line(&temp);
+			if (!res) break;
+
+			/* negate percentage numbers by substracting every char number from 9 */
+			i = 3;
+			while (i >= 0){
+				char c = res[i];
+				c = c - 48;
+				c = 9 - c;
+				c = c + 48;
+				res[i] = c;
+				i--;
+			}
+			strcat2(&new2, res);
+			strcat2(&new2, "\n");
+
+			free2(res);
+		}
+		free2(new); new = new2;
+		
 
 		/* remove leading zeros from percentage and print them */
 		temp = new;
@@ -2302,7 +2358,7 @@ int domain_exist(const char *text)
 	strcat2(&temp, text);
 	i = string_search_line(tdomf, temp);
 	free2(temp);
-	
+
 	if (i == -1) return 0;
 
 	return 1;
@@ -5768,7 +5824,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 					free2(res4);
 					break;
 				}
-				
+
 				/* add parent domain name to converted rule */
 				if (res4){
 					strcat2(&prog_rules, res4);
@@ -6151,7 +6207,7 @@ void domain_get_log()
 									flag_once = 1;
 								}
 							}
-							
+
 							free2(prog_main);
 							free2(prog);
 							free2(rule);
@@ -6167,7 +6223,7 @@ void domain_get_log()
 				free2(res);
 			}
 			free2(rules_new);
-			
+
 			/* add missing subdomains for allow_execute types of rules */
 			temp = prog_rules;
 			while(1){
