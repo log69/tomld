@@ -52,9 +52,13 @@ grep -E -m 1 -A 1000 "^ *configure\)" postinst.ex | tail -n+2 >> postinst
 rm postinst.ex
 
 # manage postrm
-grep -E -m 1 -B 1000 "^ *purge.remove.*\)" postrm.ex > postrm
+grep -E -m 1 -B 1000 "^ *purge.*remove.*\)" postrm.ex > postrm
+sed -i s/"|upgrade|"/"|"/ postrm
 cat ../dist_ubuntu/postrm.sh | tail -n+4 >> postrm
-grep -E -m 1 -A 1000 "^ *purge.remove.*\)" postrm.ex | tail -n+2 >> postrm
+echo "    ;;" >> postrm
+echo "    upgrade)" >> postrm
+echo "    echo \"* upgrade\"" >> postrm
+grep -E -m 1 -A 1000 "^ *purge.*remove.*\)" postrm.ex | tail -n+2 >> postrm
 rm postrm.ex
 
 # manage .desktop files (in rules file, lines must start with tabulator and not space)
