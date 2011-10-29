@@ -1,6 +1,5 @@
 #!/bin/bash
-
-# CREATE CHROOT FOR PACKAGING
+# create chroot for packaging
 
 if ! whoami | grep -q root; then echo Run it as root.; echo; exit 1; fi
 
@@ -67,8 +66,8 @@ echo
 echo "deleting files..."
 rm -f tomld_*
 echo "copying files back..."
-#cp -f "$CHROOTDIR""$BASE"/dist_debian/tomld_*  ./
-cp -f "$CHROOTDIR""$BASE"/dist_debian/tomld_*.deb  ./
+cp -f "$CHROOTDIR""$BASE"/dist_debian/tomld_*  ./
+#cp -f "$CHROOTDIR""$BASE"/dist_debian/tomld_*.deb  ./
 cp -f "$CHROOTDIR""$BASE"/dist_debian/changelog  ./
 chown andras:andras tomld_* changelog
 
