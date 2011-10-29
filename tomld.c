@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+29/10/2011 - tomld v0.74 - update package scripts
 15/10/2011 - tomld v0.73 - bugfix: sort dir names in --info output in ascending order beside percentage
 03/10/2011 - tomld v0.72 - bugfix: convert domain deny messages to access deny messages with an allow_execute type
                            and add subdomain if missing
@@ -428,7 +429,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.73";
+char *ver = "0.74";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
