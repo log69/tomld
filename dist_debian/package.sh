@@ -52,9 +52,13 @@ grep -E -m 1 -A 1000 "^ *configure\)" postinst.ex | tail -n+2 >> postinst
 rm postinst.ex
 
 # manage postrm
-grep -E -m 1 -B 1000 "^ *purge.remove.*\)" postrm.ex > postrm
+grep -E -m 1 -B 1000 "^ *purge.*remove.*\)" postrm.ex > postrm
+sed -i s/"|upgrade|"/"|"/ postrm
 cat ../dist_debian/postrm.sh | tail -n+4 >> postrm
-grep -E -m 1 -A 1000 "^ *purge.remove.*\)" postrm.ex | tail -n+2 >> postrm
+echo "    ;;" >> postrm
+echo "    upgrade)" >> postrm
+echo "    echo \"* upgrade\"" >> postrm
+grep -E -m 1 -A 1000 "^ *purge.*remove.*\)" postrm.ex | tail -n+2 >> postrm
 rm postrm.ex
 
 # manage .desktop files (in rules file, lines must start with tabulator and not space)
@@ -158,8 +162,8 @@ cd ..
 
 
 # create 64 bit build .deb package
-debuild -k7CA53418 -us -uc
-#debuild -k7CA53418
+#debuild -k7CA53418 -us -uc
+debuild -k7CA53418
 cp -f ../tomld_*  "$DEB"/
 
 
@@ -198,8 +202,9 @@ mkdir build
 dpkg-deb -b extract/ build/
 cp -f build/"$NAME" "$DEB"/
 cd
+rm -rf "$TEMP2"
 
 
-rm -rf "$TEMP" "$TEMP2"
+#rm -rf "$TEMP"
 
 exit 0
