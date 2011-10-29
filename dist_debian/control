@@ -2,13 +2,14 @@ Source: tomld
 Section: admin
 Priority: optional
 Maintainer: Andras Horvath <mail@log69.com>
-Build-Depends: debhelper (>= 8)
+Build-Depends: debhelper (>= 8), libc6-dev
 Standards-Version: 3.9.2
 Homepage: http://log69.com
 
 Package: tomld
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, tomoyo-tools, libnotify-bin, menu
+Depends: ${shlibs:Depends}, ${misc:Depends}, tomoyo-tools
+Suggests: libnotify-bin, menu
 Description: tomoyo learning daemon, fully automatic MAC configuration
  Tomld (tomoyo learning daemon) is a 1-click dynamic Mandatory Access Control
  (MAC) configuration solution. It is an extension to the Tomoyo security
