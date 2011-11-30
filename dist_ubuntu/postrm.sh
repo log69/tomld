@@ -10,7 +10,7 @@ if [ -f "$GRUB_DEFAULT" ]; then
 
 	# add kernel parameter to grub config
 	echo "* checking grub config"
-	if grep -E "^ *GRUB_CMDLINE_LINUX" "$GRUB_DEFAULT" | grep -q "security=tomoyo"
+	if grep -E "^ *GRUB_CMDLINE_LINUX" "$GRUB_DEFAULT" | grep -qs "security=tomoyo"
 	then
 		sed -i s/"security=tomoyo"/""/g "$GRUB_DEFAULT"
 		echo "* kernel parameter removed"
@@ -38,7 +38,7 @@ else
 	echo "* grub settings not found"
 
 	# kernel started with tomoyo enabled?
-	if ! grep -q "security=tomoyo" "$KERNEL_CMDLINE"
+	if ! grep -qs "security=tomoyo" "$KERNEL_CMDLINE"
 	then
 		echo "* kernel parameter not set"
 		echo
