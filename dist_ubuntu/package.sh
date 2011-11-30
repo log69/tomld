@@ -25,25 +25,20 @@ dh_make -f ../tomld_"$VER".orig.tar.gz --single -e mail@log69.com -p tomld -c gp
 cd debian
 
 
-#rm -f compat watch.ex init.d.ex postinst.ex
+#rm -f compat watch.ex init.d.ex postinst.ex menu.ex
 rm -f preinst.ex prerm.ex
 rm -f tomld.default.ex tomld.doc-base.EX cron.d.ex
 rm -f emacsen-install.ex emacsen-remove.ex emacsen-startup.ex
 rm -f init.d.ex init.d.lsb.ex manpage.1.ex manpage.sgml.ex manpage.xml.ex
-rm -f README.Debian README.source tomld.cron.d.ex menu.ex
+rm -f README.Debian README.source tomld.cron.d.ex
 
-
-# create application menu with .desktop file
-#cp ../tomld.desktop .
-#echo "" >> rules
-#echo "tomld.desktop:" >> rules
-#echo "dh_install tomld.desktop usr/share/applications" >> rules
-#echo "dh_installmenu" >> rules
 
 # create debian menu
+echo -n '?package(tomld):needs="text" section="Applications/System/Administration"' > menu.ex
+echo ' title="Tomld temporary learning mode" command="su-to-root -X -c '/usr/sbin/tomld --learn'"' >> menu.ex
 #echo -n '?package(tomld):needs="text" section="Applications/System/Administration"' > menu.ex
-#echo ' title="Tomld learning mode" command="so-to-root -X -- /usr/sbin/tomld --learn"' >> menu.ex
-#mv menu.ex menu
+#echo ' title="Tomld notification" command="/usr/sbin/tomld --notify"' >> menu.ex
+mv menu.ex menu
 
 # manage postinst
 grep -E -m 1 -B 1000 "^ *configure\)" postinst.ex > postinst
@@ -65,31 +60,34 @@ rm postrm.ex
 cp ../tomld_learn.desktop .
 cp ../tomld_notify.desktop .
 cp ../tomld.svg .
+cp ../tomld.xpm .
 echo "" >> rules
 echo "override_dh_auto_install:" >> rules
 echo "	dh_install ./tomld_learn.desktop usr/share/applications" >> rules
 echo "	dh_install ./tomld_notify.desktop usr/share/applications" >> rules
-echo "	dh_install ./tomld.svg usr/share/pixmaps" >> rules
+echo "	dh_install ./tomld.svg usr/share/icons" >> rules
+echo "	dh_install ./tomld.xpm usr/share/pixmaps" >> rules
 echo "	dh_auto_install" >> rules
 
 # manage logrotate
 cp ../tomld.logrotate logrotate
 
 
-> dirs
-echo "usr/sbin" 			>> dirs
-echo "etc/init.d" 			>> dirs
-echo "etc/tomld" 			>> dirs
-echo "usr/share/man/man1" 	>> dirs
-echo "usr/share/pixmaps" 	>> dirs
-echo "usr/share/applications" 	>> dirs
+#> dirs
+#echo "usr/sbin" 			>> dirs
+#echo "etc/init.d" 			>> dirs
+#echo "etc/tomld" 			>> dirs
+#echo "usr/share/man/man1" 	>> dirs
+#echo "usr/share/pixmaps" 	>> dirs
+#echo "usr/share/applications" 	>> dirs
 
 
 # AUTHORS and COPYRIGHT not needed because of copyright file
 # COPYING and LICENSE not needed either
 > docs
-echo "README"		>> docs
 echo "FAQ"			>> docs
+echo "README"		>> docs
+echo "TODO"			>> docs
 
 cp ../dist_ubuntu/control .
 #cp ../tomld.manual ./tomld.1
@@ -115,8 +113,8 @@ echo "License:" 		>> copyright.new
 echo 				>> copyright.new
 cat ../LICENSE | sed -r s/"^"/"    "/	>> copyright.new
 echo 				>> copyright.new
-echo "On Ubuntu systems, the complete text of the GNU General" >> copyright.new
-echo "Public License can be found in \`/usr/share/common-licenses/GPL'." >> copyright.new
+echo "The complete text of the GNU General Public License can be found in" >> copyright.new
+echo "\`/usr/share/common-licenses/GPL'." >> copyright.new
 echo 				>> copyright.new
 echo "The Ubuntu packaging is Copyright 2011, Andras Horvath <mail@log69.com>" >> copyright.new
 echo "and is licensed under the GPL, see above." >> copyright.new
@@ -161,6 +159,10 @@ grep -i "^version=" watch.ex > watch
 echo "http://log69.com/tomld.html downloads/tomld_(.*)\.tar\.gz" >> watch
 rm -f watch.ex
 
+# remove comments from rules file
+grep -vE "^#[^\!]|^$" rules > rules.new
+mv rules.new rules
+chmod +x rules
 
 cd ..
 
