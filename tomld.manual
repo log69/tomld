@@ -150,7 +150,7 @@ auto confirm everything with yes
 /etc/tomld/tomld.conf (settings file)
 .br
 
-.SH AUTHORS
+.SH AUTHOR
 .br
 Copyright (C) 2011 Andras Horvath
 .br
@@ -167,7 +167,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 .SH REQUIREMENTS
-Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)
+Tomoyo enabled kernel (v2.6.30 and above), tomoyo-tools (v2.2 and above) and booting the system with "security=tomoyo" kernel parameter.
 
 .SH "SEE ALSO"
 The full documentation for \fBtomld\fR is available on the website: \fBhttp://log69.com\fR
