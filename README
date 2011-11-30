@@ -1,8 +1,8 @@
-tomld (tomoyo learning daemon) 0.74
+tomld (tomoyo learning daemon) 0.75
 Copyright (C) 2011 Andras Horvath
 E-mail: mail@log69.com - suggestions & feedback are welcome
 URL: http://log69.com - the official site
-(last update Sat Oct 29 17:08:56 CEST 2011)
+(last update Wed Nov 30 12:19:55 CET 2011)
 
 LICENSE:
 This program is free software; you can redistribute it and/or modify it under 
@@ -83,7 +83,8 @@ The following options are supported:
 **these options can be used simultaneously with a running tomld daemon
 
 REQUIREMENTS:
-Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)
+Tomoyo enabled kernel (v2.6.30 and above), tomoyo-tools (v2.2 and above)
+and booting the system with "security=tomoyo" kernel parameter
 
 For full documentation and FAQ, see the website: http://log69.com
 
