@@ -1,6 +1,3 @@
 - run security checks on the final code
 - lots of tests
-- no use of regex while manipulating rules
 - make it fast
-- make it a boot service
-- entirely automatize all setup regarding Tomoyo
