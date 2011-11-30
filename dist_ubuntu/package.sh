@@ -25,8 +25,8 @@ dh_make -f ../tomld_"$VER".orig.tar.gz --single -e mail@log69.com -p tomld -c gp
 cd debian
 
 
-#rm -f compat watch.ex init.d.ex postinst.ex menu.ex
-rm -f preinst.ex prerm.ex
+#rm -f compat watch.ex init.d.ex menu.ex
+rm -f preinst.ex prerm.ex postinst.ex postrm.ex
 rm -f tomld.default.ex tomld.doc-base.EX cron.d.ex
 rm -f emacsen-install.ex emacsen-remove.ex emacsen-startup.ex
 rm -f init.d.ex init.d.lsb.ex manpage.1.ex manpage.sgml.ex manpage.xml.ex
@@ -41,36 +41,29 @@ echo ' title="Tomld temporary learning mode" command="su-to-root -X -c '/usr/sbi
 mv menu.ex menu
 
 # manage postinst
-grep -E -m 1 -B 1000 "^ *configure\)" postinst.ex > postinst
-cat ../dist_ubuntu/postinst.sh | tail -n+4 >> postinst
-grep -E -m 1 -A 1000 "^ *configure\)" postinst.ex | tail -n+2 >> postinst
-rm postinst.ex
+#grep -E -m 1 -B 1000 "^ *configure\)" postinst.ex > postinst
+#cat ../dist_ubuntu/postinst.sh | tail -n+4 >> postinst
+#grep -E -m 1 -A 1000 "^ *configure\)" postinst.ex | tail -n+2 >> postinst
+#rm postinst.ex
 
 # manage postrm
-grep -E -m 1 -B 1000 "^ *purge.*remove.*\)" postrm.ex > postrm
-sed -i s/"|upgrade|"/"|"/ postrm
-cat ../dist_ubuntu/postrm.sh | tail -n+4 >> postrm
-echo "    ;;" >> postrm
-echo "    upgrade)" >> postrm
-echo "    echo \"* upgrade\"" >> postrm
-grep -E -m 1 -A 1000 "^ *purge.*remove.*\)" postrm.ex | tail -n+2 >> postrm
-rm postrm.ex
+#grep -E -m 1 -B 1000 "^ *purge.*remove.*\)" postrm.ex > postrm
+#sed -i s/"|upgrade|"/"|"/ postrm
+#cat ../dist_ubuntu/postrm.sh | tail -n+4 >> postrm
+#echo "    ;;" >> postrm
+#echo "    upgrade)" >> postrm
+#echo "    echo \"* upgrade\"" >> postrm
+#grep -E -m 1 -A 1000 "^ *purge.*remove.*\)" postrm.ex | tail -n+2 >> postrm
+#rm postrm.ex
 
-# manage .desktop files (in rules file, lines must start with tabulator and not space)
-cp ../tomld_learn.desktop .
-cp ../tomld_notify.desktop .
-cp ../tomld.svg .
-cp ../tomld.xpm .
-echo "" >> rules
-echo "override_dh_auto_install:" >> rules
-echo "	dh_install ./tomld_learn.desktop usr/share/applications" >> rules
-echo "	dh_install ./tomld_notify.desktop usr/share/applications" >> rules
-echo "	dh_install ./tomld.svg usr/share/icons" >> rules
-echo "	dh_install ./tomld.xpm usr/share/pixmaps" >> rules
-echo "	dh_auto_install" >> rules
+# manage extra files
+echo "tomld_learn.desktop /usr/share/applications" >> tomld.install
+echo "tomld_notify.desktop /usr/share/applications" >> tomld.install
+echo "tomld.svg /usr/share/icons" >> tomld.install
+echo "tomld.xpm /usr/share/pixmaps" >> tomld.install
 
 # manage logrotate
-cp ../tomld.logrotate logrotate
+cp ../tomld.logrotate .
 
 
 #> dirs
@@ -92,7 +85,7 @@ echo "TODO"			>> docs
 cp ../dist_ubuntu/control .
 #cp ../tomld.manual ./tomld.1
 #echo "debian/tomld.1" > ./tomld.manpages
-cp ../tomld.init ./init.d
+cp ../tomld.init .
 
 
 echo "This work was packaged for Ubuntu by:" > copyright.new
@@ -167,6 +160,7 @@ chmod +x rules
 cd ..
 
 
+# ----------------------------------------------------------------
 # create 64 bit build .deb package
 #debuild -k7CA53418 -us -uc
 #debuild -k7CA53418
@@ -177,7 +171,7 @@ cp -f ../tomld_*  "$DEB"/
 # cleanup
 make clean &>/dev/null
 rm -rf debian/tomld/
-rm -f debian/tomld.*
+rm -f debian/tomld*.debhelper* tomld.substvars files
 rm -f ../tomld_*.dsc ../tomld_*.changes
 
 # create another orig with modified Makefile
