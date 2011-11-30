@@ -22,6 +22,7 @@
 
 changelog:
 -----------
+30/11/2011 - tomld v0.75 - update documentation
 29/10/2011 - tomld v0.74 - update package scripts
 15/10/2011 - tomld v0.73 - bugfix: sort dir names in --info output in ascending order beside percentage
 03/10/2011 - tomld v0.72 - bugfix: convert domain deny messages to access deny messages with an allow_execute type
@@ -429,7 +430,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.74";
+char *ver = "0.75";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -741,7 +742,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Sat Oct 15 12:22:51 CEST 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Nov 30 13:21:50 CET 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -826,7 +827,8 @@ void help() {
 	printf ("**these options can be used simultaneously with a running tomld daemon\n");
 	printf ("\n");
 	printf ("REQUIREMENTS:\n");
-	printf ("Tomoyo enabled kernel (v2.6.30 and above) and tomoyo-tools (v2.2 and above)\n");
+	printf ("Tomoyo enabled kernel (v2.6.30 and above), tomoyo-tools (v2.2 and above)\n");
+	printf ("and booting the system with \"security=tomoyo\" kernel parameter\n");
 	printf ("\n");
 	printf ("For full documentation and FAQ, see the website: http://log69.com\n");
 	printf ("\n");
