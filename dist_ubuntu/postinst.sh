@@ -11,9 +11,9 @@ if [ -f "$GRUB_DEFAULT" ]; then
 
 	# add kernel parameter to grub config
 	echo "* checking grub config"
-	if ! grep -E "^ *GRUB_CMDLINE_LINUX" "$GRUB_DEFAULT" | grep -q "security=tomoyo"
+	if ! grep -E "^ *GRUB_CMDLINE_LINUX" "$GRUB_DEFAULT" | grep -qs "security=tomoyo"
 	then
-		if grep -qE "^ *GRUB_CMDLINE_LINUX *=" "$GRUB_DEFAULT"
+		if grep -qsE "^ *GRUB_CMDLINE_LINUX *=" "$GRUB_DEFAULT"
 		then
 			sed -i -r s/"^ *GRUB_CMDLINE_LINUX *= *\""/"GRUB_CMDLINE_LINUX=\"security=tomoyo "/ "$GRUB_DEFAULT"
 		else
@@ -29,7 +29,7 @@ if [ -f "$GRUB_DEFAULT" ]; then
 
 		# prompt for reboot
 		if [ -x "$REBOOT_NOTIFY" ]; then "$REBOOT_NOTIFY"; fi
-		
+
 		echo "* done"
 		echo
 		echo "*****************************************************"
@@ -44,7 +44,7 @@ else
 	echo "* grub settings not found"
 
 	# kernel started with tomoyo enabled?
-	if ! grep -q "security=tomoyo" "$KERNEL_CMDLINE"
+	if ! grep -qs "security=tomoyo" "$KERNEL_CMDLINE"
 	then
 		echo "* kernel parameter 'tomoyo=security' has to be specified on boot manually"
 		echo
