@@ -22,6 +22,9 @@
 
 changelog:
 -----------
+05/12/2011 - tomld v0.76 - bugfix: fix checking for security fs of tomoyo
+                         - print more descriptive error message when tomoyo is not activated
+                         - print "access deny log messages" with timestamp when in learning mode too
 30/11/2011 - tomld v0.75 - update documentation
 29/10/2011 - tomld v0.74 - update package scripts
 15/10/2011 - tomld v0.73 - bugfix: sort dir names in --info output in ascending order beside percentage
@@ -742,7 +745,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Wed Nov 30 18:56:50 CET 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Wed Nov 30 19:09:15 CET 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -4148,14 +4151,14 @@ void check_tomoyo()
 	/* check mount state of securityfs */
 	cmd = file_read("/proc/mounts", -1);
 	if (string_search_keyword_first_all(cmd, "none /sys/kernel/security securityfs") == -1
-	&& !file_exist("/sys/kernel/security/tomoyo/domain_policy")){
+		|| !file_exist(tdomk)){
 		int flag_mount = 0;
 		/* mount tomoyo securityfs if not mounted */
 		/* shell command: mount -t securityfs none /sys/kernel/security */
 		flag_mount = mount("none", "/sys/kernel/security", "securityfs", MS_NOATIME, 0);
-		if (flag_mount == -1){
+		if (flag_mount == -1 || !file_exist(tdomk)){
 			free2(cmd);
-			error("error: tomoyo securityfs cannot be mounted - probable reason: tomoyo is not activated\n");
+			error("error: tomoyo is not activated, please boot the system with \"security=tomoyo\" kernel parameter\n");
 			myexit(1);
 		}
 	}
@@ -6007,7 +6010,7 @@ void domain_get_log()
 		/* signal that there was a request for temporary learning mode with deny logs too */
 		if (flag_learn && prog_rules2) flag_learn4 = 1;
 
-		if (strlen2(&prog_rules)){
+		if (strlen2(&prog_rules) || flag_learn4){
 			color("* access deny log messages ", yellow);
 			mytime_print_date(); newl();
 		}
