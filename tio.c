@@ -245,11 +245,11 @@ char *file_read(const char *name, long length)
 		fseek(f, 0, SEEK_SET);
 	}
 	/* length will be unknown (like with /proc files)
-	 * so check it by buffered reading because i need the exact length.
+	 * so check it by buffered reading because I need the exact length.
 	 * unfortunately at tomoyo proc files,
 	 * neither ftell nor fread can tell me the number of file position
 	 * or the number of read bytes,
-	 * so i have to trick with filling the buffer with zero
+	 * so I have to trick with filling the buffer with zero
 	 * and check the string length at the end */
 	else if (length == -1){
 		unsigned long c = 0;
