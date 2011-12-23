@@ -122,7 +122,7 @@ void error(const char *text)
 /* allocate dynamic string memory for char and return pointer */
 /* my dynamic string looks like this: */
 /* [maxlen] [len] [s t r i n g c h a r s \0 \0 \0] */
-/* i make the pointer point to the data part after maxlen and len data */
+/* I make the pointer point to the data part after maxlen and len data */
 /* returned value must be freed by caller */
 char *memget2(unsigned long num)
 {
@@ -148,7 +148,7 @@ char *memget2(unsigned long num)
 /* reallocate dynamic string memory for char */
 /* my dynamic string looks like this: */
 /* [maxlen] [len] [s t r i n g c h a r s \0 \0 \0] */
-/* i make the pointer point to the data part after maxlen and len data */
+/* I make the pointer point to the data part after maxlen and len data */
 void memget3(char **s1, unsigned long num)
 {
 	/* get long pointer for extra datas */
@@ -533,7 +533,7 @@ char *string_get_last_line(char **text)
 		return res;
 	}
 
-	/* go backwards till i find a new line */
+	/* go backwards till I find a new line */
 	i = l - 1;
 	while(1){
 		/* last char may be new line, that still counts for the last line */
@@ -795,7 +795,7 @@ char *string_get_diff(char *new, char *old)
 		if (strlen2(&res)){
 			/* does the new exist in the old one? */
 			if (string_search_line(old, res) == -1){
-				/* if not, then i add it */
+				/* if not, then I add it */
 				strcat2(&list, res);
 				strcat2(&list, "\n");
 			}
@@ -812,7 +812,7 @@ char *string_get_diff(char *new, char *old)
 		if (strlen2(&res)){
 			/* does the old exist in the new one? */
 			if (string_search_line(new, res) == -1){
-				/* if not, then i delete it */
+				/* if not, then I delete it */
 				strcat2(&list, "delete ");
 				strcat2(&list, res);
 				strcat2(&list, "\n");
