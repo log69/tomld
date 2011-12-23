@@ -22,6 +22,11 @@
 
 changelog:
 -----------
+23/12/2011 - tomld v0.77 - improve comparison of version numbers to make future compatibility better
+                         - don't replace manager.conf neither in kernel memory nor on disk
+                           but only add the path of my tomld binary if missing
+                         - fix required version numbers of dependencies in documentation
+                         - fix some typos
 05/12/2011 - tomld v0.76 - bugfix: fix checking for security fs of tomoyo
                          - print more descriptive error message when tomoyo is not activated
                          - print "access deny log messages" with timestamp when in learning mode too
@@ -164,7 +169,7 @@ changelog:
                          - bugfix in path_link_read() and path_link_read()
                          - bugfix in which()
                          - bugfix in check_instance() to not let more than 1 instances of tomld running together
-                         - bugifx in domain_get_log() to reread domain data after i change its profile
+                         - bugifx in domain_get_log() to reread domain data after I change its profile
                          - bugfix: switch domain with all its subdomains too to learning mode when managing deny logs
                          - bugfix in domain_reshape_rules_create_double(), space was inserted after parameter2 and not before
                          - bugfix in save(): save log mark only if it's not empty
@@ -328,7 +333,7 @@ changelog:
                          - several bugfix
 27/03/2011 - tomld v0.21 - more bugfixes and code cleanup
                          - change in structure: from now allow_mkdir will cause the file's parent dir to be wildcarded too
-                         - change in structure: i created an exception list for the dirs, so the policy gets a bit tighter with this
+                         - change in structure: I created an exception list for the dirs, so the policy gets a bit tighter with this
                            exception list contains now = "/etc", "/home/any/"
 26/03/2011 - tomld v0.20 - minor bugfixes
                          - some code cleanup
@@ -433,7 +438,7 @@ flow chart:
 /* ------------------------------------------ */
 
 /* program version */
-char *ver = "0.76";
+char *ver = "0.77";
 
 /* my unique id for version compatibility */
 /* this is a remark in the policy for me to know if it's my config
@@ -452,7 +457,7 @@ char *home = "/home";
 /* interval of policy check to run in seconds */
 int const_time_check      = 2;
 int const_time_check_long = 30;
-/* the time of one check cycle above which i send a warning log */
+/* the time of one check cycle above which I send a warning log */
 int const_time_check_warning = 30;
 /* temp vars */
 int const_time_check2;
@@ -467,11 +472,11 @@ int const_time_max_learn = 60 * 60;
 int const_time_min_dchange = 60 * 60;
 /* interval of minimum and maximum time in seconds that needs to pass since domain creation
  * for the domains before switching them to enforcing mode, otherwise it calculates it
- * to make a decision (from i day to 2 weeks) */
+ * to make a decision (from I day to 2 weeks) */
 int const_time_min_dcreate = 60 * 60 * 24 * 1;
 int const_time_max_dcreate = 60 * 60 * 24 * 14;
 /* constant for measuring the complexity of a domain
- * i raise the number of rules of the domain to the power of 2 and
+ * I raise the number of rules of the domain to the power of 2 and
  * multiply it by this factor and compare it to its processes' cpu time */
 int const_domain_complexity_factor = 2;
 
@@ -504,19 +509,15 @@ char *texcf = 0;
 
 /* default profile.conf */
 char *tprof22 = ""
-	"0-COMMENT=-----Disabled Mode-----\n"
 	"0-MAC_FOR_FILE=disabled\n"
 	"0-MAX_ACCEPT_ENTRY="MAX_MEM"\n"
 	"0-TOMOYO_VERBOSE=disabled\n"
-	"1-COMMENT=-----Learning Mode-----\n"
 	"1-MAC_FOR_FILE=learning\n"
 	"1-MAX_ACCEPT_ENTRY="MAX_MEM"\n"
 	"1-TOMOYO_VERBOSE=disabled\n"
-	"2-COMMENT=-----Permissive Mode-----\n"
 	"2-MAC_FOR_FILE=permissive\n"
 	"2-MAX_ACCEPT_ENTRY="MAX_MEM"\n"
 	"2-TOMOYO_VERBOSE=enabled\n"
-	"3-COMMENT=-----Enforcing Mode-----\n"
 	"3-MAC_FOR_FILE=enforcing\n"
 	"3-MAX_ACCEPT_ENTRY="MAX_MEM"\n"
 	"3-TOMOYO_VERBOSE=enabled\n";
@@ -526,14 +527,21 @@ char *tprof23 = ""
 	"PREFERENCE::enforcing={ verbose=yes }\n"
 	"PREFERENCE::learning={ verbose=no max_entry="MAX_MEM" }\n"
 	"PREFERENCE::permissive={ verbose=yes }\n"
-	"0-COMMENT=-----Disabled Mode-----\n"
 	"0-CONFIG={ mode=disabled }\n"
-	"1-COMMENT=-----Learning Mode-----\n"
 	"1-CONFIG={ mode=learning }\n"
-	"2-COMMENT=-----Permissive Mode-----\n"
 	"2-CONFIG={ mode=permissive }\n"
-	"3-COMMENT=-----Enforcing Mode-----\n"
 	"3-CONFIG={ mode=enforcing }\n";
+
+char *tprof24 = ""
+	"PROFILE_VERSION=20100903\n"
+	"0-PREFERENCE={ max_audit_log=1024 max_learning_entry="MAX_MEM" }\n"
+	"0-CONFIG={ mode=disabled grant_log=no reject_log=yes }\n"
+	"1-PREFERENCE={ max_audit_log=1024 max_learning_entry="MAX_MEM" }\n"
+	"1-CONFIG={ mode=learning grant_log=no reject_log=yes }\n"
+	"2-PREFERENCE={ max_audit_log=1024 max_learning_entry="MAX_MEM" }\n"
+	"2-CONFIG={ mode=permissive grant_log=no reject_log=yes }\n"
+	"3-PREFERENCE={ max_audit_log=1024 max_learning_entry="MAX_MEM" }\n"
+	"3-CONFIG={ mode=enforcing grant_log=no reject_log=yes }\n";
 
 /* default manager.conf */
 char *tmanf22 = ""
@@ -549,6 +557,13 @@ char *tmanf23 = ""
 	"/usr/sbin/tomoyo-setlevel\n"
 	"/usr/sbin/tomoyo-setprofile\n"
 	"/usr/sbin/tomoyo-ld-watch\n"
+	"/usr/sbin/tomoyo-queryd\n";
+
+char *tmanf24 = ""
+	"/usr/sbin/tomoyo-loadpolicy\n"
+	"/usr/sbin/tomoyo-editpolicy\n"
+	"/usr/sbin/tomoyo-setlevel\n"
+	"/usr/sbin/tomoyo-setprofile\n"
 	"/usr/sbin/tomoyo-queryd\n";
 
 char *tdir	= "/etc/tomoyo/";
@@ -683,15 +698,15 @@ float t_start;
 
 /* contains domain names with their cpu times and pids (pid process_binary time) for the case
  * when a domain enters learning mode from enforcing mode for user request
- * and i need to calculate process cpu time compared to the moment when tomld started,
- * so i everytime substract all running processes' cputimes in this list from the summary later */
+ * and I need to calculate process cpu time compared to the moment when tomld started,
+ * so I everytime substract all running processes' cputimes in this list from the summary later */
 char *domain_cputime_list_minus = 0;
 /* contains domain names with their cpu times and pids (pid process_binary time)
- * so i can count the formerly terminated processes' cpu times too,
- * this is a runtime list and i save it to domain policy only from time to time */
+ * so I can count the formerly terminated processes' cpu times too,
+ * this is a runtime list and I save it to domain policy only from time to time */
 char *domain_cputime_list_plus  = 0;
 /* contains domain names with their cpu times,
- * this is a runtime list that i use to print domain status, but only if it has changed */
+ * this is a runtime list that I use to print domain status, but only if it has changed */
 char *domain_cputime_list_current = 0;
 
 /* mail */
@@ -745,7 +760,7 @@ void version() {
 	printf ("Copyright (C) 2011 Andras Horvath\n");
 	printf ("E-mail: mail@log69.com - suggestions & feedback are welcome\n");
 	printf ("URL: http://log69.com - the official site\n");
-	printf ("(last update Mon Dec  5 22:07:50 CET 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
+	printf ("(last update Mon Dec  5 22:17:15 CET 2011)\n"); /* last update date c23a662fab3e20f6cd09c345f3a8d074 */
 	printf ("\n");
 	printf ("LICENSE:\n");
 	printf ("This program is free software; you can redistribute it and/or modify it ");
@@ -830,7 +845,7 @@ void help() {
 	printf ("**these options can be used simultaneously with a running tomld daemon\n");
 	printf ("\n");
 	printf ("REQUIREMENTS:\n");
-	printf ("Tomoyo enabled kernel (v2.6.30 and above), tomoyo-tools (v2.2 and above)\n");
+	printf ("Tomoyo enabled kernel (v2.6.30 - 3.0.x), tomoyo-tools (v2.2 - 2.3.x)\n");
 	printf ("and booting the system with \"security=tomoyo\" kernel parameter\n");
 	printf ("\n");
 	printf ("For full documentation and FAQ, see the website: http://log69.com\n");
@@ -922,7 +937,7 @@ void check_notify()
 	int len;
 	long pos = 0;
 
-	/* run client side only if i am non-root */
+	/* run client side only if I am non-root */
 	if (getuid()){
 		if (opt_notify){
 			static int flag_firstrun_notify = 0;
@@ -1105,7 +1120,7 @@ void sand_clock(int dot)
 {
 	static int flag_clock = 0;
 
-	/* i print these only in manual mode, so it won't fill the log in automatic mode */
+	/* I print these only in manual mode, so it won't fill the log in automatic mode */
 	if (opt_manual){
 		if (dot == 1){
 			if (!flag_firstrun){
@@ -1132,33 +1147,68 @@ void sand_clock(int dot)
 }
 
 
+/* convert version string to integer
+ * using maximum 3 version numbers with maximum 3 digits with dots between them
+ * in a format where 2.6.33 returns 002006033 of integer */
+int convert_version_int(char *v){
+	char n;
+	int c, c1, c2, c3, c5, num;
+	int ver = 0;
+
+	c = 0;
+	/* create version numbers */
+	c2 = 1000000;
+	/* get max 3 version numbers with dots between them */
+	c1 = 3;
+	/* get max 3 digits per number */
+	c3 = 3;
+	c5 = 0;
+	num = 0;
+	while (c1){
+		n = v[c++];
+		/* error and exit if number of digits are more than 3 */
+		if (c5 > 3){ ver = 0; break; }
+		if (n != '.'){
+			/* count number of digits in a version number */
+			c5++;
+			/* exit if no numbers or at end of string */
+			if (!(n >= '0' && n <= '9') || !n){
+				ver += num;
+				break;
+			}
+			/* convert string to integer and add it to result */
+			num *= 10;
+			num += c2 * string_ctoi(n);
+		}
+		else{
+			ver += num;
+			num = 0;
+			c2 /= 1000;
+			c1--;
+			c5 = 0;
+		}
+	}
+
+	return ver;
+}
+
+
 /* get kernel version in a format where 2.6.33 will be 263300 */
 int kernel_version()
 {
 	char *v = "/proc/sys/kernel/osrelease";
 	char *buff;
-	int c, c2;
-	char n;
 	static int ver = 0;
 
 	if (ver) return ver;
 
 	/* read kernel version from /proc in a format as 2.6.32-5-amd64 */
 	buff = file_read(v, -1);
-	c = 0;
-	/* create version numbers */
-	c2 = 100000;
-	while (c2){
-		n = buff[c++];
-		if (n != '.'){
-			/* exit if no numbers or at end of string */
-			if (!(n >= '0' && n <= '9') || !n){ free2(buff); return ver; }
-			/* convert string to integer and add it to result */
-			ver += c2 * string_ctoi(n);
-			c2 /= 10;
-		}
-	}
+	/* convert version string to integer */
+	ver = convert_version_int(buff);
 	free2(buff);
+
+	if (!ver){ error("error: kernel version cannot be determined\n"); myexit(1); }
 
 	return ver;
 }
@@ -1168,29 +1218,17 @@ int kernel_version()
 int tomoyo_version()
 {
 	char *buff;
-	char n;
-	int c, c2;
 	static int ver = 0;
 
 	if (ver) return ver;
 
 	/* read version string */
 	buff = file_read(tverk, -1);
-
-	c = 0;
-	/* create version numbers */
-	c2 = 1000;
-	while (c2){
-		n = buff[c++];
-		if (n != '.'){
-			/* exit if no numbers or at end of string */
-			if (!(n >= '0' && n <= '9') || !n){ free2(buff); return ver; }
-			/* convert string to integer and add it to result */
-			ver += c2 * string_ctoi(n);
-			c2 /= 10;
-		}
-	}
+	/* convert version string to integer */
+	ver = convert_version_int(buff);
 	free2(buff);
+
+	if (!ver){ error("error: tomoyo version cannot be determined\n"); myexit(1); }
 
 	return ver;
 }
@@ -1207,7 +1245,7 @@ int path_is_dir_recursive_wildcard(const char *path)
 	l1 = strlen(path);
 
 	/* compare wildcard dir to the end of paths */
-	/* wildcard file's length is longer than dir's, so i compare file first */
+	/* wildcard file's length is longer than dir's, so I compare file first */
 	if (wildcard_recursive_file2_len > l1) return 0;
 	if (!strcmp(wildcard_recursive_file2, path + l1 - wildcard_recursive_file2_len)) return 1;
 
@@ -1464,13 +1502,13 @@ char *path_wildcard_home(char *path)
 
 
 /* wildcard random part of file name */
-/* i consider random part in a file name if it contains only lower and upper case, numbers
+/* I consider random part in a file name if it contains only lower and upper case, numbers
  * and some extra characters, and upper case also from 2nd char - or only numbers */
 /* or if it's a hexadecimal number (also minimum 6 chars, at least 3 nums and 3 alphanums) */
 /* the point is a special char - if the left and right side of the point are random names too
- * (together longer than 6 chars), then i consider the point char to be a part of the random names,
+ * (together longer than 6 chars), then I consider the point char to be a part of the random names,
  * this is because apps divide random names from normal ones by a point in file names */
-/* if this condition doesn't meet, then i return the original name,
+/* if this condition doesn't meet, then I return the original name,
  * cause probably new random name will come later anyway */
 /* returned value must be freed by caller */
 char *path_wildcard_temp_name(char *name)
@@ -1920,7 +1958,7 @@ void stat_print_top_dirs_with_most_entries()
 		temp = new; new2 = 0;
 		while(1){
 			int i;
-			
+
 			/* get next line */
 			res = string_get_next_line(&temp);
 			if (!res) break;
@@ -1941,7 +1979,7 @@ void stat_print_top_dirs_with_most_entries()
 			free2(res);
 		}
 		free2(new); new = new2;
-		
+
 		/* sort new result list in ascending order because of negation */
 		res = string_sort_lines(new, 0);
 		free2(new); new = res;
@@ -1950,7 +1988,7 @@ void stat_print_top_dirs_with_most_entries()
 		temp = new; new2 = 0;
 		while(1){
 			int i;
-			
+
 			/* get next line */
 			res = string_get_next_line(&temp);
 			if (!res) break;
@@ -1971,7 +2009,7 @@ void stat_print_top_dirs_with_most_entries()
 			free2(res);
 		}
 		free2(new); new = new2;
-		
+
 
 		/* remove leading zeros from percentage and print them */
 		temp = new;
@@ -2452,7 +2490,7 @@ void domain_set_profile_for_prog(const char *prog, int profile)
 		/* get next domain policy */
 		res = domain_get_next(&temp);
 		if (!res) break;
-		/* check if domain is a main or subdomain of what i'm looking for */
+		/* check if domain is a main or subdomain of what I'm looking for */
 		res2 = domain_get_name(res);
 		if (res2){
 
@@ -2691,7 +2729,7 @@ int process_get_least_uptime(const char *name)
 
 /* return an integer containing the sum of cpu time of all of the same running processes in clock ticks
  * it doesn't add the cpu times of the running processes at the start time of tomld
- * the flag_clear option decides, whether i reset all processes' cpu time values of the same name,
+ * the flag_clear option decides, whether I reset all processes' cpu time values of the same name,
  * or just read it out */
 /* return null if no process is running like that */
 int domain_get_cpu_time_all(const char *name, int flag_clear)
@@ -3228,14 +3266,14 @@ void load()
 
 /* reload config files from variables to kernel memory */
 /* this is done using "select" and "delete" keywords during file write */
-/* to update rules in an existing domain, i feed the diff data:
+/* to update rules in an existing domain, I feed the diff data:
   select $domainname
   $newrule1
   $newrule2
   delete $rule1
   delete $rule2
   delete $rule3
-  * or if domain doesn't exist, then i create the domain without select keyword,
+  * or if domain doesn't exist, then I create the domain without select keyword,
   * and load the rules without deleting anything:
   $domainname
   $newrule1
@@ -3269,7 +3307,7 @@ void reload()
 		}
 
 		/* safety code: load old policy again to check if it hasn't changed
-		 * since i started creating the new one */
+		 * since I started creating the new one */
 		texcf_old2 = file_read(texck, -1);
 		if (!strcmp(texcf_old, texcf_old2)){
 			/* write changes to kernel */
@@ -3325,7 +3363,7 @@ void reload()
 			if (name1){
 				/* does my new domain exist in the old policy? */
 				if (string_search_line(domain_names_active, name1) == -1){
-					/* if not, then i add it as a full new domain without making any diff */
+					/* if not, then I add it as a full new domain without making any diff */
 					/* add domain name */
 					strcat2(&myappend, name1);
 					strcat2(&myappend, "\n");
@@ -3373,9 +3411,9 @@ void reload()
 				}
 
 				/* append list with the new rules for the domains of the current running process too */
-				/* i do this by searching through the end of all the active domain names,
+				/* I do this by searching through the end of all the active domain names,
 				 * and if my full domain names matches the end of any active domain names,
-				 * then i apply my rules to that one too,
+				 * then I apply my rules to that one too,
 				 * so this way the current running process will have its rules applied on it on-the-fly,
 				 * while it will also enter to my prepared domain after its restart */
 				if (strlen2(&domain_names_active)){
@@ -3430,7 +3468,7 @@ void reload()
 		}
 
 		/* safety code: load old policy again to check if it hasn't changed
-		 * since i started creating the new one */
+		 * since I started creating the new one */
 		tdomf_old2 = file_read(tdomk, -1);
 		if (!strcmp(tdomf_old, tdomf_old2)){
 			/* write changes to kernel */
@@ -3842,10 +3880,10 @@ void check_instance(){
 		myexit(1);
 	}
 	/* if first tomld is in automatic mode and second is in manual,
-	 * then i ask if second tomld should terminate the first one */
+	 * then I ask if second tomld should terminate the first one */
 	else{
 		color("tomld is already running in automatic mode\n", red);
-		if (choice("should i terminate it and run this one?")){
+		if (choice("should I terminate it and run this one?")){
 			int c;
 			if (kill(p, SIGTERM)){
 				error("error: could not terminate other tomld process\n");
@@ -3888,49 +3926,47 @@ void check_instance(){
 /* create profile.conf and manager.conf files and load them to kernel if they are different */
 void create_prof()
 {
-	char *tmanf_old, *tmanf, *tmanf2 = 0, *tprof_old, *tprof, *tprof2, *res;
+	char *tmanf_old, *tmanf = 0, *tprof_old, *tprof = 0, *tprof2, *res;
 
 	/* check tomoyo version */
-	if (tomoyo_version() <= 2299){ tmanf = tmanf22; tprof = tprof22; }
-	else                         { tmanf = tmanf23; tprof = tprof23; }
+	if      (tomoyo_version() >= 2002000 && tomoyo_version() < 2003000){ tmanf = tmanf22; tprof = tprof22; }
+	else if (tomoyo_version() >= 2003000 && tomoyo_version() < 2004000){ tmanf = tmanf23; tprof = tprof23; }
+/*	else if (tomoyo_version() >= 2004000 && tomoyo_version() < 2005000){ tmanf = tmanf24; tprof = tprof24; } */
+	else{ error("error: tomoyo version is not compatible\n"); myexit(1); }
 
-	/* load manager.conf from kernel and check if it's the same what i have */
-	/* if identical, then no reload is needed */
+	/* load manager.conf from kernel */
 	tmanf_old = file_read(tmank, -1);
-	strcpy2(&tmanf2, tmanf);
-
-	/* add my executable too to the binary list in manager.conf */
-	strcat2(&tmanf2, my_exe_path);
-	strcat2(&tmanf2, "\n");
-
-	/* sort lines before compare */
-	res = string_sort_uniq_lines(tmanf_old, 0);
-	free2(tmanf_old); tmanf_old = res;
-	res = string_sort_uniq_lines(tmanf2, 0);
-	free2(tmanf2); tmanf2 = res;
-
-	/* compare kernel manager config and mine */
-	/* reload it to kernel if they are not identical */
-	if (strcmp(tmanf2, tmanf_old) || !file_exist(tman)){
-		int ret = 0;
+	/* check if it contains my tomld binary */
+	if (string_search_line(tmanf_old, my_exe_path) == -1){
+		/* add my executable to the binary list of manager.conf in kernel */
+		char *buff = 0;
 		char *comm = 0;
-		/* write config to disk */
-		file_write(tman, tmanf2);
-		/* load config from disk to kernel */
+		strcat2(&buff, my_exe_path);
+		strcat2(&buff, "\n");
 		strcpy2(&comm, tload);
-		strcat2(&comm, " m");
+		strcat2(&comm, " -m");
 		/* this system() call here is the only one by default and this is unavoidable
 		 * because only the external tomoyo-loadpolicy has the right to upload
 		 * my new manager.conf config to the kernel,
-		 * but from now on i have the right too to change policy through /sys */
-		ret = system(comm);
-		/* command failed? */
-		if (ret == -1 || ret == 127){
-			error("error: could not load manager config to kernel\n"); myexit(1); }
+		 * but from now on I have the right too to change policy through /sys */
+		pipe_write(comm, buff);
+		free2(buff);
 		free2(comm);
 	}
+	free2(tmanf_old);
 
-	/* load profile.conf from kernel and check if it's the same what i have */
+	/* load manager.conf from disk */
+	tmanf_old = file_read(tman, 0);
+	/* check if it contains my tomld binary */
+	if (string_search_line(tmanf_old, my_exe_path) == -1){
+		/* add my executable to the binary list of manager.conf on disk */
+		strcat2(&tmanf_old, my_exe_path);
+		strcat2(&tmanf_old, "\n");
+		file_write(tman, tmanf_old);
+	}
+	free2(tmanf_old);
+
+	/* load profile.conf from kernel and check if it's the same what I have */
 	/* if identical, then no reload is needed */
 	tprof_old = file_read(tprok, -1);
 
@@ -3948,9 +3984,7 @@ void create_prof()
 		file_write(tprok, tprof);
 	}
 
-	free2(tmanf_old);
 	free2(tprof_old);
-	free2(tmanf2);
 	free2(tprof2);
 }
 
@@ -4138,7 +4172,7 @@ void check_tomoyo()
 	int tver;
 
 	/* check availability of tomoyo system compiled into the kernel above 2.6.36 */
-	if (kernel_version() >= 263600){
+	if (kernel_version() >= 2006036){
 		cmd = file_read("/proc/kallsyms", -1);
 		if (string_search_keyword(cmd, "tomoyo_supervisor") == -1){
 			free2(cmd);
@@ -4166,7 +4200,7 @@ void check_tomoyo()
 
 	/* check tomoyo version */
 	tver = tomoyo_version();
-	if (tver < 2200 || tver > 2399){
+	if (tver < 2002000 || tver > 2003999){
 		error("error: tomoyo version is not compatible\n");
 		myexit(1);
 	}
@@ -4437,7 +4471,7 @@ void domain_delete_all()
 		}
 
 		/* safety code: load old policy again to check if it hasn't changed
-		 * since i started changing it */
+		 * since I started changing it */
 		tdomf_old2 = file_read(tdomk, -1);
 		if (!strcmp(tdomf_old, tdomf_old2)){
 			free2(tdomf_old2);
@@ -4515,7 +4549,7 @@ void domain_delete_sub(const char *name)
 		}
 
 		/* safety code: load old policy again to check if it hasn't changed
-		 * since i started changing it */
+		 * since I started changing it */
 		tdomf_old2 = file_read(tdomk, -1);
 		if (!strcmp(tdomf_old, tdomf_old2)){
 			free2(tdomf_old2);
@@ -4639,15 +4673,15 @@ int domain_check_enforcing(char *domain, int flag_info)
 				/* have the processes' cpu time reached a value compared to the complexity
 				 * of the domain? (i measure it by the number of its rules)
 				 * or is the domain's last change time greater than const_time_max_dcreate?
-				 * if so, then i switch the domain to enforcing mode,
+				 * if so, then I switch the domain to enforcing mode,
 				 * but only, if there is no temporary learning mode on currently */
 				flag_enforcing = 0;
 				if ((!flag_learn2) && d_create >= const_time_max_dcreate) flag_enforcing = 1;
 				if (!flag_enforcing){
 					/* a minimum time has to pass since last domain change to let the
-					 * completness of domain grow, or else i reset cpu time of processes
+					 * completness of domain grow, or else I reset cpu time of processes
 					 * but if it is after reboot, then take uptime into account too
-					 * i calculate min time from time of check constant because this is the
+					 * I calculate min time from time of check constant because this is the
 					 * intervall to check if domain has changed */
 					if (s_uptime >= const_time_check_long2 * 2 && d_change < const_time_check_long2 * 2){
 						/* reset cpu times */
@@ -4661,7 +4695,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 					d_rules = string_count_lines(domain) + 10;
 					d_rules = d_rules * d_rules * const_domain_complexity_factor;
 					/* if a particular cpu time has grown compared to the domain complexity
-					 * since the last time of domain change, then i switch domain to enforcing mode */
+					 * since the last time of domain change, then I switch domain to enforcing mode */
 					if (d_rules <= d_cputime + p_cputime) flag_enforcing = 1;
 
 
@@ -4686,7 +4720,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 
 							/* old value match new one? */
 							if (t2 != cputime_all_percent){
-								/* if no, then i will print status info */
+								/* if no, then I will print status info */
 								flag_cputime_change = 1;
 								/* update entry by removing old entry and adding new one */
 								res2 = string_remove_line_from_pos(domain_cputime_list_current, i);
@@ -4747,7 +4781,7 @@ int domain_check_enforcing(char *domain, int flag_info)
 				}
 
 				/* if former conditions satisfy and at least a minimum time has passed since domain
-				 * creation, then i switch the domain to enforcing mode */
+				 * creation, then I switch the domain to enforcing mode */
 				if (d_create >= const_time_min_dcreate && d_change >= const_time_min_dchange && flag_enforcing){
 
 					if (flag_info){
@@ -4809,7 +4843,7 @@ void domain_info(const char *pattern)
 			prof = domain_get_profile(res);
 
 			/* get first line */
-			/* here res2 should be something, so i don't check data availability */
+			/* here res2 should be something, so I don't check data availability */
 			res2 = domain_get_name_full(res);
 
 			/* search for a keyword */
@@ -5515,7 +5549,7 @@ void domain_set_enforce_old()
 				free2(res);
 				/* get domain profile */
 				m = domain_get_profile(orig);
-				/* there are old enforcing mode domains, i have the answer, so quit */
+				/* there are old enforcing mode domains, I have the answer, so quit */
 				if (m == 3){ flag_old = 1; break; }
 			}
 
@@ -5564,7 +5598,7 @@ void domain_set_enforce_old()
 			/* reload them to kernel */
 			reload();
 
-			/* did i switch any old domain to enforcing mode? */
+			/* did I switch any old domain to enforcing mode? */
 			if (!flag_turned){
 				if (flag_old) color("* all old domains in enforcing mode already\n", green);
 				else color("* no domains in enforcing mode currently\n", green);
@@ -5678,7 +5712,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 			i = string_search_keyword_first_all(start, *tmarkfx);
 			if (i > -1){
 				start += i;
-				/* jump after the next line where i found the log mark */
+				/* jump after the next line where I found the log mark */
 				string_jump_next_line(&start);
 			}
 			/* clear tmarkf if no previous log mark found */
@@ -5691,7 +5725,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 
 		/* search for tomoyo error messages from mark */
 		/* collect access deny messages */
-		if (tomoyo_version() <= 2299) strcpy2(&key, " TOMOYO-ERROR: Access ");
+		if (tomoyo_version() < 2003000) strcpy2(&key, " TOMOYO-ERROR: Access ");
 		else strcpy2(&key, " ERROR: Access ");
 		temp = start;
 		while(1){
@@ -5710,7 +5744,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 			}
 		}
 		/* collect domain deny messages */
-		if (tomoyo_version() <= 2299) strcpy2(&key, " TOMOYO-ERROR: Domain ");
+		if (tomoyo_version() < 2003000) strcpy2(&key, " TOMOYO-ERROR: Domain ");
 		else strcpy2(&key, " ERROR: Domain ");
 		temp = start;
 		while(1){
@@ -5775,12 +5809,12 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 		/* ----- convert logs to rules ----- */
 		/* --------------------------------- */
 
-		if (tomoyo_version() <= 2299){ l = 23; l2 = 32; }
+		if (tomoyo_version() < 2003000){ l = 23; l2 = 32; }
 		else{ l = 15; l2 = 24; }
 
 		/* convert domain deny messages to access deny types
 		 * by creating a rule from it with an allow_execute type,
-		 * so when i later check the deny rules, i will create
+		 * so when I later check the deny rules, I will create
 		 * a domain for the allow_execute type if missing */
 		temp = tlogf3;
 		while(1){
@@ -5814,7 +5848,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 			res2[i] = 0;
 			strlenset3(&res2, i);
 			/* put together the rule with an allow_execute type */
-			/* i take all domain names with the subdomains except the last one,
+			/* I take all domain names with the subdomains except the last one,
 			 * this one will be the calling domain while that one will be the
 			 * parameter after the allow_execute command */
 			temp3 = res2;
@@ -5879,7 +5913,7 @@ char *domain_get_rules_from_syslog(char *tmarkx, char **tmarkfx, int *tlogf_mod_
 
 			/* get parameters of rule */
 			/* search the position of "denied for " text,
-			 * so i know that all the text before is the parameters of the rule */
+			 * so I know that all the text before is the parameters of the rule */
 			i = string_search_keyword(temp2, key2);
 			if (i == -1){
 				error("error: unexpected error, log message format is not correct\n");
@@ -6143,7 +6177,7 @@ void domain_get_log()
 
 
 
-		/* clear learn flag, because i want to allow temporary learning mode only for those domains,
+		/* clear learn flag, because I want to allow temporary learning mode only for those domains,
 		 * that had access deny logs just now,
 		 * the rest of the enforcing mode domains should stay as they are for security reasons */
 		flag_learn = 0;
@@ -6459,8 +6493,8 @@ void domain_print_mode()
 				strcat2(&tdomf, prog);
 				strcat2(&tdomf, "\nuse_profile 1\n");
 				/* add a rule with my unique id and the time in seconds
-				 * to know when i created this domain and when it changed last time
-				 * so i will know from the uptime of the process
+				 * to know when I created this domain and when it changed last time
+				 * so I will know from the uptime of the process
 				 * if it was restarted at least once since domain creation */
 				t = string_ltos(time(0));
 				strcat2(&tdomf, myuid_create);
@@ -6561,7 +6595,7 @@ void domain_print_mode()
 
 
 /* compare names conatining wildcards of "\\*" char */
-/* i check only the left most and right most parts of the "*" chars at the edge,
+/* I check only the left most and right most parts of the "*" chars at the edge,
  * no matter how many "*" chars are in the name,
  * cause more than 1 means the middle tags may be combined any way */
 int compare_names(char *name1, char *name2)
@@ -6849,7 +6883,7 @@ int compare_paths(char *path1, char *path2)
 		strlenset3(&s2, i);
 
 		/* if any of the subdir name contains recursive wildcard, then success */
-		/* i check full name of recursive wildcards only at the end */
+		/* I check full name of recursive wildcards only at the end */
 		/* recursive wildcard somewhere in the name is not supported */
 		w1 = strcmp(s1, wildcard_recursive_plain);
 		w2 = strcmp(s2, wildcard_recursive_plain);
@@ -7042,7 +7076,7 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 			/* get filename part of path */
 			char *res3 = path_get_filename(path);
 			/* does filename contain any wildcard?
-			 * if so, then i don't compare and don't replace the path with anything
+			 * if so, then I don't compare and don't replace the path with anything
 			 * cause it may happen, that one of the path contains a wildcard
 			 * as the first char, the other path may have it as the last char,
 			 * and they will always match */
@@ -7114,7 +7148,7 @@ char *compare_path_search_path_in_list_first_subdirs(char *list, char *path)
 						strlenset3(&new2, in2);
 
 						/* compare subnames */
-						/* if both contain wildcard, then i prefer the one from list (path1)
+						/* if both contain wildcard, then I prefer the one from list (path1)
 						 * or the one that is not null */
 						if (flag1)               strcat2(&new, new1);
 						else if (flag2)          strcat2(&new, new2);
@@ -7238,9 +7272,9 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 			/* success, store it on match and exit */
 			strcpy2(&path_new1, res2);
 
-			/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
-			 * to recursive dirs, so i have to calculate dir depth */
-			if (tomoyo_version() <= 2299){
+			/* if tomoyo version is under 2.3.x, then I have to manually add many "\*" wildcards
+			 * to recursive dirs, so I have to calculate dir depth */
+			if (tomoyo_version() < 2003000){
 				/* check if depth is already caclulated yet */
 				c = dirs_recursive_depth[i];
 				if (c == -1){
@@ -7287,9 +7321,9 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 				/* success, store it on match and exit */
 				strcpy2(&path_new2, res2);
 
-				/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
-				 * to recursive dirs, so i have to calculate dir depth */
-				if (tomoyo_version() <= 2299){
+				/* if tomoyo version is under 2.3.x, then I have to manually add many "\*" wildcards
+				 * to recursive dirs, so I have to calculate dir depth */
+				if (tomoyo_version() < 2003000){
 					/* check if depth is already caclulated yet */
 					c = dirs_recursive_depth[i];
 					if (c == -1){
@@ -7325,9 +7359,9 @@ char *domain_get_rules_with_recursive_dirs(char *rule)
 	rules_new = memget2(MAX_CHAR);
 
 	/* add new rules with recursive wildcard if any match */
-	/* if tomoyo version is under 2.3.x, then i have to manually add many "\*" wildcards
+	/* if tomoyo version is under 2.3.x, then I have to manually add many "\*" wildcards
 	 * to recursive dirs */
-	if (tomoyo_version() <= 2299){
+	if (tomoyo_version() < 2003000){
 		/* only 1 param? */
 		if (!path2){
 			if (count1){
@@ -7554,7 +7588,7 @@ char *domain_sort_uniq_rules(char *rules)
 		/* count wildcards in rule */
 		/* search for recursive wildcard */
 		/* if there is a recursive wildcard in the path of the rule,
-		 * then i mark it as if it had many wildcard to choose rather this
+		 * then I mark it as if it had many wildcard to choose rather this
 		 * instead of the one without recursive wildcard */
 		if (path_is_dir_recursive_wildcard(param1) || path_is_dir_recursive_wildcard(param2)) c1 = 9999;
 		else{
@@ -8015,10 +8049,10 @@ void domain_reshape_rules_wildcard_spec()
 	 * so this exact dir should be wildcarded too with the files in it */
 	char *cre2[] = {"allow_mkdir", 0};
 
-	/* these are rule types to which i always add a second parameter 0-0xFFFFFFFF */
+	/* these are rule types to which I always add a second parameter 0-0xFFFFFFFF */
 	char *cre3[] = {"allow_ioctl", "allow_chown", "allow_chgrp", 0};
 
-	/* these are rule types to which i always add a second parameter FFFF
+	/* these are rule types to which I always add a second parameter FFFF
 	 * because in kernel 2.6.36 and above Tomoyo checks for DAC's permission
 	 * more info on kernel differences: http://tomoyo.sourceforge.jp/comparison.html */
 	char *cre4[] = {"allow_create", "allow_mkdir", "allow_mkfifo", "allow_mksock", "allow_chmod", 0};
@@ -8155,7 +8189,7 @@ void domain_reshape_rules_wildcard_spec()
 						}
 
 						/* wildcard param2 if it exists, or always add it above kernel 2.6.36 */
-						if (param2 || (kernel_version() >= 263600)){
+						if (param2 || (kernel_version() >= 2006036)){
 							strcpy2(&param2, "0-0xFFFFFFFF");
 						}
 					}
@@ -8171,7 +8205,7 @@ void domain_reshape_rules_wildcard_spec()
 					if (param2){
 
 						/* wildcard param2 if it exists, or always add it above kernel 2.6.36 */
-						if (kernel_version() >= 263600){
+						if (kernel_version() >= 2006036){
 							strcpy2(&param2, "0-0xFFFF");
 						}
 					}
@@ -8343,7 +8377,7 @@ void domain_reshape_rules_create_double()
 				strcat2(&tdomf_new, param2);
 			}
 			else{
-				if (kernel_version() >= 263600){
+				if (kernel_version() >= 2006036){
 					strcat2(&tdomf_new, " ");
 					strcat2(&tdomf_new, "0-0xFFFF");
 				}
@@ -8890,7 +8924,7 @@ void domain_reshape_rules()
 
 /* update the change time entries in the domains whose rules or profile changed since last time
  * except my uid entries
- * i reset last changed time even if it is because of another domain's change,
+ * I reset last changed time even if it is because of another domain's change,
  * because after switching the domain to enforcing mode,
  * the rules cannot be changed anymore (except by user request for temporary learning mode) */
 void domain_update_change_time()
@@ -8961,21 +8995,21 @@ void domain_update_change_time()
 			}
 
 			/* if there was no match, then this is a new domain,
-			 * so i add it to new policy */
+			 * so I add it to new policy */
 			if (!flag_match){
 				strcat2(&tdomf_new, d1);
 				strcat2(&tdomf_new, "\n");
 			}
 			else{
 				/* if there was a match and they are the same,
-				 * then i also add the domain to new policy */
+				 * then I also add the domain to new policy */
 				if (!flag_change){
 					strcat2(&tdomf_new, d1);
 					strcat2(&tdomf_new, "\n");
 				}
 				else{
 					/* if no match, then update current domain's policy by
-					 * copying every rule except my uuid that i change before */
+					 * copying every rule except my uuid that I change before */
 					int flag_one_change_entry = 0;
 					temp3 = d1;
 					while(1){
@@ -9023,7 +9057,7 @@ void domain_update_change_time()
 
 /* update the cpu time entries of all domains
  * this must be one of the last operation to run (it's in finish()),
- * because here i add together the summary of all cpu time values */
+ * because here I add together the summary of all cpu time values */
 void domain_update_cpu_time_all()
 {
 	char *name, *ptime, *tdomf_new;
@@ -9879,7 +9913,7 @@ void finish()
 
 			/* update cpu times of all domains in domain policy */
 			/* this must be one of the last operation to run, because here
-			 * i add together the summary of all cpu time values */
+			 * I add together the summary of all cpu time values */
 			domain_update_cpu_time_all();
 
 			/* save configs to disk */
@@ -9968,7 +10002,7 @@ int main(int argc, char **argv)
 	 * this is an infinite cycle */
 	check_notify();
 
-	/* check if i am root */
+	/* check if I am root */
 	if (getuid()) { error("error: root privilege needed\n"); myexit(1); }
 
 	/* clear log (root priv needed from here) */
