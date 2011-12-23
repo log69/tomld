@@ -167,7 +167,7 @@ This program is distributed in the hope that it will be useful, but WITHOUT ANY 
 You should have received a copy of the GNU General Public License along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 .SH REQUIREMENTS
-Tomoyo enabled kernel (v2.6.30 and above), tomoyo-tools (v2.2 and above) and booting the system with "security=tomoyo" kernel parameter.
+Tomoyo enabled kernel (v2.6.30 - 3.0.x), tomoyo-tools (v2.2 - 2.3.x) and booting the system with "security=tomoyo" kernel parameter.
 
 .SH "SEE ALSO"
 The full documentation for \fBtomld\fR is available on the website: \fBhttp://log69.com\fR
