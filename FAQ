@@ -28,7 +28,7 @@ There's no need to use the command line even on the desktop. The package creates
 
 What are the requirements?
 
-Tomld is a Linux only solution, so you need a Linux kernel version 2.6.30 or above with Tomoyo compiled in it (this is the version where Tomoyo was introduced into the mainline kernel) and you also need the Tomoyo tools to be installed.
+Tomld is a Linux only solution, you need a Linux kernel (v2.6.30 - 3.0.x) with Tomoyo compiled in it, you also need the Tomoyo tools to be installed (v2.2 - 2.3.x) and you need to boot the system with "security=tomoyo" kernel parameter.
 
 On a Debian or Ubuntu system, install tomoyo-tools package.
 
@@ -187,4 +187,3 @@ Other remarks
 Errata
 
 - none that I know of currently
-
